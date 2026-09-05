@@ -51,7 +51,7 @@ function formatRoleLabel(role: SystemUserRole) {
 
 export default function UsersPage() {
   const { toast } = useToast();
-  const [users, setUsers] = useState<SystemUser[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<SystemUser[]>([]);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -68,7 +68,7 @@ export default function UsersPage() {
   const loadUsers = async () => {
     try {
       const res = await getUsersAction();
-      if (res.success && res.users && res.users.length > 0) {
+      if (res.success && res.users) {
         setUsers(
           res.users.map((u) => ({
             id: u.id,
@@ -81,7 +81,7 @@ export default function UsersPage() {
         );
       }
     } catch {
-      // Keep initial users on network failure
+      setError("Unable to load users from the database.");
     } finally {
       setLoading(false);
     }
@@ -356,7 +356,6 @@ export default function UsersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[110px]">User ID</TableHead>
                 <TableHead>User Name</TableHead>
                 <TableHead>Email Address</TableHead>
                 <TableHead>Role</TableHead>
@@ -367,7 +366,7 @@ export default function UsersPage() {
             <TableBody>
               {loading && users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                  <TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground">
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                       <span>Loading users...</span>
@@ -376,7 +375,7 @@ export default function UsersPage() {
                 </TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                  <TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground">
                     No users found.
                   </TableCell>
                 </TableRow>
@@ -386,7 +385,6 @@ export default function UsersPage() {
 
                   return (
                     <TableRow key={u.id}>
-                      <TableCell className="font-mono text-[11px] text-muted-foreground truncate max-w-[110px]">{u.id}</TableCell>
                       <TableCell className="font-medium text-xs">{u.name}</TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{u.email}</TableCell>
                       <TableCell>

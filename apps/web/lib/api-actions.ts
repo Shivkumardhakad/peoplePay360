@@ -3,34 +3,9 @@
 import { prisma } from "@peoplepay360/db";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
-import { createHmac } from "node:crypto";
-import { getServerSession } from "next-auth";
-import { authOptions } from "./auth";
+import { payrollApiFetch } from "@/lib/payroll-api";
 
 const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:4000/api/hr";
-
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  try {
-    const session = await getServerSession(authOptions);
-    const user = {
-      id: session?.user?.id || "admin-system-id",
-      email: session?.user?.email || "admin@peoplepay360.com",
-      role: session?.user?.role || "ADMIN",
-      employeeId: session?.user?.employeeId || null,
-      exp: Date.now() + 8 * 60 * 60 * 1000,
-    };
-    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "secret_for_local_development_only_12345";
-    const encoded = Buffer.from(JSON.stringify(user)).toString("base64url");
-    const signature = createHmac("sha256", secret).update(encoded).digest("base64url");
-    const token = `${encoded}.${signature}`;
-    return {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    };
-  } catch {
-    return { "Content-Type": "application/json" };
-  }
-}
 
 // -------------------------------------------------------------
 // EMPLOYEES
@@ -47,24 +22,15 @@ export async function createEmployeeAction(data: {
   status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED";
 }) {
   const prismaStatus = data.status === "INACTIVE" ? "TERMINATED" : data.status;
-  const normalizedEmail = data.email.trim().toLowerCase();
-
-  // Pre-check for existing employee with same email
-  const existing = await prisma.employee.findFirst({
-    where: { email: { equals: normalizedEmail, mode: "insensitive" } },
-  });
-  if (existing) {
-    return { success: false, error: `An employee with email "${data.email}" already exists.` };
-  }
 
   try {
     const res = await fetch(`${HR_API_URL}/employees`, {
       method: "POST",
-      headers: await getAuthHeaders(),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         firstName: data.firstName,
         lastName: data.lastName,
-        email: normalizedEmail,
+        email: data.email,
         phone: data.phone || null,
         hireDate: new Date(data.dateOfJoining),
         status: prismaStatus,
@@ -76,14 +42,9 @@ export async function createEmployeeAction(data: {
       const created = await res.json();
       revalidatePath("/employees");
       return { success: true, employee: created };
-    } else {
-      const errData = await res.json().catch(() => null);
-      if (errData?.message) {
-        return { success: false, error: Array.isArray(errData.message) ? errData.message.join(", ") : errData.message };
-      }
     }
   } catch {
-    // Fallback to local Prisma client
+    // Fallback
   }
 
   try {
@@ -92,7 +53,7 @@ export async function createEmployeeAction(data: {
         employeeNumber: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
         firstName: data.firstName,
         lastName: data.lastName,
-        email: normalizedEmail,
+        email: data.email,
         phone: data.phone || null,
         hireDate: new Date(data.dateOfJoining),
         status: prismaStatus,
@@ -101,146 +62,7 @@ export async function createEmployeeAction(data: {
     revalidatePath("/employees");
     return { success: true, employee: fallback };
   } catch (err: unknown) {
-    if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "P2002") {
-      return { success: false, error: `An employee with email "${data.email}" already exists.` };
-    }
     const msg = err instanceof Error ? err.message : "Failed to create employee";
-    if (msg.includes("Unique constraint failed")) {
-      return { success: false, error: `An employee with email "${data.email}" already exists.` };
-    }
-    return { success: false, error: msg };
-  }
-}
-
-export async function updateEmployeeAction(
-  employeeId: string,
-  data: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone?: string;
-    department?: string;
-    jobPosition?: string;
-    dateOfJoining?: string;
-    status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED";
-  }
-) {
-  const prismaStatus = data.status === "INACTIVE" ? "TERMINATED" : data.status;
-  const normalizedEmail = data.email.trim().toLowerCase();
-
-  try {
-    const res = await fetch(`${HR_API_URL}/employees/${employeeId}`, {
-      method: "PATCH",
-      headers: await getAuthHeaders(),
-      body: JSON.stringify({
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: normalizedEmail,
-        phone: data.phone || null,
-        hireDate: data.dateOfJoining ? new Date(data.dateOfJoining) : undefined,
-        status: prismaStatus,
-      }),
-      cache: "no-store",
-    });
-
-    if (res.ok) {
-      const updated = await res.json();
-      revalidatePath("/employees");
-      revalidatePath(`/employees/${employeeId}`);
-      return { success: true, employee: updated };
-    } else {
-      const errData = await res.json().catch(() => null);
-      if (errData?.message) {
-        return { success: false, error: Array.isArray(errData.message) ? errData.message.join(", ") : errData.message };
-      }
-    }
-  } catch {
-    // Fallback to local Prisma client
-  }
-
-  try {
-    // 1. Locate the employee record to update by ID, employeeNumber, or email
-    let existing = await prisma.employee.findFirst({
-      where: {
-        OR: [
-          { id: employeeId },
-          { employeeNumber: employeeId },
-          { email: normalizedEmail },
-        ],
-      },
-    });
-
-    // 2. Check if another employee is already using this email
-    if (existing) {
-      const conflict = await prisma.employee.findFirst({
-        where: {
-          email: { equals: normalizedEmail, mode: "insensitive" },
-          NOT: { id: existing.id },
-        },
-      });
-      if (conflict) {
-        return { success: false, error: `An employee with email "${data.email}" already exists.` };
-      }
-
-      const updated = await prisma.employee.update({
-        where: { id: existing.id },
-        data: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: normalizedEmail,
-          phone: data.phone || null,
-          hireDate: data.dateOfJoining ? new Date(data.dateOfJoining) : undefined,
-          status: prismaStatus,
-        },
-      });
-      revalidatePath("/employees");
-      revalidatePath(`/employees/${employeeId}`);
-      return { success: true, employee: updated };
-    } else {
-      // Check if email already used before creating fallback
-      const conflict = await prisma.employee.findFirst({
-        where: { email: { equals: normalizedEmail, mode: "insensitive" } },
-      });
-      if (conflict) {
-        // Update that existing record instead of throwing unique constraint error
-        const updated = await prisma.employee.update({
-          where: { id: conflict.id },
-          data: {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            phone: data.phone || null,
-            hireDate: data.dateOfJoining ? new Date(data.dateOfJoining) : undefined,
-            status: prismaStatus,
-          },
-        });
-        revalidatePath("/employees");
-        revalidatePath(`/employees/${employeeId}`);
-        return { success: true, employee: updated };
-      }
-
-      const fallback = await prisma.employee.create({
-        data: {
-          employeeNumber: employeeId.startsWith("EMP-") ? employeeId : `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: normalizedEmail,
-          phone: data.phone || null,
-          hireDate: data.dateOfJoining ? new Date(data.dateOfJoining) : new Date(),
-          status: prismaStatus,
-        },
-      });
-      revalidatePath("/employees");
-      revalidatePath(`/employees/${employeeId}`);
-      return { success: true, employee: fallback };
-    }
-  } catch (err: unknown) {
-    if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "P2002") {
-      return { success: false, error: `An employee with email "${data.email}" already exists.` };
-    }
-    const msg = err instanceof Error ? err.message : "Failed to update employee";
-    if (msg.includes("Unique constraint failed")) {
-      return { success: false, error: `An employee with email "${data.email}" already exists.` };
-    }
     return { success: false, error: msg };
   }
 }
@@ -265,6 +87,24 @@ export async function getEmployeesAction() {
   } catch {
     return [];
   }
+}
+
+export async function updateEmployeeAction(employeeId: string, data: {
+  firstName: string; lastName: string; email: string; phone?: string; department?: string; jobPosition?: string; dateOfJoining?: string; status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED";
+}) {
+  try {
+    const employee = await prisma.employee.update({ where: { id: employeeId }, data: { firstName: data.firstName, lastName: data.lastName, email: data.email.trim().toLowerCase(), phone: data.phone || null, ...(data.dateOfJoining ? { hireDate: new Date(data.dateOfJoining) } : {}), status: data.status === "INACTIVE" ? "TERMINATED" : data.status } });
+    revalidatePath("/employees");
+    revalidatePath(`/employees/${employeeId}`);
+    return { success: true, employee };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to update employee" };
+  }
+}
+
+export async function getPayrollEligibleEmployeesAction() {
+  const employees = await prisma.employee.findMany({ where: { status: "ACTIVE" }, orderBy: { lastName: "asc" }, include: { department: true, contracts: { where: { status: "ACTIVE" }, orderBy: { startDate: "desc" }, take: 1 } } });
+  return employees.map((employee) => ({ id: employee.id, employeeNumber: employee.employeeNumber, name: `${employee.firstName} ${employee.lastName}`, department: employee.department?.name ?? "-", wage: Number(employee.contracts[0]?.baseSalary ?? 0) }));
 }
 
 // -------------------------------------------------------------
@@ -453,37 +293,15 @@ export async function createAttendanceAction(data: {
   remarks?: string;
 }) {
   try {
-    const checkInDate = data.checkIn ? new Date(`${data.date}T${data.checkIn}:00`) : new Date(`${data.date}T09:00:00`);
-    const checkOutDate = data.checkOut ? new Date(`${data.date}T${data.checkOut}:00`) : undefined;
-
-    const res = await fetch(`${HR_API_URL}/attendance`, {
-      method: "POST",
-      headers: await getAuthHeaders(),
-      body: JSON.stringify({
-        employeeId: data.employeeId,
-        date: new Date(data.date),
-        checkIn: checkInDate,
-        checkOut: checkOutDate,
-        status: data.status,
-      }),
-      cache: "no-store",
-    });
-
-    if (res.ok) {
-      revalidatePath("/attendance");
-      return { success: true, attendance: await res.json() };
-    }
-  } catch {
-    // Fallback to direct Prisma handling below
-  }
-
-  try {
     // 1. Resolve real employee ID (support cuid, employeeNumber, or session name)
+    const requestedEmployeeId = data.employeeId.trim();
+    const linkedUser = await prisma.user.findUnique({ where: { id: requestedEmployeeId }, select: { employeeId: true } });
     const employee = await prisma.employee.findFirst({
       where: {
         OR: [
-          { id: data.employeeId },
-          { employeeNumber: data.employeeId },
+          { id: requestedEmployeeId },
+          { employeeNumber: requestedEmployeeId },
+          ...(linkedUser?.employeeId ? [{ id: linkedUser.employeeId }] : []),
         ],
       },
       include: {
@@ -495,7 +313,7 @@ export async function createAttendanceAction(data: {
     });
 
     if (!employee) {
-      return { success: false, error: `Employee record not found for "${data.employeeId}"` };
+      return { success: false, error: `Employee record not found for "${requestedEmployeeId}"` };
     }
 
     const realEmployeeId = employee.id;
@@ -519,6 +337,11 @@ export async function createAttendanceAction(data: {
     }
 
     // 3. Upsert into PostgreSQL database
+    const employeeExists = await prisma.employee.count({ where: { id: realEmployeeId } });
+    if (employeeExists !== 1) {
+      return { success: false, error: `Employee relation is missing for "${requestedEmployeeId}". Refresh employees and try again.` };
+    }
+
     const record = await prisma.attendance.upsert({
       where: {
         employeeId_date: {
@@ -590,28 +413,6 @@ export async function createTimeOffRequestAction(data: {
   reason?: string;
 }) {
   try {
-    const res = await fetch(`${HR_API_URL}/time-off/requests`, {
-      method: "POST",
-      headers: await getAuthHeaders(),
-      body: JSON.stringify({
-        employeeId: data.employeeId,
-        leaveTypeId: data.leaveTypeId,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        reason: data.reason || "Personal Leave",
-      }),
-      cache: "no-store",
-    });
-
-    if (res.ok) {
-      revalidatePath("/time-off/requests");
-      return { success: true, request: await res.json() };
-    }
-  } catch {
-    // Fallback to direct Prisma handling below
-  }
-
-  try {
     const employee = await prisma.employee.findFirst({
       where: {
         OR: [
@@ -675,7 +476,7 @@ export async function updateLeaveRequestStatusAction(id: string, status: "APPROV
   try {
     const res = await fetch(`${HR_API_URL}/time-off/requests/${id}/status`, {
       method: "PATCH",
-      headers: await getAuthHeaders(),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
       cache: "no-store",
     });
@@ -706,76 +507,163 @@ export async function updateLeaveRequestStatusAction(id: string, status: "APPROV
 // -------------------------------------------------------------
 
 export async function computePayrunAction(payrunId: string) {
-  try {
-    const res = await fetch(`${HR_API_URL}/payroll/payruns/${payrunId}/compute`, {
-      method: "POST",
-      headers: await getAuthHeaders(),
-      cache: "no-store",
-    });
-    if (res.ok) {
-      revalidatePath(`/payroll/payruns/${payrunId}`);
-      return { success: true, result: await res.json() };
-    }
-  } catch {
-    // Emulated success for client transition
-  }
-
+  const result = await payrollApiFetch(`/api/payroll/payruns/${payrunId}/compute`, { method: "POST" });
   revalidatePath(`/payroll/payruns/${payrunId}`);
-  return { success: true, status: "COMPUTED" };
+  return { success: true, result };
+}
+
+export async function getTimeOffTypesAction() {
+  return prisma.timeOffType.findMany({ orderBy: { name: "asc" } });
+}
+
+export async function getAllocationsAction() {
+  const rows = await prisma.allocation.findMany({ orderBy: { periodStart: "desc" }, include: { employee: true, timeOffType: true } });
+  return rows.map((row) => ({ id: row.id, employeeId: row.employeeId, employee: `${row.employee.firstName} ${row.employee.lastName}`, type: row.timeOffType.name, allocated: Number(row.allocated), used: Number(row.consumed), remaining: Number(row.remaining ?? Number(row.allocated) - Number(row.consumed)) }));
+}
+
+export async function createAllocationAction(data: { employeeId: string; timeOffTypeId: string; allocated: number; periodStart: string; periodEnd: string }) {
+  try {
+    const employee = await prisma.employee.findFirst({ where: { OR: [{ id: data.employeeId }, { employeeNumber: data.employeeId }] } });
+    if (!employee) return { success: false, error: "Selected employee was not found in the database." };
+    const type = await prisma.timeOffType.findUnique({ where: { id: data.timeOffTypeId } });
+    if (!type) return { success: false, error: "Selected time-off type was not found in the database." };
+    const allocation = await prisma.allocation.upsert({
+      where: { employeeId_timeOffTypeId_periodStart_periodEnd: { employeeId: employee.id, timeOffTypeId: type.id, periodStart: new Date(data.periodStart), periodEnd: new Date(data.periodEnd) } },
+      update: { allocated: data.allocated, remaining: data.allocated },
+      create: { employeeId: employee.id, timeOffTypeId: type.id, periodStart: new Date(data.periodStart), periodEnd: new Date(data.periodEnd), allocated: data.allocated, consumed: 0, remaining: data.allocated },
+    });
+    revalidatePath("/time-off/allocations");
+    return { success: true, allocation };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to grant allocation" };
+  }
+}
+
+export async function getTimeOffRequestsAction() {
+  const rows = await prisma.timeOffRequest.findMany({ orderBy: { createdAt: "desc" }, include: { employee: true, timeOffType: true } });
+  return rows.map((row) => ({ id: row.id, employeeId: row.employeeId, employee: `${row.employee.firstName} ${row.employee.lastName}`, type: row.timeOffType.name, dates: `${row.startDate.toISOString().slice(0, 10)} to ${row.endDate.toISOString().slice(0, 10)}`, duration: `${Number(row.quantity)} ${row.timeOffType.unit === "DAYS" ? "Days" : "Hours"}`, status: row.status === "APPROVED" ? "Approved" : row.status === "REJECTED" ? "Rejected" : row.status === "CANCELLED" ? "Cancelled" : "Pending" }));
+}
+
+export async function getHrDashboardAction() {
+  const [employees, attendance, pendingLeave, approvedLeave, departments] = await Promise.all([
+    prisma.employee.count({ where: { status: { not: "TERMINATED" } } }),
+    prisma.attendance.findMany({ where: { date: { gte: new Date(Date.now() - 30 * 86400000) } }, select: { status: true } }),
+    prisma.timeOffRequest.count({ where: { status: "SUBMITTED" } }),
+    prisma.timeOffRequest.aggregate({ where: { status: "APPROVED", startDate: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } }, _sum: { quantity: true } }),
+    prisma.department.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { employees: true } } } }),
+  ]);
+  const attendanceRate = attendance.length ? Math.round((attendance.filter((item) => ["PRESENT", "REMOTE"].includes(item.status)).length / attendance.length) * 1000) / 10 : 0;
+  return { headcount: employees, attendanceRate, pendingLeave, approvedLeave: Number(approvedLeave._sum.quantity ?? 0), departments: departments.map((department) => ({ name: department.name, total: department._count.employees })) };
 }
 
 export async function validatePayrunAction(payrunId: string) {
-  try {
-    const res = await fetch(`${HR_API_URL}/payroll/payruns/${payrunId}/validate`, {
-      method: "POST",
-      headers: await getAuthHeaders(),
-      cache: "no-store",
-    });
-    if (res.ok) {
-      revalidatePath(`/payroll/payruns/${payrunId}`);
-      return { success: true, result: await res.json() };
-    }
-  } catch {
-    // Fallback
-  }
-
+  const result = await payrollApiFetch(`/api/payroll/payruns/${payrunId}/validate`, { method: "POST" });
   revalidatePath(`/payroll/payruns/${payrunId}`);
-  return { success: true, status: "VALIDATED" };
+  return { success: true, result };
 }
 
 export async function markPayrunPaidAction(payrunId: string) {
-  try {
-    const res = await fetch(`${HR_API_URL}/payroll/payruns/${payrunId}/mark-paid`, {
-      method: "POST",
-      headers: await getAuthHeaders(),
-      cache: "no-store",
-    });
-    if (res.ok) {
-      revalidatePath(`/payroll/payruns/${payrunId}`);
-      return { success: true, result: await res.json() };
-    }
-  } catch {
-    // Fallback
-  }
-
+  const result = await payrollApiFetch(`/api/payroll/payruns/${payrunId}/pay`, { method: "POST" });
   revalidatePath(`/payroll/payruns/${payrunId}`);
-  return { success: true, status: "PAID" };
+  return { success: true, result };
 }
 
 export async function sendPayrunPayslipsAction(payrunId: string) {
-  try {
-    const res = await fetch(`${HR_API_URL}/payroll/payruns/${payrunId}/send-payslips`, {
-      method: "POST",
-      cache: "no-store",
-    });
-    if (res.ok) {
-      return { success: true, message: "Payslips sent to employees via email." };
-    }
-  } catch {
-    // Fallback
-  }
+  return { success: false, message: `Payslip email delivery is not available in Java API yet (payrun ${payrunId}).` };
+}
 
-  return { success: true, message: "Payslips distributed successfully to 124 employees." };
+export async function listPayrollRulesAction() {
+  return payrollApiFetch<unknown[]>("/api/payroll/salary-rules");
+}
+
+export async function listPayrollCategoriesAction() {
+  return payrollApiFetch<unknown[]>("/api/payroll/salary-rule-categories");
+}
+
+export async function createPayrollRuleAction(body: unknown) {
+  try {
+    const result = await payrollApiFetch("/api/payroll/salary-rules", { method: "POST", body });
+    revalidatePath("/payroll/rules");
+    return { success: true, result };
+  } catch (error) {
+    return { success: false, error: payrollUnavailableMessage(error) };
+  }
+}
+
+export async function deactivatePayrollRuleAction(id: string) {
+  try {
+    const result = await payrollApiFetch(`/api/payroll/salary-rules/${id}`, { method: "DELETE" });
+    revalidatePath("/payroll/rules");
+    return { success: true, result };
+  } catch (error) {
+    return { success: false, error: payrollUnavailableMessage(error) };
+  }
+}
+
+export async function listPayrollStructuresAction() {
+  return payrollApiFetch<unknown[]>("/api/payroll/salary-structures");
+}
+
+export async function createPayrollStructureAction(body: unknown) {
+  try {
+    const result = await payrollApiFetch("/api/payroll/salary-structures", { method: "POST", body });
+    revalidatePath("/payroll/structures");
+    return { success: true, result };
+  } catch (error) {
+    return { success: false, error: payrollUnavailableMessage(error) };
+  }
+}
+
+function payrollUnavailableMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "Payroll API request failed.";
+  return message.includes("fetch failed") || message.includes("ECONNREFUSED")
+    ? "Payroll API unavailable. Start the Java service with `pnpm dev:payroll` and try again."
+    : message;
+}
+
+export async function listPayrunsAction() {
+  return payrollApiFetch<unknown[]>("/api/payroll/payruns");
+}
+
+export async function getPayrunAction(id: string) {
+  return payrollApiFetch(`/api/payroll/payruns/${id}`);
+}
+
+export async function createPayrunAction(body: unknown) {
+  const result = await payrollApiFetch("/api/payroll/payruns", { method: "POST", body });
+  revalidatePath("/payroll/payruns");
+  return result;
+}
+
+export async function listPayrunPayslipsAction(payrunId: string) {
+  const payslips = await payrollApiFetch<any[]>(`/api/payroll/payruns/${payrunId}/payslips`);
+  return Promise.all(payslips.map(async (payslip) => {
+    const employee = await prisma.employee.findUnique({ where: { id: payslip.employeeId } });
+    return { ...payslip, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : payslip.employeeId };
+  }));
+}
+
+export async function updatePayrollStructureAction(id: string, body: unknown) {
+  try {
+    const result = await payrollApiFetch(`/api/payroll/salary-structures/${id}`, { method: "PUT", body });
+    revalidatePath("/payroll/structures");
+    return { success: true, result };
+  } catch (error) {
+    return { success: false, error: payrollUnavailableMessage(error) };
+  }
+}
+
+export async function getPayslipAction(id: string) {
+  const payslip = await payrollApiFetch<any>(`/api/payroll/payslips/${id}`);
+  const employee = await prisma.employee.findUnique({ where: { id: payslip.employeeId }, include: { department: true, jobPosition: true } });
+  const contract = await prisma.contract.findUnique({ where: { id: payslip.contractId } });
+  return { ...payslip, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : payslip.employeeId, department: employee?.department?.name ?? "-", position: employee?.jobPosition?.title ?? "-", contractRef: contract?.title ?? payslip.contractId, period: `${String(payslip.periodStart).slice(0, 10)} → ${String(payslip.periodEnd).slice(0, 10)}`, gross: Number(payslip.grossAmount), deductions: Number(payslip.deductionAmount), net: Number(payslip.netAmount), lines: (payslip.lines ?? []).map((line: any) => ({ rule: line.name, category: line.code, amount: Number(line.amount), type: line.amount < 0 ? "DEDUCTION" : "EARNING" })) };
+}
+
+export async function listPayrollPayslipsAction() {
+  const payruns = await payrollApiFetch<any[]>("/api/payroll/payruns");
+  const slips = (await Promise.all(payruns.flatMap((payrun) => (payrun.payslips ?? []).map((summary: any) => getPayslipAction(summary.id))))).flat();
+  return slips;
 }
 
 // -------------------------------------------------------------

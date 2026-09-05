@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import {
   validatePayrunAction,
   markPayrunPaidAction,
   sendPayrunPayslipsAction,
+  getPayrunAction,
+  listPayrunPayslipsAction,
 } from "@/lib/api-actions";
 import {
   Calculator,
@@ -33,13 +35,6 @@ interface Slip {
   net: number;
 }
 
-const INITIAL_PAYSLIPS: Slip[] = [
-  { id: "PS-1001", employee: "Alice Johnson", gross: 10000.0, deductions: 2500.0, net: 7500.0 },
-  { id: "PS-1002", employee: "Bob Smith", gross: 7916.67, deductions: 1800.0, net: 6116.67 },
-  { id: "PS-1003", employee: "Charlie Davis", gross: 6250.0, deductions: 1450.0, net: 4800.0 },
-  { id: "PS-1004", employee: "Emily Watson", gross: 9166.67, deductions: 2150.0, net: 7016.67 },
-];
-
 export default function PayrunProcessingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: payrunId } = use(params);
   const { data: session } = useSession();
@@ -47,6 +42,17 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
 
   const [status, setStatus] = useState<PayrunStatus>("DRAFT");
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [payrun, setPayrun] = useState<any>(null);
+  const [payslips, setPayslips] = useState<any[]>([]);
+
+  const reload = async () => {
+    const [loadedPayrun, loadedPayslips] = await Promise.all([getPayrunAction(payrunId), listPayrunPayslipsAction(payrunId)]);
+    setPayrun(loadedPayrun);
+    setStatus((loadedPayrun as any).status as PayrunStatus);
+    setPayslips(loadedPayslips as any[]);
+  };
+
+  useEffect(() => { reload().catch((error) => toast({ title: "Unable to load payrun", description: error.message, type: "error" })); }, [payrunId]);
 
   const role = session?.user?.role || "ADMIN";
   const canFinalize =
@@ -58,8 +64,7 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
     setLoadingAction("compute");
     try {
       await computePayrunAction(payrunId);
-      await new Promise((r) => setTimeout(r, 450));
-      setStatus("COMPUTED");
+      await reload();
       toast({
         title: "Payslips Computed",
         description: "Applied active salary rules and attendance hours.",
@@ -74,8 +79,7 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
     setLoadingAction("validate");
     try {
       await validatePayrunAction(payrunId);
-      await new Promise((r) => setTimeout(r, 450));
-      setStatus("VALIDATED");
+      await reload();
       toast({
         title: "Payrun Validated",
         description: "Checked contracts, banking details, and tax thresholds.",
@@ -90,8 +94,7 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
     setLoadingAction("pay");
     try {
       await markPayrunPaidAction(payrunId);
-      await new Promise((r) => setTimeout(r, 500));
-      setStatus("PAID");
+      await reload();
       toast({
         title: "Payrun Finalized & Paid",
         description: "Direct bank transfer ledger entries recorded.",
@@ -128,7 +131,7 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
         </Link>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-semibold tracking-tight text-foreground">October 2023 Payroll</h1>
+            <h1 className="text-base font-semibold tracking-tight text-foreground">{payrun?.name ?? "Payrun"}</h1>
             <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
               {payrunId}
             </span>
@@ -148,7 +151,7 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
             </Badge>
           </div>
           <p className="text-[11px] text-muted-foreground font-mono">
-            Standard Tech Package (STR-001) • Oct 01 – Oct 31, 2023
+            {payrun?.salaryStructureId ?? "-"} • {payrun?.periodStart?.slice(0, 10) ?? "-"} – {payrun?.periodEnd?.slice(0, 10) ?? "-"}
           </p>
         </div>
       </div>
@@ -238,7 +241,7 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
           <div className="space-y-0.5">
             <p className="text-xs font-semibold">Pre-validation Note</p>
             <p className="text-[11px] text-muted-foreground">
-              Bob Smith (EMP-002) has 1 attendance exception recorded (Late arrival). Verification passed.
+              Payroll API returned computed payslips. Review warnings before validation.
             </p>
           </div>
         </div>
@@ -249,7 +252,6 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[85px]">Ref</TableHead>
               <TableHead>Employee</TableHead>
               <TableHead className="text-right">Gross Earnings</TableHead>
               <TableHead className="text-right">Deductions</TableHead>
@@ -260,27 +262,26 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
           <TableBody>
             {status === "DRAFT" ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground font-mono text-xs">
+                <TableCell colSpan={5} className="text-center py-10 text-muted-foreground font-mono text-xs">
                   Payrun batch in DRAFT. Click <span className="font-semibold text-foreground">[Compute]</span> to calculate employee payslips.
                 </TableCell>
               </TableRow>
             ) : (
-              INITIAL_PAYSLIPS.map((ps) => (
+              payslips.map((ps) => (
                 <TableRow key={ps.id}>
-                  <TableCell className="font-mono text-[11px] text-muted-foreground">{ps.id}</TableCell>
                   <TableCell className="font-medium text-xs">
                     <Link href={`/payroll/payslips/${ps.id}`} className="hover:underline">
-                      {ps.employee}
+                      {ps.employeeName ?? ps.employeeId}
                     </Link>
                   </TableCell>
                   <TableCell className="font-mono text-right text-xs text-muted-foreground">
-                    ${ps.gross.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    ${Number(ps.grossAmount ?? ps.gross ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="font-mono text-right text-xs text-rose-600 font-medium">
-                    -${ps.deductions.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    -${Number(ps.deductionAmount ?? ps.deductions ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="font-mono text-right text-xs font-bold text-foreground">
-                    ${ps.net.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    ${Number(ps.netAmount ?? ps.net ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="text-right p-1.5">
                     <Link

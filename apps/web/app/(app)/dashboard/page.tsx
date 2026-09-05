@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { TrendingUp, Users, Calendar, DollarSign, UserCheck, Clock } from "lucide-react";
+import { getHrDashboardAction } from "@/lib/api-actions";
 
 const payrollDepartmentData = [
   { name: "Eng", total: 185000 },
@@ -25,6 +27,8 @@ export default function DashboardPage() {
   const { data: session } = useSession();
   const role = session?.user?.role || "ADMIN";
   const isHrManager = role === "HR_MANAGER";
+  const [hrData, setHrData] = useState({ headcount: 0, attendanceRate: 0, pendingLeave: 0, approvedLeave: 0, departments: [] as { name: string; total: number }[] });
+  useEffect(() => { if (isHrManager) getHrDashboardAction().then(setHrData); }, [isHrManager]);
 
   return (
     <div className="space-y-4">
@@ -51,7 +55,7 @@ export default function DashboardPage() {
               <Users className="w-3.5 h-3.5" />
             </div>
             <div className="mt-2">
-              <div className="text-xl font-bold font-mono tracking-tight text-foreground">124</div>
+              <div className="text-xl font-bold font-mono tracking-tight text-foreground">{hrData.headcount}</div>
               <p className="text-[11px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1">
                 <span className="text-emerald-600 font-medium">+6</span> new hires this quarter
               </p>
@@ -64,7 +68,7 @@ export default function DashboardPage() {
               <UserCheck className="w-3.5 h-3.5" />
             </div>
             <div className="mt-2">
-              <div className="text-xl font-bold font-mono tracking-tight text-foreground">97.4%</div>
+              <div className="text-xl font-bold font-mono tracking-tight text-foreground">{hrData.attendanceRate}%</div>
               <p className="text-[11px] text-muted-foreground font-mono mt-0.5">Rolling 30-day average</p>
             </div>
           </Card>
@@ -75,7 +79,7 @@ export default function DashboardPage() {
               <Clock className="w-3.5 h-3.5" />
             </div>
             <div className="mt-2">
-              <div className="text-xl font-bold font-mono tracking-tight text-amber-500">3 Requests</div>
+              <div className="text-xl font-bold font-mono tracking-tight text-amber-500">{hrData.pendingLeave} Requests</div>
               <p className="text-[11px] text-muted-foreground font-mono mt-0.5">Awaiting manager decision</p>
             </div>
           </Card>
@@ -86,7 +90,7 @@ export default function DashboardPage() {
               <Calendar className="w-3.5 h-3.5" />
             </div>
             <div className="mt-2">
-              <div className="text-xl font-bold font-mono tracking-tight text-foreground">45 Days</div>
+              <div className="text-xl font-bold font-mono tracking-tight text-foreground">{hrData.approvedLeave} Days</div>
               <p className="text-[11px] text-muted-foreground font-mono mt-0.5">Current month cycle</p>
             </div>
           </Card>
@@ -156,7 +160,7 @@ export default function DashboardPage() {
 
         <div className="h-[240px] w-full pt-4">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={isHrManager ? hrDepartmentData : payrollDepartmentData}>
+            <BarChart data={isHrManager ? hrData.departments : payrollDepartmentData}>
               <XAxis
                 dataKey="name"
                 stroke="hsl(var(--muted-foreground))"

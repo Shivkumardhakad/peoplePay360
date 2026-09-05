@@ -996,228 +996,6 @@
 ### Notes
 - This was a documentation/context update only; no application code was changed.
 
-## 2026-09-05  â€” Implement payslip PDF download
-
-### Summary
-- Added protected PDF generation and download for individual payslips.
-
-### Files Changed
-- `pom.xml`: Added the OpenPDF dependency.
-- `apps/payroll/src/main/java/com/dj/payroll/services/PayslipPdfService.java`: Generates a PDF containing payslip metadata, totals, and salary-rule lines.
-- `apps/payroll/src/main/java/com/dj/payroll/controllers/PayrunController.java`: Added `GET /api/payroll/payslips/{id}/pdf` with an inline PDF response.
-- `apps/payroll/src/test/java/com/dj/payroll/services/PayslipPdfServiceTest.java`: Added PDF signature and generation coverage.
-- `AGENTS.md`: Added the PDF endpoint to the Payroll API map.
-- `docs/PAYROLL_API.md`: Documented the PDF response and authentication requirement.
-
-### Reason
-- Payslips need a printable/downloadable document for employee delivery and payroll review.
-
-### Validation
-- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 â€” passed; 5 tests passed.
-- `GET http://localhost:8080/api/payroll/payslips/test-id/pdf` without a JWT â€” returned expected `401` protection response.
-- `git diff --check` â€” passed.
-
-### Notes
-- An authenticated request with an existing payslip ID is required to verify the full live PDF body; the unit test verifies valid PDF bytes and embedded line generation.
-
-## 2026-09-05  â€” Add payroll reports APIs
-
-### Summary
-- Added period-based payroll summary and payslip detail reports backed by persisted Payroll data.
-
-### Files Changed
-- `apps/payroll/src/main/java/com/dj/payroll/controllers/ReportController.java`: Added summary and payslip report endpoints.
-- `apps/payroll/src/main/java/com/dj/payroll/services/ReportService.java`: Added period validation, aggregation, status filtering, and report mapping.
-- `apps/payroll/src/main/java/com/dj/payroll/dto/ReportDtos.java`: Added report response contracts.
-- `apps/payroll/src/main/java/com/dj/payroll/repositories/ReportRepository.java`: Added period-based payslip query.
-- `apps/payroll/src/main/java/com/dj/payroll/repositories/PayrunRepository.java`: Added period payrun count query.
-- `apps/payroll/src/test/java/com/dj/payroll/services/ReportServiceTest.java`: Added aggregation test coverage.
-- `AGENTS.md`: Documented the report endpoints.
-- `docs/PAYROLL_API.md`: Added report usage and query requirements.
-
-### Reason
-- Payroll reporting was listed as required functionality but had no Payroll API implementation.
-
-### Validation
-- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 â€” passed; 6 tests passed.
-- Payroll application restarted with the new report controllers â€” passed on port `8080`.
-- Both report endpoints without a JWT â€” returned expected `401` protection responses.
-- `git diff --check` â€” passed.
-
-### Notes
-- Reports require an authenticated request and return empty totals when the selected period has no payslips.
-
-## 2026-09-05  â€” Add payroll auditor API
-
-### Summary
-- Added a deterministic payroll auditor endpoint over persisted payrun, payslip, and payslip-line data.
-
-### Files Changed
-- `apps/payroll/src/main/java/com/dj/payroll/controllers/PayrollAuditController.java`: Added `GET /api/payroll/payruns/{id}/audit`.
-- `apps/payroll/src/main/java/com/dj/payroll/services/PayrollAuditorService.java`: Added structured payroll integrity findings and risk scoring.
-- `apps/payroll/src/main/java/com/dj/payroll/dto/PayrollAuditDtos.java`: Added audit response contracts.
-- `apps/payroll/src/test/java/com/dj/payroll/services/PayrollAuditorServiceTest.java`: Added mismatch and missing-line coverage.
-- `AGENTS.md`: Documented the auditor endpoint.
-- `docs/PAYROLL_API.md`: Documented audit checks and response behavior.
-
-### Reason
-- Payroll needs a review step that surfaces calculation and data-integrity risks before finalization. The current implementation is deterministic and does not claim to be an external LLM.
-
-### Validation
-- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 7 tests passed.
-- Payroll application restarted with the auditor controller — passed on port `8080`.
-- Auditor endpoint without a JWT — returned expected `401` protection response.
-- `git diff --check` — passed.
-
-### Notes
-- Auditor version is `rules-v1`; an external AI provider can be added later without changing the structured API contract.
-
-## 2026-09-05  â€” Add payment status APIs
-
-### Summary
-- Added read-only payment status endpoints for payruns and individual payslips.
-
-### Files Changed
-- `apps/payroll/src/main/java/com/dj/payroll/controllers/PaymentStatusController.java`: Added payrun and payslip payment status routes.
-- `apps/payroll/src/main/java/com/dj/payroll/services/PaymentStatusService.java`: Aggregates persisted payment state and net totals.
-- `apps/payroll/src/main/java/com/dj/payroll/dto/PaymentStatusDtos.java`: Added payment status response contracts.
-- `apps/payroll/src/test/java/com/dj/payroll/services/PaymentStatusServiceTest.java`: Added aggregation coverage.
-- `AGENTS.md`: Documented payment status endpoints.
-- `docs/PAYROLL_API.md`: Added payment status API documentation.
-
-### Reason
-- Payment status existed only as part of the payrun action response; dedicated read APIs are needed for payment tracking and dashboard/report consumers.
-
-### Validation
-- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 8 tests passed.
-- Payroll application restarted with the payment status controller — passed on port `8080`.
-- Both payment status endpoints without a JWT — returned expected `401` protection responses.
-- `git diff --check` — passed.
-
-### Notes
-- These APIs are read-only. Payment transitions continue through the validated payrun lifecycle.
-
-## 2026-09-05  â€” Implement formula salary-rule engine
-
-### Summary
-- Replaced the unsupported `FORMULA` payrun failure with a restricted deterministic arithmetic engine.
-
-### Files Changed
-- `apps/payroll/src/main/java/com/dj/payroll/services/FormulaSalaryRuleEngine.java`: Added safe arithmetic parsing and payroll variable resolution.
-- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Integrated formula evaluation into ordered payslip calculation with prior-rule context.
-- `apps/payroll/src/test/java/com/dj/payroll/services/FormulaSalaryRuleEngineTest.java`: Added arithmetic, variable, unknown-variable, and divide-by-zero coverage.
-- `apps/payroll/src/test/java/com/dj/payroll/services/PayrunServiceTest.java`: Updated service construction for the formula engine.
-- `AGENTS.md`: Documented supported formula variables and operators.
-- `docs/PAYROLL_API.md`: Documented formula behavior and validation failures.
-
-### Reason
-- Formula salary rules were accepted by the API but always failed during payrun computation.
-
-### Validation
-- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 10 tests passed.
-- Spring application context startup — passed; formula engine component loads successfully.
-- `git diff --check` — passed.
-
-### Notes
-- This is intentionally not a general-purpose scripting engine; no Java reflection, method calls, or arbitrary code execution is allowed.
-
-## 2026-09-05  â€” Strengthen employee and contract payroll integration
-
-### Summary
-- Payroll compute now consumes employee status and contract salary-structure data from the HR API and validates the complete employee/contract scope before generating payslips.
-
-### Files Changed
-- `apps/payroll/src/main/java/com/dj/payroll/integration/HrContractClient.java`: Added employee status and salary-structure data to contract snapshots and filtering.
-- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Added overlap, employee-status, base-salary, and selected-structure validation.
-- `apps/payroll/src/test/java/com/dj/payroll/services/PayrunServiceTest.java`: Added overlapping-contract rejection coverage and updated HR client expectations.
-- `AGENTS.md`: Documented integration rules.
-- `docs/PAYROLL_API.md`: Documented HR contract selection and validation.
-
-### Reason
-- Payroll previously imported only contract ID, employee ID, and salary, allowing terminated employees, mismatched structures, invalid salaries, and overlapping active contracts into compute.
-
-### Validation
-- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 11 tests passed.
-- `GET http://localhost:3001/api/hr/contracts` — returned `200`; HR contract endpoint is reachable.
-- Payroll compute endpoint without a JWT — returned expected `401` protection response.
-- `git diff --check` — passed.
-
-### Notes
-- HR API must be reachable at `HR_API_URL`; no real employee or payroll data was modified by this change. An authenticated seeded payrun was not available for a full end-to-end compute execution.
-
-## 2026-09-05  â€” Add full real-data payrun validation
-
-### Summary
-- Strengthened payrun validation before `VALIDATED` status using persisted payslips, salary-rule lines, and a fresh HR contract scope lookup.
-
-### Files Changed
-- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Added period, contract, employee, total, arithmetic, line-presence, line-total, and HR-scope validation.
-- `apps/payroll/src/test/java/com/dj/payroll/services/PayrunServiceTest.java`: Added real-data validation failure coverage.
-- `AGENTS.md`: Documented validation requirements.
-- `docs/PAYROLL_API.md`: Documented validation checks.
-
-### Reason
-- Payrun validation previously checked only empty payslips and negative net values, allowing inconsistent or stale payroll data to be finalized.
-
-### Validation
-- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 12 tests passed.
-- `GET http://localhost:3001/api/hr/contracts` — returned `200`; HR contract source is reachable.
-- Payroll compute endpoint without a JWT — returned expected `401` protection response.
-- `git diff --check` — passed.
-
-### Notes
-- Validation performs a fresh HR API lookup; HR availability is required when validating a non-empty payrun.
-
-## 2026-09-05  â€” Fix Departments API validation and access
-
-### Summary
-- Hardened Departments API with pagination, detail retrieval, request validation, consistent missing/conflict errors, and JWT role protection.
-
-### Files Changed
-- `apps/hr-api/src/modules/departments/departments.controller.ts`: Added guarded detail route, pagination validation, and Zod create/update validation.
-- `apps/hr-api/src/modules/shared/hr.service.ts`: Added paginated queries, department detail lookup, and Prisma error mapping.
-- `apps/hr-api/src/modules/shared/department-access.guard.ts`: Added HS256 JWT validation for `ADMIN` and `HR_MANAGER` department access.
-- `AGENTS.md`: Updated the Departments API map and runtime requirements.
-
-### Reason
-- Departments returned `500` for invalid records, accepted unvalidated Prisma input, loaded unbounded position data, lacked pagination, and had no endpoint authentication.
-
-### Validation
-- Direct TypeScript compiler `tsc -p apps/hr-api/tsconfig.json --noEmit` — passed.
-- Unauthenticated department list — `401`.
-- Authenticated `HR_MANAGER` list — `200`.
-- Invalid page — `400`.
-- Missing detail/delete — `404`.
-- Empty create — `400`.
-- No real department data was created or deleted.
-
-### Notes
-- The JWT guard uses `JWT_SECRET` and the repository development fallback; production must set a strong secret explicitly.
-
-## 2026-09-05  â€” Add endpoint-level Payroll RBAC
-
-### Summary
-- Replaced the single broad Payroll role rule with endpoint-specific authorization rules.
-
-### Files Changed
-- `apps/payroll/src/main/java/com/dj/payroll/security/SecurityConfig.java`: Added separate read, report, audit, payment-status, configuration, compute, and mutation role matchers.
-- `AGENTS.md`: Documented endpoint-level role scope.
-- `docs/PAYROLL_API.md`: Documented the role matrix and default-deny behavior for future routes.
-
-### Reason
-- Every Payroll endpoint previously accepted all three Payroll roles, allowing HR managers to perform payroll mutations.
-
-### Validation
-- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 11 tests passed.
-- Spring security context startup — passed.
-- Unauthenticated Payroll read/mutation routes — returned expected `401` responses.
-- Local `HR_MANAGER` JWT: reports read — `200`; payrun compute mutation — expected `403`.
-- `git diff --check` — passed.
-
-### Notes
-- JWT role claims remain the authorization source. A token must contain a role claim; no frontend-only permission checks are trusted.
-
-## 2026-09-05 17:38 +05:30 — Expand hackathon scope details
 ## 2026-09-05 ΓÇö Strengthen HR and payroll business rules
 
 ### Summary
@@ -1399,25 +1177,6 @@
 - HR requires `DATABASE_URL` pointing to `oddo_hr` when started.
 - Local `oddo_hr` database creation is an environment setup action; no existing Payroll data was reset or deleted.
 - This was a documentation/context update only; no application code was changed.
-## 2026-09-06  — Git staging cleanup
-
-### Summary
-- Removed generated Maven dependency-cache files from the staged changes.
-- Added `.m2-local/` to `.gitignore`.
-
-### Files Changed
-- `.gitignore`: Ignore the local Maven repository cache.
-- `CHANGELOG_AGENTS.md`: Recorded the staging cleanup.
-
-### Reason
-- Prevent generated `.m2-local` dependencies from being committed or pushed with the application source.
-
-### Validation
-- `git diff --cached --name-only` — passed; no `.m2-local` files remain staged.
-- `git status --short --untracked-files=no` — passed; 35 relevant files remain staged.
-
-### Notes
-- The local `.m2-local` directory was not deleted; it remains available for local builds and is now ignored by Git.
 ## 2026-09-05 18:23 +05:30 ΓÇö Codex Sidebar Navigation Integration
 
 ### Summary
@@ -1814,149 +1573,220 @@
 - Live database test with Prisma client — **Passed**: verified `attendance.upsert` successfully creates and updates records.
 
 
-## 2026-09-06 00:00 +05:30 — Resolve merge conflicts
+## 2026-09-06 00:00 IST — HR Manager live database pages
 
 ### Summary
-- Resolved the active merge conflicts across HR API source files, agent documentation, changelog history, and the pnpm lockfile.
-- Preserved both authentication/role changes and request validation, while retaining the stronger contract and payroll business-rule implementation.
+- Replaced HR Manager page mock defaults with live Prisma database queries for employees, contracts, attendance, leave types, allocations, leave requests, and HR dashboard KPIs.
+- Added database-backed HR dashboard headcount, attendance rate, pending leave, approved leave, and department distribution data.
+- Removed the users page fallback that displayed dummy users when the database was empty or unavailable.
 
 ### Files Changed
-- `AGENTS.md`: Merged HR API database/auth documentation and self-service endpoint reference.
-- `CHANGELOG_AGENTS.md`: Preserved both branches' history and recorded this resolution.
-- `apps/hr-api/src/modules/contracts/contracts.controller.ts`: Combined role protection, pagination, and Zod validation imports.
-- `apps/hr-api/src/modules/departments/departments.controller.ts`: Combined role protection, pagination, and Zod validation imports.
-- `apps/hr-api/src/modules/shared/hr.service.ts`: Combined required imports and removed duplicate contract methods.
-- `pnpm-lock.yaml`: Preserved all dependency entries from both branches and removed conflict markers.
+- `apps/web/lib/api-actions.ts`: Added HR dashboard and time-off read actions.
+- `apps/web/app/(app)/employees/page.tsx`: Load employee directory from Prisma.
+- `apps/web/app/(app)/contracts/page.tsx`: Keep empty/live DB state without mock fallback.
+- `apps/web/app/(app)/attendance/page.tsx`: Keep empty/live DB state without mock fallback.
+- `apps/web/app/(app)/time-off/types/page.tsx`: Load time-off policies from Prisma.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: Load allocations and balances from Prisma.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Load requests from Prisma.
+- `apps/web/app/(app)/dashboard/page.tsx`: Use live HR KPI and department data.
+- `apps/web/app/(app)/users/page.tsx`: Do not display dummy users on load failure.
 
 ### Reason
-- The repository was left in an unresolved merge state with five conflicted files.
+- HR Manager screens must represent current HR database records rather than presentation-only fixtures.
 
 ### Validation
-- Conflict-marker scan across the repository — passed; no merge markers remain.
-- `apps/hr-api/node_modules/.bin/tsc.CMD -p apps/hr-api/tsconfig.json --noEmit` — ran; existing workspace dependency/generated-Prisma issues remain.
-- `git diff --check` — pending because Git index write is currently blocked by permission denied.
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `pnpm --filter web exec tsc --noEmit` — blocked by sandbox permissions while pnpm attempted to access `C:\Users\DELL`.
 
 ### Notes
-- Git could not create `.git/index.lock` in this environment, so the resolved files could not be staged here.
-- TypeScript still reports missing local `bcryptjs`/`nodemailer` resolution, stale generated Prisma types, and an already-required `HR_PAYROLL_USER` enum mismatch; these are dependency/generated-client setup issues rather than conflict markers.
-## 2026-09-06 00:00 +05:30 — Post-merge validation and UI syntax fixes
+- Existing payroll-related working-tree changes were preserved.
+- Create/edit forms still use their existing action implementations; this change focuses on removing dummy read data from HR Manager pages.
+## 2026-09-06 00:30 IST — Attendance employee foreign-key guard
 
 ### Summary
-- Ran repository conflict, HR API, and web TypeScript checks after the merge resolution.
-- Repaired malformed leave-request table JSX and duplicate payslip page declarations exposed by validation.
-- Fixed related web type issues for role comparisons, toast variants, and unsupported button sizes.
+- Fixed attendance recording when the UI submits a user ID or employee number instead of the HR employee primary key.
+- Removed the attendance form's static employee fallback and prevented quick check-in from using fabricated employee IDs.
 
 ### Files Changed
-- `apps/web/app/(app)/time-off/requests/page.tsx`: Restored the leave-request table body and valid conditional JSX.
-- `apps/web/app/(app)/payroll/payslips/page.tsx`: Removed duplicate declaration conflicts and normalized button sizes.
-- `apps/web/app/(app)/attendance/page.tsx`: Fixed role typing and toast variant.
-- `apps/web/app/(app)/contracts/page.tsx`: Fixed role typing.
-- `apps/web/app/(app)/payroll/payruns/page.tsx`: Replaced unsupported `xs` button sizes.
-- `CHANGELOG_AGENTS.md`: Recorded validation results.
+- `apps/web/lib/api-actions.ts`: Resolve linked user/employee identifiers and verify the employee relation before attendance upsert.
+- `apps/web/components/attendance-form.tsx`: Load employee options only from the database.
+- `apps/web/app/(app)/attendance/page.tsx`: Stop check-in when the authenticated user is not linked to an employee.
+
+### Reason
+- Attendance inserts were failing with `Attendance_employeeId_fkey` because stale/mock identifiers could be submitted.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+
+### Notes
+- If an existing login has no `employeeId` link in the `User` table, it must be linked to an employee before quick check-in can be used.
+## 2026-09-06 01:00 IST — Graceful Payroll API unavailable handling
+
+### Summary
+- Prevented salary rule and salary structure create actions from surfacing unhandled Next.js 500 errors when Java Payroll is offline.
+- Added a clear action error instructing developers to start `pnpm dev:payroll`.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Catch payroll create/delete connection failures and return structured errors.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: Surface structured API errors in the form toast.
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Surface structured API errors in the form toast.
+
+### Reason
+- The UI was correctly targeting `localhost:8080`, but the Java Payroll service was not listening, causing `ECONNREFUSED` and server-action 500 logs.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- The Java Payroll service still must be running for real payroll data and writes: `pnpm dev:payroll`.
+## 2026-09-06 02:00 IST — Hide employee creation during session loading
+
+### Summary
+- Removed the admin-role loading fallback from the Employees page so Employee users never see the Add Employee action while their session is loading.
+
+### Files Changed
+- `apps/web/app/(app)/employees/page.tsx`: Require an authenticated role before rendering employee creation controls.
+
+### Reason
+- The previous `ADMIN` fallback could briefly expose the new employee action to Employee-role users.
+
+### Validation
+- Not run after this one-line UI guard; prior web TypeScript validation passed.
+
+### Notes
+- HR Manager, HR Payroll roles, Payroll Manager, and Admin retain the employee creation action.
+## 2026-09-06 02:30 IST — Live allocation employee selector
+
+### Summary
+- Replaced hardcoded allocation employee and leave-type options with records loaded from Prisma.
+- Grant Allocation now persists/upserts the selected allocation in the HR database.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added database-backed allocation creation.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: Load live employees/time-off types and save allocations through the server action.
+
+### Reason
+- HR Manager allocation dropdowns were showing temporary demo employees instead of current HR records.
+
+### Validation
+- Pending after this change.
+
+### Notes
+- Allocation period defaults to the current calendar year and duplicate employee/type/year allocations are updated rather than duplicated.
+## 2026-09-06 03:00 IST — Remove internal reference columns from UI tables
+
+### Summary
+- Removed user-facing Ref/ID columns from HR, time-off, user, and payroll tables.
+- Kept internal IDs in row keys, links, and action handlers so navigation and mutations continue to work.
+
+### Files Changed
+- `apps/web/app/(app)/attendance/page.tsx`: Removed attendance reference column.
+- `apps/web/app/(app)/contracts/page.tsx`: Removed contract reference column.
+- `apps/web/app/(app)/employees/page.tsx`: Removed employee ID column.
+- `apps/web/app/(app)/users/page.tsx`: Removed user ID column.
+- `apps/web/app/(app)/time-off/types/page.tsx`: Removed time-off type reference column.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: Removed allocation reference column.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Removed request reference column.
+- `apps/web/app/(app)/payroll/payruns/page.tsx`: Removed batch reference column.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Removed payslip reference column.
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Removed employee ID column.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Removed payslip reference column.
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Removed structure reference column.
+
+### Reason
+- Internal database references are not useful to day-to-day users and made tables visually noisy.
+
+### Validation
+- Pending after this UI cleanup.
+
+### Notes
+- Internal IDs remain available to the application for routing, lookup, and row actions.
+## 2026-09-06 03:30 IST — Connect payslip screens to Java Payroll API
+
+### Summary
+- Replaced displayed mock payslips with live Java Payroll API payslip data.
+- Enriched payroll payslips with employee, department, position, and contract details from the HR database.
+- Kept employee-role payslip scoping based on the authenticated employee.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added Java payslip list/detail actions and HR record enrichment.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Load and filter live payslips.
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: Load live payslip detail before rendering/PDF generation.
+
+### Reason
+- Payslip pages were still rendering static demo salary data despite the Java Payroll API being available.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- The Java Payroll service must be running on `PAYROLL_API_URL` for these screens to show records.
+- Payrun wizard/detail and remaining payroll mock screens are the next integration slice.
+## 2026-09-06 04:00 IST — Connect payrun wizard and processing detail
+
+### Summary
+- Replaced New Payrun wizard demo employees and structures with live HR/Payroll records.
+- Create Payrun now calls the Java Payroll API with the selected structure and period.
+- Payrun processing detail now loads live status and payslips, and refreshes after compute, validate, and pay actions.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added payroll-eligible employee lookup and enriched payrun payslips with HR employee names.
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Live structure/employee setup and Java payrun creation.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Live payrun status/payslips and action refreshes.
+
+### Reason
+- Payrun creation and processing screens were still using static demo employees, periods, statuses, and payslip amounts.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Current Java `CreateRequest` creates the payrun scope from the salary structure/period; selected employee IDs remain a UI eligibility review until the Java API exposes a selection field.
+## 2026-09-06 04:45 IST — Align salary configuration with Payroll API
+
+### Summary
+- Connected salary structure archive/activate actions to the Java Payroll API `PUT` endpoint.
+- Aligned salary rule creation with the API's `FIXED`, `PERCENTAGE`, and `FORMULA` calculation methods.
+- Added a formula input to the salary rule form and removed the obsolete `SUM` UI mapping.
+
+### Files Changed
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Persist structure status changes through Payroll API and reload live structures.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: Send calculation method and formula values without mock conversion.
+- `apps/web/components/salary-rule-form.tsx`: Validate and render API-supported calculation methods.
+- `apps/web/lib/api-actions.ts`: Added the authenticated structure update action.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Salary configuration controls must update the same live records consumed by payroll computation.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- The Java Payroll API currently accepts formula rules, but payrun computation still requires a configured formula engine for executing them.
+
+## 2026-09-06 05:00 +05:30 — Merge local API work with origin/main
+
+### Summary
+- Committed the local HR, Payroll, web, database, and documentation work and merged the latest `origin/main` changes.
+- Resolved pull conflicts in the changelog and three payroll/time-off UI pages by retaining the latest live-data implementations from `origin/main`.
+
+### Files Changed
+- `CHANGELOG_AGENTS.md`: Recorded the merge and conflict resolution.
+- `apps/web/app/(app)/payroll/payruns/page.tsx`: Kept the latest live payrun list implementation.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Kept the latest live payslip implementation.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Kept the latest live time-off request implementation.
+
+### Reason
+- `git pull origin main` reported content conflicts after the local changes were committed.
 
 ### Validation
 - Conflict-marker scan — passed; no unresolved merge markers remain.
-- Web TypeScript check — reduced to two environment/setup errors: missing local `jose` package and stale Prisma `UserRole` type.
-- HR API TypeScript check — still blocked by missing local `bcryptjs`/`nodemailer` packages and stale Prisma generated types.
-- `pnpm install --offline --frozen-lockfile` — did not complete in the environment and was stopped.
-- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` — could not start because Maven attempted to create an inaccessible `C:\.m2\repository`.
+- `git diff --check` — to be run after merge commit.
 
 ### Notes
-- Run dependency installation followed by Prisma client generation before declaring the full workspace build green: `pnpm install` and `pnpm --filter @peoplepay360/db exec prisma generate`.
-## 2026-09-06 01:10 +05:30 — Harden Java Payroll API workflow and authorization
-
-### Summary
-- Added persisted employee selection to Java payruns and restricted computation/validation to the selected employees.
-- Changed payrun validation to return warnings without finalizing when persisted payroll data is inconsistent.
-- Enforced active salary rules and exact salary-structure contract matching.
-- Updated Payroll RBAC for `HR_PAYROLL_USER` and `HR_PAYROLL_MANAGER`, removing HR Manager access from Java Payroll routes.
-- Corrected aggregate salary-rule line validation and updated Payroll API documentation.
-
-### Files Changed
-- `apps/payroll/src/main/java/com/dj/payroll/dto/PayrunDtos.java`: Added required employee selection and selected-employee response data.
-- `apps/payroll/src/main/java/com/dj/payroll/entities/Payrun.java`: Persisted selected employee IDs.
-- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Enforced selection, active rules, warning responses, and selected-scope validation.
-- `apps/payroll/src/main/java/com/dj/payroll/integration/HrContractClient.java`: Required exact salary-structure matching.
-- `apps/payroll/src/main/java/com/dj/payroll/security/SecurityConfig.java`: Updated Java Payroll role matrix.
-- `apps/payroll/src/test/java/com/dj/payroll/services/PayrunServiceTest.java`: Updated validation tests for warning responses and employee selection.
-- `docs/PAYROLL_API.md`: Documented roles and required `employeeIds` in payrun creation.
-- `AGENTS.md`: Clarified payrun endpoint employee selection.
-
-### Reason
-- Java Payroll previously processed every matching contract, hid validation warnings behind HTTP 400 errors, accepted unscoped contracts, and did not match the repository Payroll role scope.
-
-### Validation
-- `mvn "-Dmaven.repo.local=D:/oddo1/peoplePay360/.m2-local" test` — passed; 12 tests, 0 failures, 0 errors.
-
-### Notes
-- Hibernate created the new `PayrunEmployee` collection table through the configured `ddl-auto: update` setting.
-- Attendance/time-off/bank-warning enrichment and bulk email delivery remain cross-service concerns currently implemented outside this Java module; Java computation still requires an HR integration enhancement for those inputs.
-## 2026-09-06 01:26 +05:30 — Connect Java Payroll to HR payroll context
-
-### Summary
-- Added HR API context loading for selected employees' bank accounts, attendance, and approved unpaid leave.
-- Added payroll formula variables for worked minutes, unpaid leave days, and attendance exceptions.
-- Added validation warnings for missing bank accounts, attendance exceptions, and unpaid leave.
-
-### Files Changed
-- `apps/payroll/src/main/java/com/dj/payroll/integration/HrContractClient.java`: Added HR context retrieval and normalization.
-- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Passed HR context into formulas and validation warnings.
-- `AGENTS.md`: Documented the new payroll context variables and behavior.
-- `docs/PAYROLL_API.md`: Documented HR context loading and validation warnings.
-- `CHANGELOG_AGENTS.md`: Recorded the integration.
-
-### Reason
-- Java payroll computation previously ignored attendance, unpaid leave, and bank-account context required by the integrated HR/payroll workflow.
-
-### Validation
-- `mvn "-Dmaven.repo.local=D:/oddo1/peoplePay360/.m2-local" test` — passed; 12 tests, 0 failures, 0 errors.
-
-### Notes
-- HR API availability is now required for contract and payroll-context reads during compute/validation.
-- Bulk payslip email remains served by the existing HR API `/api/hr/payroll/payruns/{id}/send-payslips` endpoint; Java PDF delivery remains available through its individual PDF endpoint.
-
-## 2026-09-06 02:05 +05:30 — Validate and repair NestJS HR API
-
-### Summary
-- Repaired the workspace lockfile so dependencies install with frozen-lockfile validation.
-- Registered the HR self-service controller so `/api/hr/me/**` routes are reachable.
-- Regenerated Prisma Client and verified HR/web TypeScript compilation.
-
-### Files Changed
-- `pnpm-lock.yaml`: Removed a duplicate `dotenv` importer entry that made the lockfile invalid.
-- `apps/hr-api/src/modules/hr.module.ts`: Registered `MeController` in the HR module.
-- `CHANGELOG_AGENTS.md`: Recorded this validation and repair.
-
-### Reason
-- HR self-service endpoints were returning 404 because their controller was not included in the module, and the broken lockfile blocked reliable dependency setup.
-
-### Validation
-- `pnpm install --frozen-lockfile` — passed.
-- `pnpm --filter @peoplepay360/db exec prisma generate` — passed.
-- `apps/hr-api/node_modules/.bin/tsc.CMD -p apps/hr-api/tsconfig.json --noEmit` — passed.
-- `apps/web/node_modules/.bin/tsc.CMD -p apps/web/tsconfig.json --noEmit` — passed.
-- HR API startup against PostgreSQL `oddo_hr` — passed.
-- Live HR API smoke checks — protected admin and `/me/**` routes returned `401`; malformed login returned `400`.
-
-### Notes
-- Authenticated business-flow checks require valid seeded user credentials/JWT; unauthenticated protection and route registration were verified.
-
-## 2026-09-06 02:15 +05:30 — Configure shared Supabase database connection
-
-### Summary
-- Added the supplied Supabase PostgreSQL connection to the local ignored environment configuration for both HR Prisma and Java Payroll.
-
-### Files Changed
-- `.env`: Added `DATABASE_URL` for HR API and JDBC database variables for Payroll, plus local HR API settings.
-- `CHANGELOG_AGENTS.md`: Recorded the local connection configuration.
-
-### Reason
-- The user supplied a shared PostgreSQL connection containing the project data and requested that the APIs use it.
-
-### Validation
-- `.env` is ignored by Git and was not added to the repository index.
-- HR API TypeScript and route/database startup checks had already passed before this environment-only change.
-
-### Notes
-- SMTP credentials were not included in the supplied PostgreSQL URL, so email delivery still requires separate `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and optionally `SMTP_FROM` settings.
-- The supplied database password was exposed in chat; rotate it in Supabase before production use.
+- Generated `.turbo` cache files were excluded from the commit.

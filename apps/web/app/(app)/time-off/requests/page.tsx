@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
-import { updateLeaveRequestStatusAction, createTimeOffRequestAction } from "@/lib/api-actions";
-import { Search, CheckCircle, XCircle, Plus, Loader2, LayoutList, Kanban, Calendar, Clock, User } from "lucide-react";
+import { updateLeaveRequestStatusAction, createTimeOffRequestAction, getTimeOffRequestsAction } from "@/lib/api-actions";
+import { Search, CheckCircle, XCircle, Plus, Loader2 } from "lucide-react";
 
 interface LeaveRequestItem {
   id: string;
@@ -31,9 +31,8 @@ const INITIAL_REQUESTS: LeaveRequestItem[] = [
 export default function TimeOffRequestsPage() {
   const { data: session } = useSession();
   const { toast } = useToast();
-  const [requests, setRequests] = useState<LeaveRequestItem[]>(INITIAL_REQUESTS);
+  const [requests, setRequests] = useState<LeaveRequestItem[]>([]);
   const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -44,7 +43,9 @@ export default function TimeOffRequestsPage() {
   const [endDate, setEndDate] = useState("2023-12-12");
   const [reason, setReason] = useState("");
 
-  const role = String(session?.user?.role || "ADMIN");
+  useEffect(() => { getTimeOffRequestsAction().then((rows) => setRequests(rows as LeaveRequestItem[])); }, []);
+
+  const role = session?.user?.role || "ADMIN";
   const isEmployee = role === "EMPLOYEE";
   const canApprove =
     role === "ADMIN" ||
@@ -103,17 +104,10 @@ export default function TimeOffRequestsPage() {
       setRequests([newReq, ...requests]);
       toast({
         title: "Application Submitted",
-        description: `Requested ${leaveType} from ${startDate} to ${endDate}.`,
+        description: "Your leave request is queued for manager review.",
         type: "success",
       });
       setDialogOpen(false);
-      setReason("");
-    } catch {
-      toast({
-        title: "Request Error",
-        description: "Failed to submit leave request.",
-        type: "error",
-      });
     } finally {
       setSubmittingRequest(false);
     }
@@ -143,10 +137,6 @@ export default function TimeOffRequestsPage() {
       r.id.toLowerCase().includes(search.toLowerCase())
   );
 
-  const pendingRequests = filteredRequests.filter((r) => r.status === "Pending");
-  const approvedRequests = filteredRequests.filter((r) => r.status === "Approved");
-  const rejectedRequests = filteredRequests.filter((r) => r.status === "Rejected");
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -161,105 +151,81 @@ export default function TimeOffRequestsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* View Toggle */}
-          <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
-            <Button
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 px-2.5 text-xs gap-1.5"
-              onClick={() => setViewMode("list")}
-            >
-              <LayoutList className="w-3.5 h-3.5" />
-              List
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="gap-1.5 h-8">
+              <Plus className="w-3.5 h-3.5" />
+              Apply for Leave
             </Button>
-            <Button
-              variant={viewMode === "kanban" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 px-2.5 text-xs gap-1.5"
-              onClick={() => setViewMode("kanban")}
-            >
-              <Kanban className="w-3.5 h-3.5" />
-              Kanban
-            </Button>
-          </div>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Request Time Off</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCreateRequest} className="space-y-3 pt-1">
+              <div className="space-y-1">
+                <Label htmlFor="type" className="text-xs font-medium">Leave Policy</Label>
+                <select
+                  id="type"
+                  value={leaveType}
+                  onChange={(e) => setLeaveType(e.target.value)}
+                  className="flex h-8 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="Annual Leave">Annual Paid Leave</option>
+                  <option value="Sick Leave">Sick Leave</option>
+                  <option value="Casual Leave">Casual Absence</option>
+                  <option value="Unpaid Leave">Unpaid Leave</option>
+                </select>
+              </div>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-1.5 h-8">
-                <Plus className="w-3.5 h-3.5" />
-                Apply for Leave
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Request Time Off</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateRequest} className="space-y-3 pt-1">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="type" className="text-xs font-medium">Leave Policy</Label>
-                  <select
-                    id="type"
-                    value={leaveType}
-                    onChange={(e) => setLeaveType(e.target.value)}
-                    className="flex h-8 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="Annual Leave">Annual Paid Leave</option>
-                    <option value="Sick Leave">Sick Leave</option>
-                    <option value="Casual Leave">Casual Absence</option>
-                    <option value="Unpaid Leave">Unpaid Leave</option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="start" className="text-xs font-medium">Start Date</Label>
-                    <Input
-                      id="start"
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="font-mono text-xs h-8"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="end" className="text-xs font-medium">End Date</Label>
-                    <Input
-                      id="end"
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="font-mono text-xs h-8"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label htmlFor="reason" className="text-xs font-medium">Reason / Remarks</Label>
+                  <Label htmlFor="start" className="text-xs font-medium">Start Date</Label>
                   <Input
-                    id="reason"
-                    placeholder="Personal, travel, medical, etc."
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    className="text-xs h-8"
+                    id="start"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="font-mono text-xs h-8"
+                    required
                   />
                 </div>
-
-                <div className="flex justify-end gap-2 pt-2 border-t border-border">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(false)} disabled={submittingRequest}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" size="sm" disabled={submittingRequest} className="gap-1.5">
-                    {submittingRequest && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    {submittingRequest ? "Submitting..." : "Submit Application"}
-                  </Button>
+                <div className="space-y-1">
+                  <Label htmlFor="end" className="text-xs font-medium">End Date</Label>
+                  <Input
+                    id="end"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="font-mono text-xs h-8"
+                    required
+                  />
                 </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="reason" className="text-xs font-medium">Reason / Remarks</Label>
+                <Input
+                  id="reason"
+                  placeholder="Personal, travel, medical, etc."
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="text-xs h-8"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(false)} disabled={submittingRequest}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={submittingRequest} className="gap-1.5">
+                  {submittingRequest && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {submittingRequest ? "Submitting..." : "Submit Application"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Toolbar */}
@@ -278,71 +244,113 @@ export default function TimeOffRequestsPage() {
         </span>
       </div>
 
-      {/* Content View */}
-      {viewMode === "list" ? (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
+      {/* Table */}
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Employee</TableHead>
+              <TableHead>Policy</TableHead>
+              <TableHead>Date Range</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Decision</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredRequests.length === 0 ? (
               <TableRow>
-                <TableHead className="w-[85px]">Ref</TableHead>
-                <TableHead>Employee</TableHead>
-                <TableHead>Leave Type</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-                {canApprove && <TableHead className="w-[170px] text-right">Actions</TableHead>}
+                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                  No leave requests found.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRequests.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={canApprove ? 7 : 6} className="h-24 text-center text-xs text-muted-foreground">
-                    No leave requests found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredRequests.map((req) => {
-                  const approving = actionLoading === `${req.id}-approved`;
-                  const rejecting = actionLoading === `${req.id}-rejected`;
-                  const pending = req.status === "Pending";
-                  return (
-                    <TableRow key={req.id}>
-                      <TableCell className="font-mono text-[11px]">{req.id}</TableCell>
-                      <TableCell className="text-xs">{req.employee}</TableCell>
-                      <TableCell className="text-xs">{req.type}</TableCell>
-                      <TableCell className="text-xs font-mono">{req.dates}</TableCell>
-                      <TableCell className="text-xs">{req.duration}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={req.status === "Approved" ? "success" : req.status === "Rejected" ? "destructive" : "warning"}>
-                          {req.status}
-                        </Badge>
-                      </TableCell>
-                      {canApprove && (
-                        <TableCell className="text-right">
-                          {pending ? (
-                            <div className="flex justify-end gap-1">
-                              <Button size="sm" className="h-7 text-[11px]" onClick={() => handleDecision(req.id, "Approved")} disabled={Boolean(actionLoading)}>
-                                {approving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle className="w-3 h-3 mr-1" />}
-                                {approving ? "Approving..." : "Approve"}
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => handleDecision(req.id, "Rejected")} disabled={Boolean(actionLoading)}>
-                                {rejecting ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
-                                {rejecting ? "Rejecting..." : "Reject"}
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground font-mono">No action</span>
-                          )}
-                        </TableCell>
+            ) : (
+              filteredRequests.map((req) => {
+                const isApproving = actionLoading === `${req.id}-approved`;
+                const isRejecting = actionLoading === `${req.id}-rejected`;
+                const isRowLoading = isApproving || isRejecting;
+                const isSelf = req.employee.toLowerCase() === currentUserName.toLowerCase();
+                const canApproveThis = canApprove && (role === "ADMIN" || !isSelf);
+
+                return (
+                  <TableRow key={req.id}>
+                    <TableCell className="font-medium text-xs">
+                      {req.employee}
+                      {isSelf && (
+                        <span className="ml-1.5 text-[10px] font-mono text-muted-foreground bg-muted px-1 py-0.2 rounded">
+                          (You)
+                        </span>
                       )}
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      ) : null}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{req.type}</TableCell>
+                    <TableCell className="font-mono text-[11px] text-muted-foreground">{req.dates}</TableCell>
+                    <TableCell className="font-mono text-[11px] font-medium">{req.duration}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          req.status === "Approved"
+                            ? "success"
+                            : req.status === "Rejected"
+                            ? "destructive"
+                            : "warning"
+                        }
+                        className="text-[10px] font-mono"
+                      >
+                        {req.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {req.status === "Pending" ? (
+                        isSelf && role !== "ADMIN" ? (
+                          <span className="text-[10px] text-amber-600 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                            Awaiting Admin
+                          </span>
+                        ) : canApproveThis ? (
+                          <div className="flex justify-end gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDecision(req.id, "Rejected")}
+                              disabled={isRowLoading}
+                              className="h-6 px-2 text-[11px] text-destructive border-destructive/20 hover:bg-destructive/10"
+                            >
+                              {isRejecting ? (
+                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                              ) : (
+                                <XCircle className="w-3 h-3 mr-1" />
+                              )}
+                              {isRejecting ? "Rejecting..." : "Reject"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleDecision(req.id, "Approved")}
+                              disabled={isRowLoading}
+                              className="h-6 px-2 text-[11px] bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              {isApproving ? (
+                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                              ) : (
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                              )}
+                              {isApproving ? "Approving..." : "Approve"}
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground font-mono">Pending Review</span>
+                        )
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground font-mono">
+                          {req.status === "Approved" ? "Approved" : "Rejected"}
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

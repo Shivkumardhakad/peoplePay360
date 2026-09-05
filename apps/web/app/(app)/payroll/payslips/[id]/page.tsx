@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { generatePayslipPDF } from "@/lib/payslip-pdf";
+import { getPayslipAction } from "@/lib/api-actions";
 import { ArrowLeft, Printer, Download, CheckCircle, FileText, Loader2 } from "lucide-react";
 
 interface SlipLine {
@@ -45,12 +46,15 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [livePayslip, setLivePayslip] = useState<any>(null);
+
+  useEffect(() => { getPayslipAction(payslipId).then(setLivePayslip).catch(() => setLivePayslip({ error: true })); }, [payslipId]);
 
   const isEmployee = session?.user?.role === "EMPLOYEE";
   const currentUserName = session?.user?.name || "Employee";
   const currentEmpId = session?.user?.employeeId || "EMP-004";
 
-  const payslip = {
+  const mockPayslip = {
     ...MOCK_PAYSLIP_DATA,
     id: payslipId,
     ...(isEmployee
@@ -65,6 +69,9 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
         }
       : {}),
   };
+  if (livePayslip?.error) return <div className="p-6 text-sm text-destructive">Payslip could not be loaded from Payroll API.</div>;
+  if (!livePayslip) return <div className="p-6 text-sm text-muted-foreground">Loading payslip...</div>;
+  const payslip = livePayslip;
 
   const handleDownloadPDF = async () => {
     setDownloading(true);
@@ -188,7 +195,7 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payslip.lines.map((line, idx) => (
+              {payslip.lines.map((line: any, idx: number) => (
                 <TableRow key={idx} className="hover:bg-transparent">
                   <TableCell className="py-2 px-4 text-xs font-medium">{line.rule}</TableCell>
                   <TableCell className="py-2 px-4 text-center font-mono text-[11px] text-muted-foreground">

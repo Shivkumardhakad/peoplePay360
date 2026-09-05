@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { SalaryRuleForm, type SalaryRuleFormValues } from "@/components/salary-rule-form";
 import { Sparkles, Trash2, Loader2, Lock } from "lucide-react";
+import { createPayrollRuleAction, deactivatePayrollRuleAction, listPayrollCategoriesAction, listPayrollRulesAction } from "@/lib/api-actions";
 
 interface RuleItem {
   id: string;
@@ -19,18 +20,12 @@ interface RuleItem {
   type: string;
 }
 
-const INITIAL_RULES: RuleItem[] = [
-  { id: "RUL-001", name: "Basic Salary", code: "BASIC", category: "BASIC", sequence: 10, type: "FIXED" },
-  { id: "RUL-002", name: "Housing Allowance", code: "HRA", category: "ALLOWANCE", sequence: 20, type: "PERCENTAGE" },
-  { id: "RUL-003", name: "Provident Fund", code: "PF", category: "DEDUCTION", sequence: 30, type: "PERCENTAGE" },
-  { id: "RUL-004", name: "Gross Salary", code: "GROSS", category: "GROSS", sequence: 100, type: "SUM" },
-  { id: "RUL-005", name: "Net Salary Payable", code: "NET", category: "NET", sequence: 200, type: "SUM" },
-];
 
 export default function SalaryRulesPage() {
   const { data: session } = useSession();
   const { toast } = useToast();
-  const [rules, setRules] = useState<RuleItem[]>(INITIAL_RULES);
+  const [rules, setRules] = useState<RuleItem[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const role = session?.user?.role || "ADMIN";
@@ -39,22 +34,20 @@ export default function SalaryRulesPage() {
     role === "HR_PAYROLL_MANAGER" ||
     role === "PAYROLL_MANAGER";
 
+  useEffect(() => {
+    Promise.all([listPayrollRulesAction(), listPayrollCategoriesAction()]).then(([loadedRules, loadedCategories]) => {
+      setCategories(loadedCategories as any[]);
+      setRules((loadedRules as any[]).map((rule) => ({ ...rule, category: (loadedCategories as any[]).find((category) => category.id === rule.categoryId)?.code ?? rule.categoryId, type: rule.calculationType })));
+    }).catch((error) => toast({ title: "Payroll API unavailable", description: error.message, type: "error" }));
+  }, [toast]);
+
   const handleRuleCreated = (data: SalaryRuleFormValues) => {
-    const newRule: RuleItem = {
-      id: `RUL-${String(rules.length + 1).padStart(3, "0")}`,
-      name: data.name,
-      code: data.code.toUpperCase(),
-      category: data.category,
-      sequence: Number(data.sequence),
-      type: data.calculationType,
-    };
-    const sorted = [...rules, newRule].sort((a, b) => a.sequence - b.sequence);
-    setRules(sorted);
+    void data;
   };
 
   const handleDeleteRule = async (id: string, name: string) => {
     setDeletingId(id);
-    await new Promise((r) => setTimeout(r, 450));
+    await deactivatePayrollRuleAction(id);
     setRules((prev) => prev.filter((r) => r.id !== id));
     setDeletingId(null);
     toast({
@@ -151,7 +144,17 @@ export default function SalaryRulesPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-3">
-                <SalaryRuleForm onSuccess={handleRuleCreated} />
+                <SalaryRuleForm
+                  onSuccess={handleRuleCreated}
+                  onSave={async (data) => {
+                    const category = categories.find((item) => item.code === data.category);
+                    if (!category) throw new Error("Select a valid payroll category");
+                    const saved = await createPayrollRuleAction({ name: data.name, code: data.code, categoryId: category.id, sequence: Number(data.sequence), calculationType: data.calculationType, value: data.calculationType === "FIXED" ? data.amount : data.percentage, formula: data.calculationType === "FORMULA" ? data.formula : null });
+                    if (!saved.success) throw new Error(saved.error);
+                    const loaded = await listPayrollRulesAction();
+                    setRules((loaded as any[]).map((rule) => ({ ...rule, category: categories.find((item) => item.id === rule.categoryId)?.code ?? rule.categoryId, type: rule.calculationType })));
+                  }}
+                />
               </CardContent>
             </Card>
           </div>
