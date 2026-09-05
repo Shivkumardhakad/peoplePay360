@@ -364,3 +364,88 @@
 ### Notes
 - Controllers currently follow the existing pattern of accepting Prisma input types directly; DTO validation and authorization guards are still needed before production exposure.
 - Payrun computation supports fixed and percentage rules. Formula rules currently compute as zero until a formula engine/parser is defined.
+
+## 2026-09-05 17:04 IST — HR API Server Port Update
+
+### Summary
+- Moved `@peoplepay360/hr-api` server configuration from port 3001 to port 4000 (`http://localhost:4000/api/hr`).
+- Configured `apps/web/.env` with `NEXT_PUBLIC_HR_API_URL` and Supabase PostgreSQL credentials.
+
+### Files Changed
+- `apps/hr-api/.env`: Added `PORT=4000`.
+- `apps/hr-api/src/main.ts`: Updated fallback port to 4000 with console confirmation log.
+- `apps/web/.env`: Added `NEXT_PUBLIC_HR_API_URL="http://localhost:4000/api/hr"` and Supabase database URLs.
+- `CHANGELOG_AGENTS.md`: Updated agent change log.
+
+### Reason
+- Avoid local port conflicts on 3001 and expose the NestJS HR API at a dedicated server endpoint (`http://localhost:4000`).
+
+### Validation
+- NestJS application startup — verified routes initialized on port 4000.
+
+## 2026-09-05 17:33 IST — PeoplePay360 Full UI Overhaul Execution
+
+### Summary
+- Restyled all remaining screens in `apps/web/app/(app)/` (`contracts`, `attendance`, `time-off/requests`, `time-off/allocations`, `time-off/types`, `payroll/structures`, `payroll/rules`, `payroll/payruns`, `payroll/payslips`, `dashboard`) to conform strictly to the design system rules.
+- Added custom `.pp-glass`, `.pp-glass-dark`, `.pp-solid-surface`, and `.pp-mesh-bg` utility classes in `apps/web/app/globals.css`.
+- Updated `apps/web/components/app-sidebar.tsx` with `isHRManagerOnly` role gating (hiding Payroll section completely for HR Manager) and `isAdmin` role gating (adding Team & Roles link).
+- Built new `apps/web/app/(app)/users/page.tsx` Admin screen listing team users with modal user creation and role assignment (5 fixed roles).
+
+### Files Changed
+- `apps/web/app/globals.css`: Added utility classes for `.pp-glass`, `.pp-glass-dark`, `.pp-solid-surface`, `.pp-mesh-bg`.
+- `apps/web/components/app-sidebar.tsx`: Added `isAdmin` and `isHRManagerOnly` role handling.
+- `apps/web/app/(app)/users/page.tsx`: Created Admin team management screen.
+- `apps/web/app/(app)/contracts/page.tsx`: Restyled with glass search/filter and solid surface table.
+- `apps/web/app/(app)/attendance/page.tsx`: Restyled with glass search/filter and solid surface table.
+- `apps/web/app/(app)/time-off/*`: Restyled requests, allocations, and types screens.
+- `apps/web/app/(app)/payroll/*`: Restyled structures, rules, payruns (list, wizard, processing), and payslips screens.
+- `apps/web/app/(app)/dashboard/page.tsx`: Restyled with glass KPI cards and solid surface chart container.
+- `CHANGELOG_AGENTS.md`: Recorded UI Overhaul execution.
+
+### Reason
+- Fulfill the PeoplePay360 Full UI Overhaul Execution prompt brief to establish visual consistency and role-gated interfaces across the entire frontend.
+
+### Validation
+- `npx tsc --noEmit` from `apps/web` — passed (0 errors).
+
+## 2026-09-05 17:53 IST — Login Page Full Redesign & Real Auth Wiring
+
+### Summary
+- Rewrote `apps/web/app/login/page.tsx` as a Client Component using `react-hook-form` and `zodResolver(loginSchema)`.
+- Wired real authentication against NextAuth Credentials provider (`signIn("credentials", { email, password, redirect: false })`).
+- Implemented role-based post-login redirects using `getSession()`: `EMPLOYEE` role redirects to `/employees/[employeeId]`, all other roles redirect to `/dashboard`.
+- Added inline error alert (`text-xs text-destructive`) positioned between the password field and submit button.
+- Added in-flight request loading state (`<Loader2 className="animate-spin" /> Signing in...`) that disables the submit button and prevents double submissions.
+- Added minimal `loginSchema` in `packages/validation/src/login.schema.ts` and exported it via `packages/validation/src/index.ts`.
+- Preserved `.pp-glass` card styling, "P" badge, title, description, and color tokens without adding any new npm packages or extra environment variables.
+
+### Files Changed
+- `packages/validation/src/login.schema.ts`: Created `loginSchema` for email & password validation.
+- `packages/validation/src/index.ts`: Exported `loginSchema`.
+- `apps/web/app/login/page.tsx`: Rewrote login page with real NextAuth authentication, Zod validation, inline error display, loading states, and role-based redirects.
+- `CHANGELOG_AGENTS.md`: Updated agent change log.
+
+### Reason
+- Complete the Login Page Full Redesign + Real Auth Wiring execution brief.
+
+### Validation
+- `npx tsc --noEmit` from `apps/web` — passed with zero errors.
+- `git status --short` — verified zero `package.json` modifications or new dependencies added.
+
+## 2026-09-05 17:55 IST — Server Restart and Build Cache Clearance
+
+### Summary
+- Killed lingering Node/pnpm processes on ports 3000 and 4000.
+- Cleared Next.js build cache (`apps/web/.next`).
+- Launched `pnpm dev` in the background to serve `@peoplepay360/web` (Next.js port 3000) and `@peoplepay360/hr-api` (NestJS port 4000).
+
+### Files Changed
+- `CHANGELOG_AGENTS.md`: Recorded server restart action.
+
+### Reason
+- Address user request ("restart the server , changes are not visible whatsoever") caused by stale Next.js build cache and server timeout.
+
+### Validation
+- `Get-Process` — terminated lingering node processes.
+- `Remove-Item apps/web/.next` — cleared stale `.next` build cache.
+- `pnpm dev` — running in background task `7b92bd24-c012-4faa-a062-748a8eccbedc/task-709`.

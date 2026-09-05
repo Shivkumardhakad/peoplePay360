@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
+"use client";
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TimeOffTypeForm } from "@/components/time-off-type-form";
 
@@ -16,28 +16,42 @@ export default function TimeOffTypesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Time Off Types</h1>
-          <p className="text-sm text-muted-foreground">Configure leave policies and rules.</p>
+          <p className="text-sm text-muted-foreground">Configure leave policies, approval rules, and compensation settings.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 rounded-md border bg-card">
+        <div className="md:col-span-2 pp-solid-surface overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="border-b border-border bg-muted/20">
+                <TableHead>Type Ref</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Unit</TableHead>
                 <TableHead>Requires Approval</TableHead>
-                <TableHead>Is Paid</TableHead>
+                <TableHead className="text-right">Is Paid</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {MOCK_TYPES.map((type) => (
-                <TableRow key={type.id} className="hover:bg-muted/50 cursor-pointer">
+                <TableRow key={type.id} className="hover:bg-muted/50 border-b border-border/60">
+                  <TableCell className="font-mono text-xs text-muted-foreground">{type.id}</TableCell>
                   <TableCell className="font-medium text-foreground">{type.name}</TableCell>
-                  <TableCell>{type.unit}</TableCell>
-                  <TableCell>{type.requiresApproval ? "Yes" : "No"}</TableCell>
-                  <TableCell>{type.isPaid ? "Yes" : "No"}</TableCell>
+                  <TableCell className="font-mono text-xs">{type.unit}</TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      type.requiresApproval ? 'bg-muted text-foreground' : 'bg-muted/50 text-muted-foreground'
+                    }`}>
+                      {type.requiresApproval ? "Required" : "Auto-Approved"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      type.isPaid ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+                    }`}>
+                      {type.isPaid ? "Paid Leave" : "Unpaid"}
+                    </span>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -45,11 +59,11 @@ export default function TimeOffTypesPage() {
         </div>
 
         <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Create Leave Type</CardTitle>
+          <Card className="pp-solid-surface">
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="text-base font-semibold">Create Leave Policy</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               <TimeOffTypeForm />
             </CardContent>
           </Card>

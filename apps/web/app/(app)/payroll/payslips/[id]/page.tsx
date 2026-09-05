@@ -23,14 +23,19 @@ export default async function PayslipDetailPage({ params }: { params: Promise<{ 
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/payroll/payruns/1">
+          <Link href="/payroll/payslips">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Payslip {payslipId}</h1>
-            <p className="text-sm text-muted-foreground">{MOCK_PAYSLIP.employee} • {MOCK_PAYSLIP.period}</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold tracking-tight">Payslip {payslipId}</h1>
+              <span className="font-mono text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                {MOCK_PAYSLIP.period}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">{MOCK_PAYSLIP.employee} • {MOCK_PAYSLIP.contract}</p>
           </div>
         </div>
         <Button variant="outline" className="gap-2">
@@ -39,41 +44,41 @@ export default async function PayslipDetailPage({ params }: { params: Promise<{ 
         </Button>
       </div>
 
-      <Card>
-        <CardHeader className="border-b bg-muted/20 pb-4">
+      <Card className="pp-solid-surface overflow-hidden">
+        <CardHeader className="border-b border-border bg-muted/20 pb-4">
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="text-lg">Salary Statement</CardTitle>
+              <CardTitle className="text-lg font-bold">Salary Ledger Statement</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">Contract: {MOCK_PAYSLIP.contract}</p>
             </div>
             <div className="text-right">
               <p className="text-sm font-semibold">PeoplePay360 Inc.</p>
-              <p className="text-xs text-muted-foreground">123 Business Rd, Tech City</p>
+              <p className="text-xs text-muted-foreground font-mono">123 Business Rd, Tech City</p>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/10 border-b">
-                <TableHead className="py-3 px-6">Description</TableHead>
+              <TableRow className="bg-muted/10 border-b border-border">
+                <TableHead className="py-3 px-6">Salary Component / Rule</TableHead>
                 <TableHead className="py-3 px-6 text-center">Category</TableHead>
-                <TableHead className="py-3 px-6 text-right">Amount</TableHead>
+                <TableHead className="py-3 px-6 text-right">Line Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {MOCK_PAYSLIP.lines.map((line, idx) => (
                 <TableRow key={idx} className="border-b border-border/50 hover:bg-transparent">
                   <TableCell className="py-3 px-6 font-medium">{line.rule}</TableCell>
-                  <TableCell className="py-3 px-6 text-center text-xs text-muted-foreground">{line.category}</TableCell>
-                  <TableCell className={`py-3 px-6 text-right font-mono ${line.type === 'DEDUCTION' ? 'text-destructive' : ''}`}>
+                  <TableCell className="py-3 px-6 text-center font-mono text-xs text-muted-foreground">{line.category}</TableCell>
+                  <TableCell className={`py-3 px-6 text-right font-mono text-sm ${line.type === 'DEDUCTION' ? 'text-destructive' : 'text-foreground'}`}>
                     {line.amount > 0 ? '' : '-'}${Math.abs(line.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </TableCell>
                 </TableRow>
               ))}
-              <TableRow className="border-t-2 hover:bg-transparent bg-muted/5">
-                <TableCell colSpan={2} className="py-4 px-6 text-right font-bold text-sm">
-                  Net Salary
+              <TableRow className="border-t-2 border-border hover:bg-transparent bg-muted/10">
+                <TableCell colSpan={2} className="py-4 px-6 text-right font-bold text-sm tracking-wide">
+                  NET SALARY PAYABLE
                 </TableCell>
                 <TableCell className="py-4 px-6 text-right font-mono text-xl font-bold text-accent">
                   ${MOCK_PAYSLIP.net.toLocaleString('en-US', { minimumFractionDigits: 2 })}

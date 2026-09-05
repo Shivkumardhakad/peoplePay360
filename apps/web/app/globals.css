@@ -58,6 +58,54 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+@utility pp-glass {
+  background-color: hsl(var(--card) / 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+
+@utility pp-glass-dark {
+  background-color: hsl(var(--primary) / 0.96);
+  color: hsl(var(--primary-foreground));
+  backdrop-filter: blur(12px);
+  border-right: 1px solid hsl(var(--border) / 0.2);
+}
+
+@utility pp-solid-surface {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+
+@utility pp-mesh-bg {
+  background-color: hsl(var(--background));
+}
+
+.pp-glass {
+  background-color: hsl(var(--card) / 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+
+.pp-glass-dark {
+  background-color: hsl(var(--primary) / 0.96);
+  color: hsl(var(--primary-foreground));
+  backdrop-filter: blur(12px);
+  border-right: 1px solid hsl(var(--border) / 0.2);
+}
+
+.pp-solid-surface {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+
+.pp-mesh-bg {
+  background-color: hsl(var(--background));
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
