@@ -102,6 +102,11 @@ export async function updateEmployeeAction(employeeId: string, data: {
   }
 }
 
+export async function getPayrollEligibleEmployeesAction() {
+  const employees = await prisma.employee.findMany({ where: { status: "ACTIVE" }, orderBy: { lastName: "asc" }, include: { department: true, contracts: { where: { status: "ACTIVE" }, orderBy: { startDate: "desc" }, take: 1 } } });
+  return employees.map((employee) => ({ id: employee.id, employeeNumber: employee.employeeNumber, name: `${employee.firstName} ${employee.lastName}`, department: employee.department?.name ?? "-", wage: Number(employee.contracts[0]?.baseSalary ?? 0) }));
+}
+
 // -------------------------------------------------------------
 // CONTRACTS
 // -------------------------------------------------------------
@@ -631,7 +636,11 @@ export async function createPayrunAction(body: unknown) {
 }
 
 export async function listPayrunPayslipsAction(payrunId: string) {
-  return payrollApiFetch(`/api/payroll/payruns/${payrunId}/payslips`);
+  const payslips = await payrollApiFetch<any[]>(`/api/payroll/payruns/${payrunId}/payslips`);
+  return Promise.all(payslips.map(async (payslip) => {
+    const employee = await prisma.employee.findUnique({ where: { id: payslip.employeeId } });
+    return { ...payslip, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : payslip.employeeId };
+  }));
 }
 
 export async function getPayslipAction(id: string) {

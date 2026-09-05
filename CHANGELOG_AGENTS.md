@@ -1724,3 +1724,24 @@
 ### Notes
 - The Java Payroll service must be running on `PAYROLL_API_URL` for these screens to show records.
 - Payrun wizard/detail and remaining payroll mock screens are the next integration slice.
+## 2026-09-06 04:00 IST — Connect payrun wizard and processing detail
+
+### Summary
+- Replaced New Payrun wizard demo employees and structures with live HR/Payroll records.
+- Create Payrun now calls the Java Payroll API with the selected structure and period.
+- Payrun processing detail now loads live status and payslips, and refreshes after compute, validate, and pay actions.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added payroll-eligible employee lookup and enriched payrun payslips with HR employee names.
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Live structure/employee setup and Java payrun creation.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Live payrun status/payslips and action refreshes.
+
+### Reason
+- Payrun creation and processing screens were still using static demo employees, periods, statuses, and payslip amounts.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Current Java `CreateRequest` creates the payrun scope from the salary structure/period; selected employee IDs remain a UI eligibility review until the Java API exposes a selection field.
