@@ -317,3 +317,287 @@
 
 ### Notes
 - Dashboard data remains static fixture data.
+## 2026-09-05 14:35 IST — Payroll database initialization
+
+### Summary
+- Added Spring Data JPA entities for the payroll models defined in the Prisma schema.
+- Enabled Hibernate schema initialization against PostgreSQL for the Java payroll service.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/domain/SalaryStructure.java`: Added salary structure persistence model.
+- `apps/payroll/src/main/java/com/dj/payroll/domain/SalaryRuleCategory.java`: Added salary rule category persistence model.
+- `apps/payroll/src/main/java/com/dj/payroll/domain/SalaryRule.java`: Added salary rule persistence model.
+- `apps/payroll/src/main/java/com/dj/payroll/domain/SalaryStructureRule.java`: Added structure-to-rule persistence model.
+- `apps/payroll/src/main/java/com/dj/payroll/domain/Payrun.java`: Added payrun persistence model.
+- `apps/payroll/src/main/java/com/dj/payroll/domain/Payslip.java`: Added payslip persistence model.
+- `apps/payroll/src/main/resources/application.yaml`: Enabled globally quoted Hibernate identifiers to preserve Prisma table and column names.
+
+### Reason
+- The Java payroll app had no persistence models, so Spring Boot could not initialize the payroll tables represented by `schema.prisma`.
+
+### Validation
+- `mvn -f apps/payroll/pom.xml test` — failed because the active shell used Java 8 while Spring Boot 4.1.1 requires Java 17+.
+- `JAVA_HOME="C:\\Program Files\\Java\\jdk-21.0.10" mvn -f apps/payroll/pom.xml test` — passed; Spring Boot connected to PostgreSQL and Hibernate created the payroll tables.
+
+### Notes
+- Hibernate `ddl-auto: update` initializes or updates the payroll tables at application startup. Existing data is preserved by this setting.
+
+## 2026-09-05 14:45 IST — Add PayslipLine entity
+
+### Summary
+- Added the missing Java JPA entity for the Prisma `PayslipLine` model.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/entities/PayslipLine.java`: Added payslip line fields and decimal precision matching `schema.prisma`.
+
+### Reason
+- `PayslipLine` is part of the payroll schema and was missing from the Java persistence models.
+
+### Validation
+- `JAVA_HOME="C:\\Program Files\\Java\\jdk-21.0.10" mvn -f apps/payroll/pom.xml test` — run after implementation.
+
+### Notes
+- The entity follows the existing Java package name `com.dj.payroll.entities`.
+
+## 2026-09-05 15:00 IST — JWT authorization for payroll API
+
+### Summary
+- Added bearer JWT validation and role-based authorization to the Java payroll service.
+
+### Files Changed
+- `apps/payroll/pom.xml`: Added Spring Security OAuth2 resource-server and JOSE dependencies.
+- `apps/payroll/src/main/resources/application.yaml`: Added `JWT_SECRET` configuration.
+- `apps/payroll/src/main/java/com/dj/payroll/security/SecurityConfig.java`: Validated JWTs and mapped the `role` claim to Spring authorities.
+
+### Reason
+- Payroll endpoints must validate the incoming JWT and allow access only to `ADMIN`, `PAYROLL_MANAGER`, or `HR_MANAGER` users.
+
+### Validation
+- `JAVA_HOME="C:\\Program Files\\Java\\jdk-21.0.10" JWT_SECRET="<32+ characters>" mvn -f apps/payroll/pom.xml test` — passed; 1 test succeeded after fixing the claim converter generic type.
+
+### Notes
+- The application requires `JWT_SECRET` to be at least 32 characters and expects a signed bearer JWT in the `Authorization` header.
+
+## 2026-09-05 15:05 IST — Align JWT application configuration
+
+### Summary
+- Moved the JWT secret configuration under Spring Boot's standard resource-server property path.
+
+### Files Changed
+- `apps/payroll/src/main/resources/application.yaml`: Configured `spring.security.oauth2.resourceserver.jwt.secret-key` from `JWT_SECRET`.
+- `apps/payroll/src/main/java/com/dj/payroll/security/SecurityConfig.java`: Read the standard Spring property for JWT validation.
+
+### Reason
+- Keep Maven dependencies in `pom.xml` and JWT runtime configuration in `application.yaml` using the standard Spring Security property structure.
+
+### Validation
+- `mvn -f apps/payroll/pom.xml clean compile -DskipTests` — run after configuration update.
+
+### Notes
+- `JWT_SECRET` must contain at least 32 characters when the application starts.
+
+## 2026-09-05 15:10 IST — Fix SecurityConfig import
+
+### Summary
+- Corrected the `HttpSecurity` import typo in the JWT security configuration.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/security/SecurityConfig.java`: Changed `builde` to `builders` in the Spring Security import.
+
+### Reason
+- Maven could not resolve `HttpSecurity` because the package name was misspelled.
+
+### Validation
+- `mvn -U -f apps/payroll/pom.xml clean compile -DskipTests` — run after the import fix.
+
+### Notes
+- No authorization behavior was changed; this was a compile-fix only.
+
+## 2026-09-05 15:20 IST — Standardize Java 21 Maven project
+
+### Summary
+- Added a root Maven project that includes the payroll service as a Java 21 module.
+- Declared Java 21 compiler and UTF-8 settings at both root and payroll module levels.
+
+### Files Changed
+- `pom.xml`: Added the Java 21 Maven aggregator for the repository's Java services.
+- `apps/payroll/pom.xml`: Explicitly configured Java 21 compiler release and UTF-8 source encoding.
+
+### Reason
+- IntelliJ was opening the repository as a plain Java module, so Maven dependencies were not available to `SecurityConfig.java`.
+- A root Maven project gives the IDE a clear Maven entry point and keeps the payroll service compatible with Java 21.
+
+### Validation
+- `mvn -f pom.xml -pl apps/payroll -am clean compile -DskipTests` — run after the Maven project update.
+
+### Notes
+- Open or reload the repository root `pom.xml` as a Maven project in IntelliJ.
+
+## 2026-09-05 15:30 IST — Complete Java 21 Spring dependencies
+
+### Summary
+- Added the direct Spring Security modules used by `SecurityConfig` and the validation starter to the payroll module.
+
+### Files Changed
+- `apps/payroll/pom.xml`: Added Spring Security config/core/web, OAuth2 JWT modules, and Spring Boot validation dependency under the Spring Boot 4.1.1 dependency management.
+
+### Reason
+- Make every package directly used by the Java 21 payroll application explicit in Maven so IDE and command-line builds resolve the same compatible dependencies.
+
+### Validation
+- `mvn -f pom.xml -pl apps/payroll -am clean compile -DskipTests` — run after dependency update.
+- `mvn -f pom.xml -pl apps/payroll -am test` — run after dependency update.
+
+### Notes
+- Dependency versions remain managed by the Spring Boot 4.1.1 parent; no individual Spring Security versions were hardcoded.
+
+## 2026-09-05 15:40 IST — Centralize Java dependencies in root Maven POM
+
+### Summary
+- Converted the root Maven project into the Spring Boot parent project.
+- Moved all shared payroll dependencies into the root `pom.xml`.
+- Changed the payroll module to inherit dependencies from the root project.
+
+### Files Changed
+- `pom.xml`: Added Spring Boot 4.1.1 parent and all Java 21 payroll dependencies.
+- `apps/payroll/pom.xml`: Changed parent to the root Maven project and removed duplicated dependency declarations.
+
+### Reason
+- Dependencies were previously visible only in the module POM, while the root POM appeared empty to IntelliJ.
+- Centralizing them makes the root project the single Maven entry point.
+
+### Validation
+- `mvn -f pom.xml -pl apps/payroll -am test` — run after centralizing dependencies.
+
+### Notes
+- Java source and target remain Java 21, and Spring dependency versions continue to come from Spring Boot 4.1.1.
+
+## 2026-09-05 15:40 IST — Verify payroll runtime startup
+
+### Summary
+- Started the payroll Spring Boot application with Java 21, JWT configuration, and PostgreSQL enabled.
+
+### Files Changed
+- No repository files changed; runtime verification only.
+
+### Reason
+- Confirm the application works beyond compilation and tests.
+
+### Validation
+- `mvn -f apps/payroll/pom.xml spring-boot:run` — passed; application started on port 8080 with Java 21.0.10 and connected to PostgreSQL.
+- `curl.exe http://localhost:8080/` — returned HTTP 401, confirming security protection is active.
+
+### Notes
+- The test process was stopped gracefully after the startup and authorization checks.
+
+## 2026-09-05 16:20 IST — Use HR API for contract selection
+
+### Summary
+- Replaced the payroll service's direct `Contract` table query with an HR API integration.
+- Added a controlled `503 Service Unavailable` response when HR contract data cannot be loaded.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/integration/HrContractClient.java`: Loads active period-valid contracts from the HR API.
+- `apps/payroll/src/main/java/com/dj/payroll/exception/ExternalServiceException.java`: Represents unavailable upstream services.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Uses the HR contract client during computation.
+- `apps/payroll/src/main/resources/application.yaml`: Added configurable `HR_API_URL`.
+- `apps/payroll/src/main/java/com/dj/payroll/exception/GlobalExceptionHandler.java`: Maps upstream failures to HTTP 503.
+
+### Reason
+- The repository architecture assigns employee contracts to the HR API; payroll's local database does not own the `Contract` table.
+
+### Validation
+- Not run yet after the HR integration change.
+
+### Notes
+- Payrun computation requires the HR API at `HR_API_URL` and its `/contracts` endpoint to be available.
+
+## 2026-09-05 15:50 IST — Add local JWT fallback configuration
+
+### Summary
+- Added a development fallback JWT secret so the payroll app can start from IntelliJ when no environment variable is configured.
+
+### Files Changed
+- `apps/payroll/src/main/resources/application.yaml`: Added a 32+ character local fallback for `JWT_SECRET`.
+
+### Reason
+- IntelliJ was starting without the user-level `JWT_SECRET`, causing `SecurityConfig` construction to fail.
+
+### Validation
+- `mvn -f apps/payroll/pom.xml spring-boot:run` — run after the configuration update.
+
+### Notes
+- A real production `JWT_SECRET` environment variable overrides this development fallback and must be configured in production.
+
+## 2026-09-05 15:55 IST — Implement payroll MVC REST API
+
+### Summary
+- Added DTO, repository, service, and controller layers for payroll rule categories, salary rules, salary structures, payruns, and payslips.
+- Added payrun lifecycle processing with deterministic salary-rule ordering, contract-period selection, monetary rounding, duplicate payslip prevention, validation, payment, and cancellation flows.
+- Expanded global exception handling for validation, malformed requests, data conflicts, authentication, and authorization failures.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/dto/`: Added validated request and response DTOs.
+- `apps/payroll/src/main/java/com/dj/payroll/repositories/`: Added Spring Data repositories for payroll aggregates.
+- `apps/payroll/src/main/java/com/dj/payroll/services/`: Added constructor-injected business services and payrun computation engine.
+- `apps/payroll/src/main/java/com/dj/payroll/controllers/`: Added protected REST endpoints under `/api/payroll`.
+- `apps/payroll/src/main/java/com/dj/payroll/exception/GlobalExceptionHandler.java`: Added consistent API error handling.
+
+### Reason
+- The Java payroll service had persistence entities but no production API flow for managing salary configuration or processing payroll.
+
+### Validation
+- `mvn -f apps/payroll/pom.xml clean compile -DskipTests` — passed; 32 Java source files compiled with Java 21.
+- `mvn -f pom.xml -pl apps/payroll -am test` — passed; 1 test succeeded and 7 repositories loaded against PostgreSQL.
+- `git diff --check` — passed.
+
+### Notes
+- Formula salary rules intentionally return a controlled error until a formula engine is configured; fixed and percentage rules are implemented.
+- Payrun computation reads active contracts from the shared Prisma PostgreSQL schema for the requested period.
+
+## 2026-09-05 16:10 IST — Harden payroll transaction boundaries
+
+### Summary
+- Added pessimistic payrun row locking for compute, validate, pay, and cancel transitions.
+- Added database unique constraints matching Prisma's duplicate payslip and structure-rule protections.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/repositories/PayrunRepository.java`: Added a `PESSIMISTIC_WRITE` lookup for state-changing operations.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Uses the locked payrun lookup for lifecycle transitions.
+- `apps/payroll/src/main/java/com/dj/payroll/entities/Payslip.java`: Added the `(payrunId, employeeId)` unique constraint.
+- `apps/payroll/src/main/java/com/dj/payroll/entities/SalaryStructureRule.java`: Added the `(salaryStructureId, salaryRuleId)` unique constraint.
+
+### Reason
+- Prevent concurrent requests from processing the same payrun twice and preserve schema-level duplicate protections.
+
+### Validation
+- `mvn -f apps/payroll/pom.xml clean compile -DskipTests` — run after transaction hardening.
+- `mvn -f pom.xml -pl apps/payroll -am test` — run after transaction hardening.
+
+### Notes
+- Service methods use Spring's default `REQUIRED` transaction propagation; runtime business exceptions roll back the complete payrun operation.
+
+## 2026-09-05 16:08 IST � Verify and harden payroll APIs
+
+### Summary
+- Added explicit RestClient builder configuration for the HR contract client.
+- Added payrun service unit tests covering computation, lifecycle state rejection, rounding, and empty-payslip validation.
+- Fixed salary structure updates so replaced assignments are flushed before reinsertion.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/integration/RestClientConfig.java`: Registers the constructor-injected RestClient builder.
+- `apps/payroll/src/main/java/com/dj/payroll/services/SalaryStructureService.java`: Flushes deleted assignments before saving replacements.
+- `apps/payroll/src/test/java/com/dj/payroll/services/PayrunServiceTest.java`: Added three unit tests for payroll processing behavior.
+
+### Reason
+- The application context could not start without a RestClient builder, and structure updates could conflict with the unique structure-rule constraint.
+
+### Validation
+- `mvn -f pom.xml -pl apps/payroll -am test` � passed; 4 tests succeeded.
+- Runtime smoke checks on port 8081 � authentication, CRUD, validation, not-found handling, payrun reads, payslip listing, and structure update passed.
+- Payrun compute returned controlled HTTP 503 because the configured HR API was unavailable.
+- `git diff --check` � passed.
+
+### Notes
+- Full payrun compute, validate, and paid lifecycle requires the HR API `/contracts` endpoint to be running and returning period-valid active contracts.
+- Local smoke records were created in the development database for verification.
