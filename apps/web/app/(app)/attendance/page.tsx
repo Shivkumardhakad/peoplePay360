@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Filter } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Plus, Search, Clock } from "lucide-react";
 import { AttendanceForm } from "@/components/attendance-form";
 
 const MOCK_ATTENDANCE = [
@@ -11,52 +15,79 @@ const MOCK_ATTENDANCE = [
 ];
 
 export default function AttendancePage() {
+  const [search, setSearch] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const filteredAttendance = MOCK_ATTENDANCE.filter(r => 
+    r.employee.toLowerCase().includes(search.toLowerCase()) ||
+    r.date.includes(search) ||
+    r.status.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Attendance</h1>
-          <p className="text-sm text-muted-foreground">Monitor employee attendance and timesheets.</p>
+          <p className="text-sm text-muted-foreground">Monitor employee presence, check-in times, and total working hours.</p>
         </div>
-        
-        <Button className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add Manual Entry
-        </Button>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Add Manual Entry
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="pp-solid-surface sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Manual Attendance Record</DialogTitle>
+            </DialogHeader>
+            <AttendanceForm />
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <div className="flex items-center gap-4">
+      {/* Filter Bar as Glass */}
+      <div className="p-4 pp-glass flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search attendance..." className="pl-9" />
+          <Input 
+            placeholder="Search by employee, date, or status..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-background/80" 
+          />
         </div>
-        <Button variant="outline" className="gap-2">
-          <Filter className="w-4 h-4" />
-          Filter Date
-        </Button>
+        <div className="text-xs font-mono text-muted-foreground">
+          Showing <span className="font-bold text-foreground">{filteredAttendance.length}</span> attendance entries
+        </div>
       </div>
 
-      <div className="rounded-md border bg-card">
+      {/* Solid Surface Table */}
+      <div className="pp-solid-surface overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="border-b border-border bg-muted/20">
+              <TableHead>Ref ID</TableHead>
               <TableHead>Employee</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Check In</TableHead>
               <TableHead>Check Out</TableHead>
               <TableHead className="text-right">Worked Hours</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {MOCK_ATTENDANCE.map((record) => (
-              <TableRow key={record.id} className="hover:bg-muted/50">
+            {filteredAttendance.map((record) => (
+              <TableRow key={record.id} className="hover:bg-muted/50 border-b border-border/60">
+                <TableCell className="font-mono text-xs text-muted-foreground">{record.id}</TableCell>
                 <TableCell className="font-medium text-foreground">{record.employee}</TableCell>
-                <TableCell className="font-mono text-xs">{record.date}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">{record.date}</TableCell>
                 <TableCell className="font-mono text-xs">{record.checkIn}</TableCell>
                 <TableCell className="font-mono text-xs">{record.checkOut}</TableCell>
                 <TableCell className="font-mono text-xs text-right font-medium">{record.workedHours}h</TableCell>
-                <TableCell>
+                <TableCell className="text-right">
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                     record.status === 'Present' ? 'bg-success/10 text-success' : 
                     record.status === 'Absent' ? 'bg-destructive/10 text-destructive' :

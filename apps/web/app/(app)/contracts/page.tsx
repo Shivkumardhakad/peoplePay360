@@ -1,13 +1,12 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search } from "lucide-react";
-import { ContractForm } from "@/components/contract-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-
-// We'll stub the Dialog component if it wasn't installed fully, 
-// but assuming we are using standard shadcn structure.
+import { Plus, Search, FileText } from "lucide-react";
+import { ContractForm } from "@/components/contract-form";
 
 const MOCK_CONTRACTS = [
   { id: "CON-1001", employee: "Alice Johnson", position: "Senior Frontend Engineer", department: "Engineering", startDate: "2023-01-15", endDate: "-", wage: 120000, status: "Active" },
@@ -16,47 +15,77 @@ const MOCK_CONTRACTS = [
 ];
 
 export default function ContractsPage() {
+  const [search, setSearch] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const filteredContracts = MOCK_CONTRACTS.filter(c => 
+    c.employee.toLowerCase().includes(search.toLowerCase()) ||
+    c.position.toLowerCase().includes(search.toLowerCase()) ||
+    c.department.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Contracts</h1>
-          <p className="text-sm text-muted-foreground">Manage employee employment terms and compensation.</p>
+          <p className="text-sm text-muted-foreground">Manage employee terms, compensation, and active contracts.</p>
         </div>
-        
-        {/* We use a simple button here. In a real app this might open a dialog or navigate to a new page */}
-        <Button className="gap-2">
-          <Plus className="w-4 h-4" />
-          Create Contract
-        </Button>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Create Contract
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="pp-solid-surface sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>New Employment Contract</DialogTitle>
+            </DialogHeader>
+            <ContractForm />
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <div className="flex items-center gap-4">
+      {/* Filter bar as glass */}
+      <div className="p-4 pp-glass flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search contracts..." className="pl-9" />
+          <Input 
+            placeholder="Search contracts..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-background/80" 
+          />
+        </div>
+        <div className="text-xs font-mono text-muted-foreground">
+          Showing <span className="font-bold text-foreground">{filteredContracts.length}</span> contract records
         </div>
       </div>
 
-      <div className="rounded-md border bg-card">
+      {/* Solid Surface Table */}
+      <div className="pp-solid-surface overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="border-b border-border bg-muted/20">
+              <TableHead>Contract Ref</TableHead>
               <TableHead>Employee</TableHead>
               <TableHead>Position</TableHead>
               <TableHead>Department</TableHead>
               <TableHead>Start Date</TableHead>
               <TableHead>End Date</TableHead>
               <TableHead className="text-right">Wage</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {MOCK_CONTRACTS.map((contract) => (
+            {filteredContracts.map((contract) => (
               <TableRow 
                 key={contract.id} 
-                className={`cursor-pointer hover:bg-muted/50 ${contract.status === 'Active' ? 'border-l-4 border-l-success' : ''}`}
+                className={`hover:bg-muted/50 border-b border-border/60 ${contract.status === 'Active' ? 'border-l-4 border-l-success' : ''}`}
               >
+                <TableCell className="font-mono text-xs text-muted-foreground">{contract.id}</TableCell>
                 <TableCell className="font-medium text-foreground">{contract.employee}</TableCell>
                 <TableCell>{contract.position}</TableCell>
                 <TableCell>{contract.department}</TableCell>
@@ -65,7 +94,7 @@ export default function ContractsPage() {
                 <TableCell className="font-mono text-right font-medium">
                   ${contract.wage.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-right">
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                     contract.status === 'Active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
                   }`}>
