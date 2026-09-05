@@ -2282,3 +2282,23 @@
 
 ### Notes
 - The Payroll API receives only validated employee IDs; the department selector is not forwarded as an unknown Java DTO field.
+
+## 2026-09-06 15:20 IST — Persist employee department assignment
+
+### Summary
+- New and edited employees now persist the selected department relation.
+- Employee creation rejects unknown department names instead of silently creating an unassigned employee.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Resolves department names to IDs for HR API and Prisma employee writes.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Newly created employees could have an active contract but no `employee.departmentId`, so department-scoped payrun selection excluded them.
+
+### Validation
+- TypeScript check — pending.
+- `git diff --check` — pending.
+
+### Notes
+- Existing unassigned employees need their department updated once from the employee edit form; new records will be correctly assigned.

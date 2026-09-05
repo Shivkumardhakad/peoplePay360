@@ -26,6 +26,8 @@ export async function createEmployeeAction(data: {
   password?: string;
 }) {
   const prismaStatus = data.status === "INACTIVE" ? "TERMINATED" : data.status;
+  const department = await prisma.department.findFirst({ where: { name: { equals: data.department.trim(), mode: "insensitive" } }, select: { id: true } });
+  if (!department) return { success: false, error: `Department not found: ${data.department}` };
 
   try {
     const res = await fetch(`${HR_API_URL}/employees`, {
@@ -36,6 +38,7 @@ export async function createEmployeeAction(data: {
         lastName: data.lastName,
         email: data.email,
         phone: data.phone || null,
+        departmentId: department.id,
         hireDate: new Date(data.dateOfJoining),
         status: prismaStatus,
       }),
@@ -63,6 +66,7 @@ export async function createEmployeeAction(data: {
         lastName: data.lastName,
         email: data.email,
         phone: data.phone || null,
+        departmentId: department.id,
         hireDate: new Date(data.dateOfJoining),
         status: prismaStatus,
       },
@@ -105,7 +109,9 @@ export async function updateEmployeeAction(employeeId: string, data: {
   firstName: string; lastName: string; email: string; phone?: string; department?: string; jobPosition?: string; dateOfJoining?: string; status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED"; password?: string;
 }) {
   try {
-    const employee = await prisma.employee.update({ where: { id: employeeId }, data: { firstName: data.firstName, lastName: data.lastName, email: data.email.trim().toLowerCase(), phone: data.phone || null, ...(data.dateOfJoining ? { hireDate: new Date(data.dateOfJoining) } : {}), status: data.status === "INACTIVE" ? "TERMINATED" : data.status } });
+    const department = data.department ? await prisma.department.findFirst({ where: { name: { equals: data.department.trim(), mode: "insensitive" } }, select: { id: true } }) : null;
+    if (data.department && !department) return { success: false, error: `Department not found: ${data.department}` };
+    const employee = await prisma.employee.update({ where: { id: employeeId }, data: { firstName: data.firstName, lastName: data.lastName, email: data.email.trim().toLowerCase(), phone: data.phone || null, ...(department ? { departmentId: department.id } : {}), ...(data.dateOfJoining ? { hireDate: new Date(data.dateOfJoining) } : {}), status: data.status === "INACTIVE" ? "TERMINATED" : data.status } });
     if (data.password?.trim()) {
       const passwordHash = await bcrypt.hash(data.password.trim(), 10);
       const linkedUser = await prisma.user.findFirst({ where: { employeeId }, select: { id: true } });
