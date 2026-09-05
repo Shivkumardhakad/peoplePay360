@@ -1,8 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Prisma, UserRole } from "@prisma/client";
+import { HrAuthGuard } from "../auth/auth.guard";
+import { Roles } from "../auth/roles.decorator";
 import { HrService } from "../shared/hr.service";
 
 @Controller("payroll")
+@UseGuards(HrAuthGuard)
+@Roles(UserRole.ADMIN, UserRole.PAYROLL_MANAGER, UserRole.HR_PAYROLL_USER)
 export class PayrollController {
   constructor(private readonly hr: HrService) {}
 
@@ -35,6 +39,7 @@ export class PayrollController {
   @Get("payruns/:id/warnings") getPayrunWarnings(@Param("id") id: string) { return this.hr.getPayrunWarnings(id); }
   @Post("payruns/:id/validate") validatePayrun(@Param("id") id: string) { return this.hr.validatePayrun(id); }
   @Post("payruns/:id/mark-paid") markPayrunPaid(@Param("id") id: string) { return this.hr.markPayrunPaid(id); }
+  @Post("payruns/:id/send-payslips") sendPayslips(@Param("id") id: string) { return this.hr.sendPayrunPayslips(id); }
   @Post("payruns/:id/cancel") cancelPayrun(@Param("id") id: string) { return this.hr.cancelPayrun(id); }
 
   @Get("payslips") listPayslips() { return this.hr.listPayslips(); }

@@ -10,7 +10,7 @@ async function bootstrap() {
     origin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
     credentials: true
   });
-  const port = process.env.PORT ? Number(process.env.PORT) : 4000;
+  const port = process.env.PORT ? Number(process.env.PORT) : 3001;
   await app.listen(port);
   console.log(`[HR-API] Running on http://localhost:${port}/api/hr`);
 }

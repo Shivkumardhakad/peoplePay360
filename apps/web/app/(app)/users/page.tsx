@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,15 +8,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Search, ShieldCheck } from "lucide-react";
 
-type UserRole = "ADMIN" | "HR_MANAGER" | "HR_PAYROLL_USER" | "HR_PAYROLL_MANAGER" | "EMPLOYEE";
+const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:3001/api/hr";
 
-const MOCK_USERS = [
-  { id: "USR-001", name: "Admin User", email: "admin@peoplepay360.local", role: "ADMIN" as UserRole, status: "Active" },
-  { id: "USR-002", name: "Bob Smith", email: "hr.manager@peoplepay360.local", role: "HR_MANAGER" as UserRole, status: "Active" },
-  { id: "USR-003", name: "Alice Johnson", email: "payroll.manager@peoplepay360.local", role: "HR_PAYROLL_MANAGER" as UserRole, status: "Active" },
-  { id: "USR-004", name: "Charlie Davis", email: "payroll.user@peoplepay360.local", role: "HR_PAYROLL_USER" as UserRole, status: "Active" },
-  { id: "USR-005", name: "Emily Watson", email: "employee@peoplepay360.local", role: "EMPLOYEE" as UserRole, status: "Active" },
-];
+type UserRole = "ADMIN" | "HR_MANAGER" | "PAYROLL_MANAGER" | "EMPLOYEE";
+
+type SystemUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  employeeId?: string | null;
+};
 
 function formatRoleLabel(role: UserRole) {
   switch (role) {
@@ -24,49 +26,92 @@ function formatRoleLabel(role: UserRole) {
       return "Admin";
     case "HR_MANAGER":
       return "HR Manager";
-    case "HR_PAYROLL_MANAGER":
+    case "PAYROLL_MANAGER":
       return "Payroll Manager";
-    case "HR_PAYROLL_USER":
-      return "Payroll User";
     case "EMPLOYEE":
       return "Employee";
   }
 }
 
 export default function UsersPage() {
-  const [users, setUsers] = useState(MOCK_USERS);
+  const [users, setUsers] = useState<SystemUser[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("HR_MANAGER");
   const [password, setPassword] = useState("");
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(search.toLowerCase()) || 
-    u.email.toLowerCase().includes(search.toLowerCase()) ||
-    u.role.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    let mounted = true;
 
-  const handleAddUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !email) return;
+    async function loadUsers() {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`${HR_API_URL}/users`, { cache: "no-store" });
+        if (!response.ok) throw new Error(await readError(response));
+        const data = await response.json();
+        if (mounted) setUsers(data);
+      } catch (err) {
+        if (mounted) setError(err instanceof Error ? err.message : "Unable to load users");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
 
-    const newUser = {
-      id: `USR-${String(users.length + 1).padStart(3, "0")}`,
-      name,
-      email,
-      role,
-      status: "Active",
+    void loadUsers();
+
+    return () => {
+      mounted = false;
     };
+  }, []);
 
-    setUsers([...users, newUser]);
-    setName("");
-    setEmail("");
-    setPassword("");
-    setRole("HR_MANAGER");
-    setDialogOpen(false);
+  const filteredUsers = useMemo(() => {
+    const term = search.toLowerCase();
+    return users.filter((u) =>
+      u.name.toLowerCase().includes(term) ||
+      u.email.toLowerCase().includes(term) ||
+      u.role.toLowerCase().includes(term)
+    );
+  }, [search, users]);
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || !password) return;
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch(`${HR_API_URL}/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          role,
+          password
+        })
+      });
+
+      if (!response.ok) throw new Error(await readError(response));
+      const createdUser = await response.json();
+
+      setUsers((currentUsers) => [...currentUsers, createdUser].sort((a, b) => a.email.localeCompare(b.email)));
+      setName("");
+      setEmail("");
+      setPassword("");
+      setRole("HR_MANAGER");
+      setDialogOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create user");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -92,6 +137,11 @@ export default function UsersPage() {
               <DialogTitle>Create System User</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAddUser} className="space-y-4 pt-2">
+              {error && (
+                <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                  {error}
+                </p>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
                 <Input
@@ -126,8 +176,7 @@ export default function UsersPage() {
                 >
                   <option value="ADMIN">ADMIN</option>
                   <option value="HR_MANAGER">HR_MANAGER</option>
-                  <option value="HR_PAYROLL_MANAGER">HR_PAYROLL_MANAGER</option>
-                  <option value="HR_PAYROLL_USER">HR_PAYROLL_USER</option>
+                  <option value="PAYROLL_MANAGER">PAYROLL_MANAGER</option>
                   <option value="EMPLOYEE">EMPLOYEE</option>
                 </select>
               </div>
@@ -141,6 +190,7 @@ export default function UsersPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="font-mono text-sm"
+                  minLength={8}
                   required
                 />
               </div>
@@ -149,8 +199,8 @@ export default function UsersPage() {
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                  Create User
+                <Button type="submit" disabled={submitting} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  {submitting ? "Creating..." : "Create User"}
                 </Button>
               </div>
             </form>
@@ -170,9 +220,15 @@ export default function UsersPage() {
           />
         </div>
         <div className="text-xs font-mono text-muted-foreground">
-          Showing <span className="font-bold text-foreground">{filteredUsers.length}</span> user records
+          {loading ? "Loading user records..." : <>Showing <span className="font-bold text-foreground">{filteredUsers.length}</span> user records</>}
         </div>
       </div>
+
+      {error && !dialogOpen && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+          {error}
+        </p>
+      )}
 
       {/* Solid Surface Table */}
       <div className="pp-solid-surface overflow-hidden">
@@ -187,6 +243,13 @@ export default function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {!loading && filteredUsers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center text-sm text-muted-foreground">
+                  No users found.
+                </TableCell>
+              </TableRow>
+            )}
             {filteredUsers.map((u) => (
               <TableRow key={u.id} className="hover:bg-muted/50 border-b border-border/60">
                 <TableCell className="font-mono text-xs text-muted-foreground">{u.id}</TableCell>
@@ -194,12 +257,12 @@ export default function UsersPage() {
                 <TableCell className="font-mono text-xs">{u.email}</TableCell>
                 <TableCell>
                   <span className="font-mono text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-                    {u.role}
+                    {formatRoleLabel(u.role)}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
                   <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-success/10 text-success">
-                    {u.status}
+                    Active
                   </span>
                 </TableCell>
               </TableRow>
@@ -209,4 +272,16 @@ export default function UsersPage() {
       </div>
     </div>
   );
+}
+
+async function readError(response: Response) {
+  const fallback = `Request failed with status ${response.status}`;
+  try {
+    const data = await response.json();
+    if (typeof data.message === "string") return data.message;
+    if (Array.isArray(data.message)) return data.message.join(", ");
+    return fallback;
+  } catch {
+    return fallback;
+  }
 }

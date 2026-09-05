@@ -1,8 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Prisma, UserRole } from "@prisma/client";
+import { HrAuthGuard } from "../auth/auth.guard";
+import { Roles } from "../auth/roles.decorator";
 import { HrService } from "../shared/hr.service";
 
 @Controller("users")
+@UseGuards(HrAuthGuard)
+@Roles(UserRole.ADMIN)
 export class UsersController {
   constructor(private readonly hr: HrService) {}
 

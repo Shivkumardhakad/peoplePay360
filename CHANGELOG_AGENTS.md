@@ -789,10 +789,44 @@
 ### Validation
 - `pnpm --filter @peoplepay360/hr-api build` — passed (`tsc --noEmit`).
 - Prisma client generation — attempted; Windows reported an `EPERM` rename because the Prisma query engine file was in use. Run `pnpm --filter @peoplepay360/db exec prisma generate` after stopping running Node/Prisma processes.
-- `git diff --check` — pending final review.
+- `git diff --check` — passed.
 
 ### Notes
 - The database migration must be deployed before using employee selection: `pnpm --filter @peoplepay360/db exec prisma migrate deploy`.
+
+## 2026-09-05 — Add backend RBAC, attendance rules, and bulk payslip email
+
+### Summary
+- Added authenticated backend access with role checks, derived attendance status/worked time, and SMTP-based bulk payslip delivery.
+
+### Files Changed
+- `apps/hr-api/src/modules/auth/auth.controller.ts`: Added login endpoint issuing signed bearer tokens.
+- `apps/hr-api/src/modules/auth/auth.service.ts`: Added bcrypt login and HMAC token verification.
+- `apps/hr-api/src/modules/auth/auth.guard.ts`: Added global bearer authentication and role enforcement.
+- `apps/hr-api/src/modules/auth/public.decorator.ts`: Marked login as the public endpoint.
+- `apps/hr-api/src/modules/auth/roles.decorator.ts`: Added route role metadata.
+- `apps/hr-api/src/modules/hr.module.ts`: Registered authentication and global guard providers.
+- `apps/hr-api/src/modules/payroll/payroll.controller.ts`: Protected payroll routes and added bulk send endpoint.
+- `apps/hr-api/src/modules/rbac/rbac.controller.ts`: Restricted RBAC administration to Admin.
+- `apps/hr-api/src/modules/users/users.controller.ts`: Restricted user administration to Admin.
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Added SMTP payslip delivery and attendance status derivation.
+- `packages/db/prisma/schema.prisma`: Added the `HR_PAYROLL_USER` role.
+- `packages/db/prisma/migrations/20260905161000_add_hr_payroll_user_role/migration.sql`: Added the role enum value.
+- `apps/hr-api/package.json`, `pnpm-lock.yaml`: Added Nodemailer and its types.
+- `CHANGELOG_AGENTS.md`: Recorded this implementation.
+
+### Reason
+- Payroll and administrative APIs needed server-side authorization, attendance needed business-derived status, and the payrun workflow needed an actual backend bulk delivery action.
+
+### Validation
+- `pnpm --filter @peoplepay360/db exec prisma generate --no-engine` — passed.
+- `pnpm --filter @peoplepay360/hr-api build` — passed (`tsc --noEmit`).
+- `git diff --check` — pending final review.
+
+### Notes
+- Set `AUTH_SECRET` for bearer-token signing.
+- Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, and optionally `SMTP_SECURE` before using bulk email.
+- The bulk email currently sends an HTML payslip summary; PDF attachment generation remains separate work.
 
 ## 2026-09-05 17:38 +05:30 — Expand hackathon scope details
 
