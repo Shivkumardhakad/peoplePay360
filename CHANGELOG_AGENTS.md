@@ -16,6 +16,25 @@
 
 ### Notes
 - The current repository has no `package.json`, so Node.js checks will be skipped until one is added.
+
+## 2026-09-05 12:15 IST — Fix pnpm CI runtime
+
+### Summary
+- Updated CI for the pnpm monorepo and current Node.js runner runtime.
+
+### Files Changed
+- `.github/workflows/ci.yml`: Switched from Node 20/npm to Node 24/pnpm and removed npm lockfile caching.
+- `CHANGELOG_AGENTS.md`: Recorded the CI fix.
+
+### Reason
+- CI failed because it requested deprecated Node 20 and attempted npm dependency caching without a `package-lock.json`.
+
+### Validation
+- `git diff --check` — passed
+- `git status --short` — reviewed
+
+### Notes
+- CI uses `pnpm install --no-frozen-lockfile` because the repository does not currently contain a `pnpm-lock.yaml`.
 ## 2026-09-05 11:20 +05:30 — Codex Project Scaffold
 
 ### Summary
