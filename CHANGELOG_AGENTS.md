@@ -175,3 +175,26 @@
 ### Notes
 - Existing legacy HR fields (`baseSalary`, `payrollProfileCode`, `days`, and single `User.role`) remain for backward compatibility.
 - Payroll API currently owns its separate Spring database; these Prisma payroll models provide the normalized shared application model requested in `temp/one` and should be reconciled before production migrations.
+
+## 2026-09-05 14:05 IST — Modularize HR API source
+
+### Summary
+- Reorganized HR API source into feature-oriented module directories and introduced a dedicated `HrModule` composition boundary.
+
+### Files Changed
+- `apps/hr-api/src/modules/*`: Grouped controllers by employees, contracts, attendance, departments, job positions, time off, users, and dashboard.
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Moved shared HR application service into the shared module area.
+- `apps/hr-api/src/infrastructure/database/prisma.service.ts`: Moved Prisma lifecycle adapter into the infrastructure layer.
+- `apps/hr-api/src/modules/hr.module.ts`: Added module-level controller/provider composition.
+- `apps/hr-api/src/app.module.ts`: Reduced root module to application composition.
+- `CHANGELOG_AGENTS.md`: Recorded the refactor.
+
+### Reason
+- Establish a maintainable source architecture while preserving all existing `/api/hr` routes.
+
+### Validation
+- `git diff --check` — pending
+- NestJS build/tests — not run; dependencies and Maven are unavailable in the local environment.
+
+### Notes
+- `HrService` remains a shared application service for now; domain-specific services can be extracted next without changing the route contract.

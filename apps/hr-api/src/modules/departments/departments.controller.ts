@@ -1,5 +1,5 @@
 import { Controller, Get } from "@nestjs/common";
-import { HrService } from "./hr.service";
+import { HrService } from "../shared/hr.service";
 
 @Controller("departments")
 export class DepartmentsController {
