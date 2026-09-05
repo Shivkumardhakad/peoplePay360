@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { Search, Plus, Loader2 } from "lucide-react";
-import { getAllocationsAction } from "@/lib/api-actions";
+import { createAllocationAction, getAllocationsAction, getEmployeesAction, getTimeOffTypesAction } from "@/lib/api-actions";
 
 interface AllocationItem {
   id: string;
@@ -25,13 +25,23 @@ export default function TimeOffAllocationsPage() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [employees, setEmployees] = useState<Array<{ id: string; employeeNumber: string; name: string }>>([]);
+  const [types, setTypes] = useState<Array<{ id: string; name: string }>>([]);
 
   // Form State
-  const [employee, setEmployee] = useState("Alice Johnson");
-  const [leaveType, setLeaveType] = useState("Annual Leave");
+  const [employee, setEmployee] = useState("");
+  const [leaveType, setLeaveType] = useState("");
   const [allocatedDays, setAllocatedDays] = useState(15);
 
-  useEffect(() => { getAllocationsAction().then((rows) => setAllocations(rows)); }, []);
+  useEffect(() => {
+    Promise.all([getAllocationsAction(), getEmployeesAction(), getTimeOffTypesAction()]).then(([allocationRows, employeeRows, typeRows]) => {
+      setAllocations(allocationRows);
+      setEmployees(employeeRows);
+      setTypes(typeRows.map((type) => ({ id: type.id, name: type.name })));
+      setEmployee(employeeRows[0]?.id ?? "");
+      setLeaveType(typeRows[0]?.id ?? "");
+    });
+  }, []);
 
   const filteredAllocations = allocations.filter(
     (a) =>
@@ -43,25 +53,11 @@ export default function TimeOffAllocationsPage() {
   const handleGrantAllocation = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 450));
-
-    const newAlloc: AllocationItem = {
-      id: `ALL-${String(allocations.length + 1).padStart(3, "0")}`,
-      employee,
-      type: leaveType,
-      allocated: Number(allocatedDays),
-      used: 0,
-    };
-
-    setAllocations([newAlloc, ...allocations]);
-    setSubmitting(false);
-    setDialogOpen(false);
-
-    toast({
-      title: "Allocation Granted",
-      description: `${allocatedDays} days of ${leaveType} allocated to ${employee}.`,
-      type: "success",
-    });
+    const result = await createAllocationAction({ employeeId: employee, timeOffTypeId: leaveType, allocated: Number(allocatedDays), periodStart: `${new Date().getFullYear()}-01-01`, periodEnd: `${new Date().getFullYear()}-12-31` });
+    if (!result.success) { toast({ title: "Allocation failed", description: result.error, type: "error" }); setSubmitting(false); return; }
+    setAllocations(await getAllocationsAction());
+    setSubmitting(false); setDialogOpen(false);
+    toast({ title: "Allocation Granted", description: "Allocation saved to the HR database.", type: "success" });
   };
 
   return (
@@ -92,10 +88,7 @@ export default function TimeOffAllocationsPage() {
                   onChange={(e) => setEmployee(e.target.value)}
                   className="flex h-8 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="Alice Johnson">Alice Johnson (EMP-001)</option>
-                  <option value="Bob Smith">Bob Smith (EMP-002)</option>
-                  <option value="Charlie Davis">Charlie Davis (EMP-003)</option>
-                  <option value="Emily Watson">Emily Watson (EMP-004)</option>
+                  {employees.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.employeeNumber})</option>)}
                 </select>
               </div>
 
@@ -108,9 +101,7 @@ export default function TimeOffAllocationsPage() {
                     onChange={(e) => setLeaveType(e.target.value)}
                     className="flex h-8 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
-                    <option value="Annual Leave">Annual Leave</option>
-                    <option value="Sick Leave">Sick Leave</option>
-                    <option value="Casual Absence">Casual Absence</option>
+                    {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
                   </select>
                 </div>
 

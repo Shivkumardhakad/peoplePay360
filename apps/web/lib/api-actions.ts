@@ -516,6 +516,24 @@ export async function getAllocationsAction() {
   return rows.map((row) => ({ id: row.id, employeeId: row.employeeId, employee: `${row.employee.firstName} ${row.employee.lastName}`, type: row.timeOffType.name, allocated: Number(row.allocated), used: Number(row.consumed), remaining: Number(row.remaining ?? Number(row.allocated) - Number(row.consumed)) }));
 }
 
+export async function createAllocationAction(data: { employeeId: string; timeOffTypeId: string; allocated: number; periodStart: string; periodEnd: string }) {
+  try {
+    const employee = await prisma.employee.findFirst({ where: { OR: [{ id: data.employeeId }, { employeeNumber: data.employeeId }] } });
+    if (!employee) return { success: false, error: "Selected employee was not found in the database." };
+    const type = await prisma.timeOffType.findUnique({ where: { id: data.timeOffTypeId } });
+    if (!type) return { success: false, error: "Selected time-off type was not found in the database." };
+    const allocation = await prisma.allocation.upsert({
+      where: { employeeId_timeOffTypeId_periodStart_periodEnd: { employeeId: employee.id, timeOffTypeId: type.id, periodStart: new Date(data.periodStart), periodEnd: new Date(data.periodEnd) } },
+      update: { allocated: data.allocated, remaining: data.allocated },
+      create: { employeeId: employee.id, timeOffTypeId: type.id, periodStart: new Date(data.periodStart), periodEnd: new Date(data.periodEnd), allocated: data.allocated, consumed: 0, remaining: data.allocated },
+    });
+    revalidatePath("/time-off/allocations");
+    return { success: true, allocation };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to grant allocation" };
+  }
+}
+
 export async function getTimeOffRequestsAction() {
   const rows = await prisma.timeOffRequest.findMany({ orderBy: { createdAt: "desc" }, include: { employee: true, timeOffType: true } });
   return rows.map((row) => ({ id: row.id, employeeId: row.employeeId, employee: `${row.employee.firstName} ${row.employee.lastName}`, type: row.timeOffType.name, dates: `${row.startDate.toISOString().slice(0, 10)} to ${row.endDate.toISOString().slice(0, 10)}`, duration: `${Number(row.quantity)} ${row.timeOffType.unit === "DAYS" ? "Days" : "Hours"}`, status: row.status === "APPROVED" ? "Approved" : row.status === "REJECTED" ? "Rejected" : row.status === "CANCELLED" ? "Cancelled" : "Pending" }));

@@ -1656,3 +1656,21 @@
 
 ### Notes
 - HR Manager, HR Payroll roles, Payroll Manager, and Admin retain the employee creation action.
+## 2026-09-06 02:30 IST — Live allocation employee selector
+
+### Summary
+- Replaced hardcoded allocation employee and leave-type options with records loaded from Prisma.
+- Grant Allocation now persists/upserts the selected allocation in the HR database.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added database-backed allocation creation.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: Load live employees/time-off types and save allocations through the server action.
+
+### Reason
+- HR Manager allocation dropdowns were showing temporary demo employees instead of current HR records.
+
+### Validation
+- Pending after this change.
+
+### Notes
+- Allocation period defaults to the current calendar year and duplicate employee/type/year allocations are updated rather than duplicated.
