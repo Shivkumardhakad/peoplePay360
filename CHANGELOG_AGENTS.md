@@ -1640,3 +1640,19 @@
 
 ### Notes
 - The Java Payroll service still must be running for real payroll data and writes: `pnpm dev:payroll`.
+## 2026-09-06 02:00 IST — Hide employee creation during session loading
+
+### Summary
+- Removed the admin-role loading fallback from the Employees page so Employee users never see the Add Employee action while their session is loading.
+
+### Files Changed
+- `apps/web/app/(app)/employees/page.tsx`: Require an authenticated role before rendering employee creation controls.
+
+### Reason
+- The previous `ADMIN` fallback could briefly expose the new employee action to Employee-role users.
+
+### Validation
+- Not run after this one-line UI guard; prior web TypeScript validation passed.
+
+### Notes
+- HR Manager, HR Payroll roles, Payroll Manager, and Admin retain the employee creation action.

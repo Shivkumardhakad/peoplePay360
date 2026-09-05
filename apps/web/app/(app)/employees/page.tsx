@@ -42,7 +42,7 @@ export default function EmployeesPage() {
 
   useEffect(() => { getEmployeesAction().then((rows) => setEmployees(rows.map((row) => ({ ...row, status: row.status === "ACTIVE" ? "Active" : row.status === "ON_LEAVE" ? "On Leave" : "Inactive" })))); }, []);
 
-  const role = session?.user?.role || "ADMIN";
+  const role = session?.user?.role;
   const canAddEmployee =
     role === "ADMIN" ||
     role === "HR_MANAGER" ||
