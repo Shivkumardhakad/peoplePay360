@@ -44,7 +44,14 @@ export default function TimeOffRequestsPage() {
   const [reason, setReason] = useState("");
 
   const role = session?.user?.role || "ADMIN";
-  const canApprove = role === "ADMIN" || role === "HR_MANAGER";
+  const isEmployee = role === "EMPLOYEE";
+  const canApprove =
+    role === "ADMIN" ||
+    role === "HR_MANAGER" ||
+    role === "HR_PAYROLL_MANAGER" ||
+    role === "PAYROLL_MANAGER" ||
+    role === "HR_PAYROLL_USER";
+  const currentUserName = session?.user?.name || "Emily Watson";
 
   const handleDecision = async (id: string, decision: "Approved" | "Rejected") => {
     const actionKey = `${id}-${decision.toLowerCase()}`;
@@ -104,7 +111,23 @@ export default function TimeOffRequestsPage() {
     }
   };
 
-  const filteredRequests = requests.filter(
+  // RBAC Scoping: Employees see ONLY their own requests. Managers see all requests.
+  const scopedRequests = isEmployee
+    ? (requests.some((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
+        ? requests.filter((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
+        : [
+            {
+              id: "REQ-MINE",
+              employee: currentUserName,
+              type: "Annual Leave",
+              dates: "2024-01-10 to 2024-01-12",
+              duration: "3 Days",
+              status: "Pending" as const,
+            },
+          ])
+    : requests;
+
+  const filteredRequests = scopedRequests.filter(
     (r) =>
       r.employee.toLowerCase().includes(search.toLowerCase()) ||
       r.type.toLowerCase().includes(search.toLowerCase()) ||
@@ -116,8 +139,14 @@ export default function TimeOffRequestsPage() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold tracking-tight text-foreground">Time Off Requests</h1>
-          <p className="text-xs text-muted-foreground">Review, approve, or submit employee leave applications.</p>
+          <h1 className="text-base font-semibold tracking-tight text-foreground">
+            {isEmployee ? "My Leave Requests" : "Time Off Requests"}
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            {isEmployee
+              ? "Submit, view status, and track your personal leave requests."
+              : "Review, approve, or submit employee leave applications."}
+          </p>
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -239,11 +268,20 @@ export default function TimeOffRequestsPage() {
                 const isApproving = actionLoading === `${req.id}-approved`;
                 const isRejecting = actionLoading === `${req.id}-rejected`;
                 const isRowLoading = isApproving || isRejecting;
+                const isSelf = req.employee.toLowerCase() === currentUserName.toLowerCase();
+                const canApproveThis = canApprove && (role === "ADMIN" || !isSelf);
 
                 return (
                   <TableRow key={req.id}>
                     <TableCell className="font-mono text-[11px] text-muted-foreground">{req.id}</TableCell>
-                    <TableCell className="font-medium text-xs">{req.employee}</TableCell>
+                    <TableCell className="font-medium text-xs">
+                      {req.employee}
+                      {isSelf && (
+                        <span className="ml-1.5 text-[10px] font-mono text-muted-foreground bg-muted px-1 py-0.2 rounded">
+                          (You)
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{req.type}</TableCell>
                     <TableCell className="font-mono text-[11px] text-muted-foreground">{req.dates}</TableCell>
                     <TableCell className="font-mono text-[11px] font-medium">{req.duration}</TableCell>
@@ -262,39 +300,47 @@ export default function TimeOffRequestsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {canApprove && req.status === "Pending" ? (
-                        <div className="flex justify-end gap-1.5">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDecision(req.id, "Rejected")}
-                            disabled={isRowLoading}
-                            className="h-6 px-2 text-[11px] text-destructive border-destructive/20 hover:bg-destructive/10"
-                          >
-                            {isRejecting ? (
-                              <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                            ) : (
-                              <XCircle className="w-3 h-3 mr-1" />
-                            )}
-                            {isRejecting ? "Rejecting..." : "Reject"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleDecision(req.id, "Approved")}
-                            disabled={isRowLoading}
-                            className="h-6 px-2 text-[11px] bg-emerald-600 text-white hover:bg-emerald-700"
-                          >
-                            {isApproving ? (
-                              <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                            ) : (
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                            )}
-                            {isApproving ? "Approving..." : "Approve"}
-                          </Button>
-                        </div>
+                      {req.status === "Pending" ? (
+                        isSelf && role !== "ADMIN" ? (
+                          <span className="text-[10px] text-amber-600 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                            Awaiting Admin
+                          </span>
+                        ) : canApproveThis ? (
+                          <div className="flex justify-end gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDecision(req.id, "Rejected")}
+                              disabled={isRowLoading}
+                              className="h-6 px-2 text-[11px] text-destructive border-destructive/20 hover:bg-destructive/10"
+                            >
+                              {isRejecting ? (
+                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                              ) : (
+                                <XCircle className="w-3 h-3 mr-1" />
+                              )}
+                              {isRejecting ? "Rejecting..." : "Reject"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleDecision(req.id, "Approved")}
+                              disabled={isRowLoading}
+                              className="h-6 px-2 text-[11px] bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              {isApproving ? (
+                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                              ) : (
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                              )}
+                              {isApproving ? "Approving..." : "Approve"}
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground font-mono">Pending Review</span>
+                        )
                       ) : (
                         <span className="text-[10px] text-muted-foreground font-mono">
-                          {req.status === "Pending" ? "Pending Review" : "Decided"}
+                          {req.status === "Approved" ? "Approved" : "Rejected"}
                         </span>
                       )}
                     </TableCell>

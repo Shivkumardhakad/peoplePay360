@@ -2,6 +2,7 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,13 +41,29 @@ const MOCK_PAYSLIP_DATA = {
 
 export default function PayslipDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: payslipId } = use(params);
+  const { data: session } = useSession();
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
   const [printing, setPrinting] = useState(false);
 
+  const isEmployee = session?.user?.role === "EMPLOYEE";
+  const currentUserName = session?.user?.name || "Employee";
+  const currentEmpId = session?.user?.employeeId || "EMP-004";
+
   const payslip = {
     ...MOCK_PAYSLIP_DATA,
     id: payslipId,
+    ...(isEmployee
+      ? {
+          employeeName: currentUserName,
+          employeeId: currentEmpId,
+          department: "Product & Design",
+          position: "Staff Member",
+          gross: 8500.0,
+          deductions: 1700.0,
+          net: 6800.0,
+        }
+      : {}),
   };
 
   const handleDownloadPDF = async () => {

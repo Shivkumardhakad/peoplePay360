@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Search } from "lucide-react";
 import { ContractForm, type ContractFormValues } from "@/components/contract-form";
+import { getContractsAction } from "@/lib/api-actions";
 
 interface ContractItem {
   id: string;
@@ -34,8 +35,21 @@ export default function ContractsPage() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  useEffect(() => {
+    getContractsAction().then((liveContracts) => {
+      if (liveContracts && liveContracts.length > 0) {
+        setContracts(liveContracts);
+      }
+    });
+  }, []);
+
   const role = session?.user?.role || "ADMIN";
-  const canCreateContract = role === "ADMIN" || role === "HR_MANAGER";
+  const canCreateContract =
+    role === "ADMIN" ||
+    role === "HR_MANAGER" ||
+    role === "HR_PAYROLL_MANAGER" ||
+    role === "PAYROLL_MANAGER" ||
+    role === "HR_PAYROLL_USER";
 
   const filteredContracts = contracts.filter(
     (c) =>
@@ -45,26 +59,11 @@ export default function ContractsPage() {
       c.id.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleCreated = (data: ContractFormValues) => {
-    const employeeNames: Record<string, string> = {
-      "EMP-001": "Alice Johnson",
-      "EMP-002": "Bob Smith",
-      "EMP-003": "Charlie Davis",
-      "EMP-004": "Emily Watson",
-    };
-
-    const newContract: ContractItem = {
-      id: `CON-${String(contracts.length + 1001)}`,
-      employee: employeeNames[data.employeeId] || data.employeeId,
-      position: data.position,
-      department: data.department,
-      startDate: data.startDate,
-      endDate: data.endDate || "-",
-      wage: Number(data.wage),
-      status: "Active",
-    };
-
-    setContracts([newContract, ...contracts]);
+  const handleCreated = async () => {
+    const live = await getContractsAction();
+    if (live && live.length > 0) {
+      setContracts(live);
+    }
     setDialogOpen(false);
   };
 

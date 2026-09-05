@@ -49,7 +49,10 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
   const role = session?.user?.role || "ADMIN";
-  const canFinalize = role === "ADMIN" || role === "PAYROLL_MANAGER";
+  const canFinalize =
+    role === "ADMIN" ||
+    role === "PAYROLL_MANAGER" ||
+    role === "HR_PAYROLL_MANAGER";
 
   const handleCompute = async () => {
     setLoadingAction("compute");

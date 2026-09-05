@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Search, Download, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +73,26 @@ const MOCK_PAYSLIPS = [
       { rule: "Deductions", category: "DEDUCTION", amount: -2500.0, type: "DEDUCTION" as const },
     ],
   },
+  {
+    id: "PS-1004",
+    employeeName: "Emily Watson",
+    employeeId: "EMP-004",
+    department: "Product & Design",
+    position: "Lead UX Designer",
+    period: "2023-10",
+    payrun: "October 2023 Payroll",
+    contractRef: "CON-1004 (Design Lead)",
+    gross: 8500,
+    deductions: 1700,
+    net: 6800,
+    status: "PAID" as const,
+    lines: [
+      { rule: "Basic Salary", category: "BASIC", amount: 7000.0, type: "EARNING" as const },
+      { rule: "Creative Allowance", category: "ALLOWANCE", amount: 1500.0, type: "EARNING" as const },
+      { rule: "Income Tax", category: "DEDUCTION", amount: -1300.0, type: "DEDUCTION" as const },
+      { rule: "Provident Fund", category: "DEDUCTION", amount: -400.0, type: "DEDUCTION" as const },
+    ],
+  },
 ];
 
 function money(value: number) {
@@ -79,11 +100,26 @@ function money(value: number) {
 }
 
 export default function PayslipsPage() {
+  const { data: session } = useSession();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const filteredPayslips = MOCK_PAYSLIPS.filter(
+  const role = session?.user?.role || "ADMIN";
+  const isEmployee = role === "EMPLOYEE";
+  const currentUserName = session?.user?.name || "Emily Watson";
+  const currentEmpId = session?.user?.employeeId || "EMP-004";
+
+  // RBAC Scoping: Employees see ONLY their own payslips. Managers see all company payslips.
+  const scopedPayslips = isEmployee
+    ? MOCK_PAYSLIPS.filter(
+        (p) =>
+          p.employeeId === currentEmpId ||
+          p.employeeName.toLowerCase() === currentUserName.toLowerCase()
+      )
+    : MOCK_PAYSLIPS;
+
+  const filteredPayslips = scopedPayslips.filter(
     (p) =>
       p.employeeName.toLowerCase().includes(search.toLowerCase()) ||
       p.payrun.toLowerCase().includes(search.toLowerCase()) ||
@@ -117,8 +153,14 @@ export default function PayslipsPage() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold tracking-tight text-foreground">Payslips</h1>
-          <p className="text-xs text-muted-foreground">Generated employee salary statements ready for review and delivery.</p>
+          <h1 className="text-base font-semibold tracking-tight text-foreground">
+            {isEmployee ? "My Payslips" : "Payslips"}
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            {isEmployee
+              ? "Your historical salary statements and printable compensation receipts."
+              : "Generated employee salary statements ready for review and delivery."}
+          </p>
         </div>
       </div>
 
@@ -134,7 +176,7 @@ export default function PayslipsPage() {
           />
         </div>
         <span className="text-[11px] font-mono text-muted-foreground">
-          {filteredPayslips.length} payslips
+          {filteredPayslips.length} {filteredPayslips.length === 1 ? "payslip" : "payslips"}
         </span>
       </div>
 

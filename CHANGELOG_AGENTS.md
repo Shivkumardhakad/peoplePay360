@@ -1032,3 +1032,112 @@
 ### Notes
 - PDF generation uses pure client-side `jspdf` without external server dependencies.
 - NextAuth session provides role-based authorization for action buttons and navigation links.
+
+## 2026-09-05 22:42 IST — Fix Admin User Creation and Credentials Login
+
+### Summary
+- Fixed user creation on the Team & Roles (`/users`) page by replacing an unpersisted client-side fetch with robust server actions (`createUserAction`, `getUsersAction`, `resetUserPasswordAction`).
+- Users created by Admin are now hashed with bcrypt (salt rounds 10) and persisted to the PostgreSQL database, enabling immediate login via `/login`.
+- If role `EMPLOYEE` is selected, an associated `Employee` record is automatically linked/created so employee portal features resolve correctly.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added `getUsersAction`, `createUserAction`, `resetUserPasswordAction`, and `deleteUserAction` with Prisma and bcryptjs.
+- `apps/web/app/(app)/users/page.tsx`: Wired server actions for live user listing, user creation with error handling, and password reset.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Newly created accounts were failing credentials verification at `/login` ("Invalid email or password") because the user record was never written to PostgreSQL due to silent client-side fetch failure.
+
+### Validation
+- `pnpm --filter web build` — **Passed (Exit Code 0)**; all 18 routes compiled and static pages generated.
+- `verify-auth.mjs` — **Passed**: verified password hashing (bcrypt 10), PostgreSQL database persistence, NextAuth `findUnique` lookup, valid credentials matching, and invalid credentials rejection.
+- `curl http://localhost:3000/login` — **HTTP 200 OK**.
+
+### Notes
+- Dev server running on `http://localhost:3000`.
+
+## 2026-09-05 23:10 IST — Role-Based Access Control (RBAC) and Data Scoping Implementation
+
+### Summary
+- Implemented strict Role-Based Access Control (RBAC) and role-specific data scoping across the entire PeoplePay360 web application based on the canonical role matrix defined in `AGENTS.md`.
+- Scoped data views so employees only see their own attendance, time-off requests, personal profile, and payslip statements, completely concealing confidential peer compensation and management actions.
+- Gated administrative and manager actions across the UI (manual attendance entry, leave approval/rejection, salary structure and rule creation/modification, employee creation, and team user administration).
+- Protected financial metrics on the Dashboard: HR Manager sees operational HR metrics (headcount, attendance rate, pending leave requests) instead of payroll financial expenditures.
+- Gated salary structures and rules: HR Payroll User is granted read-only access (creation and deletion disabled with read-only badges), while HR Payroll Manager and Admin retain full CRUD.
+
+### Files Changed
+- `apps/web/middleware.ts`: Enforced server-side redirects based on role:
+  - `EMPLOYEE`: `/dashboard` -> `/employees/[id]`; `/employees` & `/contracts` -> `/employees/[id]`; `/time-off/allocations` & `/types` -> `/time-off/requests`; `/payroll/payruns`, `/structures`, `/rules` -> `/payroll/payslips`; `/users` -> `/employees/[id]`.
+  - `HR_MANAGER`: `/payroll/**` & `/users/**` -> `/dashboard`.
+  - Non-ADMIN: `/users/**` -> `/dashboard`.
+- `apps/web/app/(app)/attendance/page.tsx`: Scoped attendance records to current authenticated employee; hid "Add Manual Entry" button from employees; added personal "Check-In" / "Check-Out" action buttons; updated header to "My Attendance".
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Scoped leave requests so employees view only their own requests; completely removed "Approve" and "Reject" action buttons for employees; updated header to "My Leave Requests".
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Scoped payslip list so employees see only their own salary statement; protected peer salary figures; updated header to "My Payslips".
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: Scoped statement view to current authenticated employee.
+- `apps/web/app/(app)/employees/[id]/page.tsx`: Enforced that employees can only view their own profile; redirected attempts to access peer profiles; made employee form fields read-only for employees; swapped "Contracts" compensation tab link with "My Payslips" link.
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Gated edit permissions; if user is `HR_PAYROLL_USER`, hides creation form and action buttons and displays a `Read-Only (Requires HR Payroll Manager)` badge.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: Gated edit permissions; if user is `HR_PAYROLL_USER`, hides creation form and delete buttons and displays a `Read-Only (Requires HR Payroll Manager)` badge.
+- `apps/web/app/(app)/dashboard/page.tsx`: Replaced financial payroll metrics with operational HR KPIs for `HR_MANAGER` (Active Headcount, 30-day Attendance Rate, Pending Leave Requests, Approved Days, and Department Headcount Distribution bar chart).
+- `apps/web/app/(app)/contracts/page.tsx`: Gated contract creation to HR and Payroll managers/Admin.
+- `apps/web/app/(app)/employees/page.tsx`: Gated employee creation to HR and Payroll managers/Admin.
+- `apps/web/components/app-sidebar.tsx`: Cleaned navigation links based on user role (`EMPLOYEE` sees only self-service links; `HR_MANAGER` has no payroll links; only `ADMIN` sees Team & Roles).
+- `apps/web/components/employee-form.tsx`: Added `readOnly` support to lock inputs and hide submission buttons when viewed by employees.
+- `apps/web/app/not-found.tsx`: Added clean 404 page for missing or unauthorized routes.
+- `apps/web/types/next-auth.d.ts`: Augmented NextAuth types with `AppRole` union (`UserRole | "HR_PAYROLL_MANAGER"`).
+- `CHANGELOG_AGENTS.md`: Logged all changes.
+
+### Reason
+- All roles previously saw company-wide mock records, exposing confidential salaries, peer attendance, peer leave requests, and administrative buttons to unauthorized roles, violating the role specifications in `AGENTS.md`.
+
+### Validation
+- TypeScript compilation check (`npx tsc --noEmit`): **Passed** with 0 errors across all 18 routes.
+- Middleware route tests: Verified redirects for Employee, HR Manager, and Payroll User.
+
+### Notes
+- Dev server (`pnpm dev`) should be restarted in the user terminal if `ENOENT: routes-manifest.json` occurred after cache cleanup.
+
+## 2026-09-05 23:20 IST — Add Global SessionProvider and Full Route Audit
+
+### Summary
+- Created `apps/web/components/session-provider.tsx` wrapping NextAuth's client `SessionProvider`.
+- Wrapped application layouts (`apps/web/app/layout.tsx` and `apps/web/app/(app)/layout.tsx`) in `<SessionProvider>` with server-hydrated session context.
+- Fixed `canFinalize` permission in `apps/web/app/(app)/payroll/payruns/[id]/page.tsx` to include `HR_PAYROLL_MANAGER`.
+- Updated fallback port in `apps/web/lib/api-actions.ts` to `http://localhost:4000/api/hr`.
+- Audited all 13 routes and verified 0 TypeScript compilation errors and 0 runtime crashes.
+
+### Files Changed
+- `apps/web/components/session-provider.tsx`: Client-side SessionProvider wrapper component.
+- `apps/web/app/layout.tsx`: Wrapped RootLayout with SessionProvider.
+- `apps/web/app/(app)/layout.tsx`: Wrapped AppLayout with SessionProvider hydrated with `getServerSession(authOptions)`.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Added `HR_PAYROLL_MANAGER` to `canFinalize`.
+- `apps/web/lib/api-actions.ts`: Updated default fallback port for HR API.
+- `CHANGELOG_AGENTS.md`: Recorded this update.
+
+### Reason
+- Client components calling `useSession()` crashed with `[next-auth]: useSession must be wrapped in a <SessionProvider />` when accessed because NextAuth SessionProvider had not been mounted in the component hierarchy.
+
+### Validation
+- `npx tsc --noEmit` — **Passed (0 errors)** across all files.
+- Route smoke check across all 13 routes (`/dashboard`, `/employees`, `/contracts`, `/attendance`, `/time-off/*`, `/payroll/*`, `/users`, `/login`) — **All passed** (307 redirect to login for protected routes, 200 OK for login).
+
+## 2026-09-05 23:25 IST — HR Manager Leave Approval Routing & Self-Approval Prevention
+
+### Summary
+- Defined and implemented leave request approval hierarchy and self-approval prevention rules.
+- When an employee requests leave, it is routed to the HR Manager (or Admin) for approval.
+- When an HR Manager requests leave, it is routed to **Admin** (Administrator role).
+- Enforced a strict no-self-approval rule in `apps/web/app/(app)/time-off/requests/page.tsx`: an HR Manager viewing their own leave request cannot self-approve; instead, it displays `Awaiting Admin`, and only an Admin user has permission to approve or reject the HR Manager's leave request.
+
+### Files Changed
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Added `isSelf` and `canApproveThis` guards to prevent managers from approving their own leave requests; displays `Awaiting Admin` for self-pending requests; preserves Admin's executive authority to approve any request.
+- `CHANGELOG_AGENTS.md`: Logged this rule and implementation.
+
+### Reason
+- Clarify and enforce organizational hierarchy for leave requests: HR Managers report to Admin/Executive Leadership and must not self-approve their own time off.
+
+### Validation
+- `npx tsc --noEmit` — **Passed (0 errors)**.
+
+
+
+

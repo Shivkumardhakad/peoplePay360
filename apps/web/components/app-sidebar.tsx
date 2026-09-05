@@ -18,7 +18,7 @@ export type Session = {
   user: {
     id: string;
     name: string;
-    role: "ADMIN" | "HR_MANAGER" | "PAYROLL_MANAGER" | "HR_PAYROLL_USER" | "EMPLOYEE";
+    role: "ADMIN" | "HR_MANAGER" | "PAYROLL_MANAGER" | "HR_PAYROLL_MANAGER" | "HR_PAYROLL_USER" | "EMPLOYEE";
     employeeId: string | null;
   };
 };
