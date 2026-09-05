@@ -90,6 +90,9 @@ importers:
       date-fns:
         specifier: 4.1.0
         version: 4.1.0
+      jose:
+        specifier: 4.15.9
+        version: 4.15.9
       jspdf:
         specifier: 3.0.2
         version: 3.0.2

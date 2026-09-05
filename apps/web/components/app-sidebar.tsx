@@ -8,17 +8,26 @@ import {
   Clock,
   LayoutDashboard,
   CalendarDays,
+  CalendarClock,
+  CalendarRange,
   CreditCard,
   Shield,
   Layers,
   Sparkles,
+  Settings2,
+  Wallet,
+  Receipt,
+  ListChecks,
+  SlidersHorizontal,
+  type LucideIcon,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type Session = {
   user: {
     id: string;
     name: string;
-    role: "ADMIN" | "HR_MANAGER" | "HR_PAYROLL_USER" | "HR_PAYROLL_MANAGER" | "EMPLOYEE";
+    role: "ADMIN" | "HR_MANAGER" | "HR_PAYROLL_USER" | "PAYROLL_MANAGER" | "EMPLOYEE";
     employeeId: string | null;
   };
 };
@@ -32,8 +41,41 @@ export const MOCK_SESSION: Session = {
   },
 };
 
-export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
+function NavLink({
+  href,
+  icon: Icon,
+  children,
+  accent,
+  nested,
+}: {
+  href: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+  accent?: boolean;
+  nested?: boolean;
+}) {
   const pathname = usePathname();
+  const isActive = pathname === href || pathname.startsWith(href + "/");
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+        nested && "ml-2",
+        isActive
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        accent && isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+      )}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      {children}
+    </Link>
+  );
+}
+
+export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
   const role = session.user.role;
   const isEmployee = role === "EMPLOYEE";
   const isHRManagerOnly = role === "HR_MANAGER";
@@ -53,59 +95,59 @@ export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
         </div>
       </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3">
-          {!isEmployee && (
-            <NavLink href="/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
-          )}
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
+        {!isEmployee && (
+          <NavLink href="/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
+        )}
 
-          {/* Admin-only: user & role management */}
-          {isAdmin && (
-            <NavLink href="/users" icon={Shield} accent>Team &amp; Roles</NavLink>
-          )}
+        {/* Admin-only: user & role management */}
+        {isAdmin && (
+          <NavLink href="/users" icon={Shield} accent>Team &amp; Roles</NavLink>
+        )}
 
-          {isEmployee ? (
-            <NavLink href={employeeProfileHref} icon={Users}>My Profile</NavLink>
-          ) : (
-            <>
-              <NavLink href="/employees" icon={Users}>Employees</NavLink>
-              <NavLink href="/contracts" icon={FileText}>Contracts</NavLink>
-            </>
-          )}
+        {isEmployee ? (
+          <NavLink href={employeeProfileHref} icon={Users}>My Profile</NavLink>
+        ) : (
+          <>
+            <NavLink href="/employees" icon={Users}>Employees</NavLink>
+            <NavLink href="/contracts" icon={FileText}>Contracts</NavLink>
+          </>
+        )}
 
-          <NavLink href="/attendance" icon={Clock}>Attendance</NavLink>
+        <NavLink href="/attendance" icon={Clock}>Attendance</NavLink>
 
-          <div className="px-3 pt-4 pb-1">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">Time Off</p>
-          </div>
-          {!isEmployee ? (
-            <>
-              <NavLink href="/time-off/requests" icon={CalendarClock} nested>Requests</NavLink>
-              <NavLink href="/time-off/allocations" icon={CalendarRange} nested>Allocations</NavLink>
-              <NavLink href="/time-off/types" icon={Settings2} nested>Types</NavLink>
-            </>
-          ) : (
-            <NavLink href="/time-off/requests" icon={CalendarClock} nested>My Requests</NavLink>
-          )}
+        <div className="px-1 pt-4 pb-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Time Off</p>
+        </div>
+        {!isEmployee ? (
+          <>
+            <NavLink href="/time-off/requests" icon={CalendarClock} nested>Requests</NavLink>
+            <NavLink href="/time-off/allocations" icon={CalendarRange} nested>Allocations</NavLink>
+            <NavLink href="/time-off/types" icon={Settings2} nested>Types</NavLink>
+          </>
+        ) : (
+          <NavLink href="/time-off/requests" icon={CalendarClock} nested>My Requests</NavLink>
+        )}
 
-          {/* Payroll section - hidden entirely for HR Manager, per role permissions */}
-          {!isHRManagerOnly && (
-            <>
-              <div className="px-3 pt-4 pb-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">Payroll</p>
-              </div>
-              {!isEmployee ? (
-                <>
-                  <NavLink href="/payroll/payruns" icon={Wallet} nested>Payruns</NavLink>
-                  <NavLink href="/payroll/payslips" icon={Receipt} nested>Payslips</NavLink>
-                  <NavLink href="/payroll/structures" icon={ListChecks} nested>Structures</NavLink>
-                  <NavLink href="/payroll/rules" icon={SlidersHorizontal} nested>Rules</NavLink>
-                </>
-              ) : (
-                <NavLink href="/payroll/payslips" icon={Receipt} nested>My Payslips</NavLink>
-              )}
-            </>
-          )}
-        </nav>
+        {/* Payroll section - hidden entirely for HR Manager, per role permissions */}
+        {!isHRManagerOnly && (
+          <>
+            <div className="px-1 pt-4 pb-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Payroll</p>
+            </div>
+            {!isEmployee ? (
+              <>
+                <NavLink href="/payroll/payruns" icon={Wallet} nested>Payruns</NavLink>
+                <NavLink href="/payroll/payslips" icon={Receipt} nested>Payslips</NavLink>
+                <NavLink href="/payroll/structures" icon={ListChecks} nested>Structures</NavLink>
+                <NavLink href="/payroll/rules" icon={SlidersHorizontal} nested>Rules</NavLink>
+              </>
+            ) : (
+              <NavLink href="/payroll/payslips" icon={Receipt} nested>My Payslips</NavLink>
+            )}
+          </>
+        )}
+      </nav>
 
       {/* Footer */}
       <div className="p-3 border-t border-border flex items-center justify-between text-[11px] font-mono text-muted-foreground">

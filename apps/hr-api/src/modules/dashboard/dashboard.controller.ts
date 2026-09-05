@@ -1,12 +1,9 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
-import { HR_ADMIN_ROLES } from "../auth/auth.types";
-import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { Controller, Get } from "@nestjs/common";
+import { UserRole } from "@prisma/client";
 import { Roles } from "../auth/roles.decorator";
-import { RolesGuard } from "../auth/roles.guard";
 import { HrService } from "../shared/hr.service";
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(...HR_ADMIN_ROLES)
+@Roles(UserRole.ADMIN, UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.PAYROLL_MANAGER)
 @Controller("dashboard")
 export class HrDashboardController {
   constructor(private readonly hr: HrService) {}

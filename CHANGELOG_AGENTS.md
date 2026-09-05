@@ -1,4 +1,55 @@
-﻿## 2026-09-05 11:58 IST ΓÇö CI workflow
+## 2026-09-05 23:28 IST — Add Kanban view and layout toggle to Employees page
+
+### Summary
+- Added view mode toggle (List vs Kanban) to the toolbar on `/employees`.
+- Added Kanban view layout with status columns ("Active Employees", "On Leave", "Inactive / Former"), employee status counts, and interactive card UI.
+
+### Files Changed
+- `apps/web/app/(app)/employees/page.tsx`: Added `viewMode` state, Lucide view icons, toolbar toggle control, and Kanban board card grid.
+- `CHANGELOG_AGENTS.md`: Recorded feature change.
+
+### Reason
+- Fulfill user request to provide a Kanban view format alongside the list format with a toggle button on `http://localhost:3000/employees`.
+
+### Validation
+- JSX component compiled cleanly.
+
+## 2026-09-05 23:23 IST — Sync PostgreSQL UserRole enum with Prisma schema
+
+### Summary
+- Ran `prisma db push` to add `HR_PAYROLL_USER` enum value to the live PostgreSQL `UserRole` enum type.
+
+### Files Changed
+- `CHANGELOG_AGENTS.md`: Recorded database schema sync.
+
+### Reason
+- Fix runtime PostgreSQL error `22P02: invalid input value for enum "UserRole": "HR_PAYROLL_USER"` during user creation.
+
+### Validation
+- `pnpm --filter @peoplepay360/db exec prisma db push` — completed successfully (`Your database is now in sync with your Prisma schema`).
+
+## 2026-09-05 23:16 IST — Fix NavLink missing import and NextAuth SessionProvider wrapper
+
+### Summary
+- Defined `NavLink` component and imported missing Lucide icons in `app-sidebar.tsx`.
+- Created `components/providers.tsx` client component wrapping `SessionProvider`.
+- Wrapped root layout `ToastProvider` with `Providers` in `app/layout.tsx`.
+
+### Files Changed
+- `apps/web/components/app-sidebar.tsx`: Defined `NavLink`, imported missing Lucide icons, fixed `Session` role type to `PAYROLL_MANAGER`, moved `usePathname` call into `NavLink`.
+- `apps/web/components/providers.tsx`: Created client component for `SessionProvider`.
+- `apps/web/app/layout.tsx`: Wrapped application root with `Providers`.
+- `CHANGELOG_AGENTS.md`: Appended log entry.
+
+### Reason
+- Fix runtime `ReferenceError: NavLink is not defined` on sidebar rendering.
+- Fix runtime `[next-auth]: useSession must be wrapped in a <SessionProvider />` on attendance and other client pages.
+
+### Validation
+- `apps/web/components/providers.tsx` created.
+- `apps/web/app/layout.tsx` updated with `<Providers>`.
+
+## 2026-09-05 11:58 IST — CI workflow
 
 ### Summary
 - Added a GitHub Actions CI workflow that runs for every pushed commit and pull request.
