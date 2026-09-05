@@ -297,6 +297,20 @@ public class PayrunService {
         return payslipRepository.findAllByPayrunIdOrderByEmployeeIdAsc(payrunId).stream().map(this::toPayslipResponse).toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<PayslipDtos.EmployeeResponse> listEmployeePayslips(String employeeId) {
+        return payslipRepository.findAllByEmployeeIdOrderByPeriodStartDesc(employeeId).stream()
+            .map(payslip -> {
+                String payrunName = payrunRepository.findById(payslip.getPayrunId())
+                    .map(Payrun::getName).orElse(payslip.getPayrunId());
+                PayslipDtos.Response response = toPayslipResponse(payslip);
+                return new PayslipDtos.EmployeeResponse(response.id(), response.payrunId(), payrunName,
+                    response.employeeId(), response.contractId(), response.periodStart(), response.periodEnd(),
+                    response.grossAmount(), response.deductionAmount(), response.netAmount(), response.status(),
+                    response.lines(), response.createdAt(), response.updatedAt());
+            }).toList();
+    }
+
     private void createPayslip(Payrun payrun, String contractId, String employeeId,
                                BigDecimal baseSalary, List<SalaryRule> rules,
                                HrContractClient.PayrollContext payrollContext) {

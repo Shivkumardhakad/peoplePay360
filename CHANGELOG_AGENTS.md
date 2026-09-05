@@ -2232,3 +2232,53 @@
 
 ### Notes
 - The setting is only necessary for transaction-pooler connections and is harmless for local direct PostgreSQL connections.
+
+## 2026-09-06 14:45 IST — Fix employee payroll self-service access
+
+### Summary
+- Added a scoped Payroll endpoint for employees to list only their own payslips.
+- Updated the web action to use the scoped endpoint instead of the admin payrun endpoint for employee sessions.
+- Protected individual payslip and PDF access with employee ownership checks.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/controllers/PayrunController.java`: Added employee payslip endpoint and ownership checks.
+- `apps/payroll/src/main/java/com/dj/payroll/dto/PayslipDtos.java`: Added the employee payslip response shape.
+- `apps/payroll/src/main/java/com/dj/payroll/repositories/PayslipRepository.java`: Added employee-scoped lookup.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Added employee payslip query mapping.
+- `apps/payroll/src/main/java/com/dj/payroll/security/SecurityConfig.java`: Allowed only scoped employee payslip reads for `EMPLOYEE`.
+- `apps/web/lib/api-actions.ts`: Routed employee payslip listing through the scoped Payroll API.
+- `AGENTS.md`: Synchronized the Payroll endpoint map.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Employee users were receiving `403` because the payslip page called the payroll-admin `/api/payroll/payruns` endpoint before applying client-side filtering.
+
+### Validation
+- `git diff --check` — passed.
+- Java compile, TypeScript check, and runtime employee-token smoke test — pending.
+
+### Notes
+- Employees can read only their own payslips and PDFs; payroll administration remains role-protected.
+
+## 2026-09-06 15:05 IST — Scope payrun employees by department
+
+### Summary
+- Added department/branch selection to the payrun wizard.
+- Employee selection now loads only active employees from that department.
+- Server-side validation rejects cross-department employee IDs before creating a payrun.
+- Normalized the web payload from `selectedEmployeeIds` to the Java API's required `employeeIds` field.
+
+### Files Changed
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Added department selection and scoped employee loading.
+- `apps/web/lib/api-actions.ts`: Added department-scoped employee query and payrun payload validation/normalization.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payrun creation was showing employees from every department and the request used a field name the Java API did not accept, resulting in `employeeIds must not be empty`.
+
+### Validation
+- `git diff --check` — pending.
+- Web TypeScript check — pending.
+
+### Notes
+- The Payroll API receives only validated employee IDs; the department selector is not forwarded as an unknown Java DTO field.

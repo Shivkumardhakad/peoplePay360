@@ -147,9 +147,13 @@ export async function getEmployeeAction(employeeId: string) {
   };
 }
 
-export async function getPayrollEligibleEmployeesAction() {
-  const employees = await prisma.employee.findMany({ where: { status: "ACTIVE" }, orderBy: { lastName: "asc" }, include: { department: true, contracts: { where: { status: "ACTIVE" }, orderBy: { startDate: "desc" }, take: 1 } } });
-  return employees.map((employee) => ({ id: employee.id, employeeNumber: employee.employeeNumber, name: `${employee.firstName} ${employee.lastName}`, department: employee.department?.name ?? "-", wage: Number(employee.contracts[0]?.baseSalary ?? 0) }));
+export async function listPayrollDepartmentsAction() {
+  return prisma.department.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
+}
+
+export async function getPayrollEligibleEmployeesAction(departmentId?: string) {
+  const employees = await prisma.employee.findMany({ where: { status: "ACTIVE", ...(departmentId ? { departmentId } : {}) }, orderBy: { lastName: "asc" }, include: { department: true, contracts: { where: { status: "ACTIVE" }, orderBy: { startDate: "desc" }, take: 1 } } });
+  return employees.map((employee) => ({ id: employee.id, employeeNumber: employee.employeeNumber, name: `${employee.firstName} ${employee.lastName}`, departmentId: employee.departmentId, department: employee.department?.name ?? "-", wage: Number(employee.contracts[0]?.baseSalary ?? 0) }));
 }
 
 // -------------------------------------------------------------
@@ -923,7 +927,15 @@ export async function getPayslipPaymentStatusAction(payslipId: string) {
 }
 
 export async function createPayrunAction(body: unknown) {
-  const result = await payrollApiFetch("/api/payroll/payruns", { method: "POST", body });
+  const request = body as { departmentId?: string; selectedEmployeeIds?: string[] };
+  if (request.departmentId) {
+    const selectedEmployeeIds = request.selectedEmployeeIds ?? [];
+    const matchingEmployees = await prisma.employee.count({ where: { id: { in: selectedEmployeeIds }, departmentId: request.departmentId, status: "ACTIVE" } });
+    if (matchingEmployees !== selectedEmployeeIds.length) throw new Error("All selected employees must belong to the chosen department.");
+  }
+  const { departmentId: _departmentId, selectedEmployeeIds, ...payrollBody } = request as any;
+  payrollBody.employeeIds = selectedEmployeeIds;
+  const result = await payrollApiFetch("/api/payroll/payruns", { method: "POST", body: payrollBody });
   revalidatePath("/payroll/payruns");
   return result;
 }
@@ -952,6 +964,10 @@ export async function getPayslipAction(id: string) {
   if (session?.user?.role === "EMPLOYEE" && payslip.employeeId !== session.user.employeeId) {
     throw new Error("You are not authorized to view this payslip.");
   }
+  return enrichPayslipForUi(payslip);
+}
+
+async function enrichPayslipForUi(payslip: any) {
   const employee = await prisma.employee.findUnique({ where: { id: payslip.employeeId }, include: { department: true, jobPosition: true } });
   const contract = await prisma.contract.findUnique({ where: { id: payslip.contractId } });
   return { ...payslip, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : payslip.employeeId, department: employee?.department?.name ?? "-", position: employee?.jobPosition?.title ?? "-", contractRef: contract?.title ?? payslip.contractId, period: `${String(payslip.periodStart).slice(0, 10)} → ${String(payslip.periodEnd).slice(0, 10)}`, gross: Number(payslip.grossAmount), deductions: Number(payslip.deductionAmount), net: Number(payslip.netAmount), lines: (payslip.lines ?? []).map((line: any) => ({ rule: line.name, category: line.code, amount: Number(line.amount), type: line.amount < 0 ? "DEDUCTION" : "EARNING" })) };
@@ -965,6 +981,10 @@ export async function getPayslipPdfAction(id: string) {
 
 export async function listPayrollPayslipsAction() {
   const session = await getServerSession(authOptions);
+  if (session?.user?.role === "EMPLOYEE") {
+    const payslips = await payrollApiFetch<any[]>("/api/payroll/me/payslips");
+    return Promise.all(payslips.map(async (payslip) => ({ ...(await enrichPayslipForUi(payslip)), payrun: payslip.payrunName })));
+  }
   const payruns = await payrollApiFetch<any[]>("/api/payroll/payruns");
   const slips = (await Promise.all(payruns.flatMap((payrun) => (payrun.payslips ?? []).filter((summary: any) => session?.user?.role !== "EMPLOYEE" || summary.employeeId === session.user.employeeId).map((summary: any) => getPayslipAction(summary.id).then((payslip) => ({ ...payslip, payrun: payrun.name })))))).flat();
   return slips;
