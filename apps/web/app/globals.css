@@ -5,6 +5,11 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --surface-page: #F6F5F1;
+  --surface-card: #FFFFFF;
+  --border: #E2E0D8;
+  --text-primary: #1A1D22;
+  --text-secondary: #5B5E57;
   --background: 60 14% 97%;        /* #FAFAF8 paper */
   --foreground: 213 24% 11%;       /* #161B22 ink */
   --primary: 213 24% 11%;
@@ -13,7 +18,7 @@
   --accent-foreground: 60 14% 97%;
   --muted: 220 9% 46%;             /* #6B7280 */
   --muted-foreground: 220 9% 46%;
-  --border: 40 12% 88%;            /* #E5E3DD hairline borders */
+  --border-hsl: 40 12% 88%;        /* #E5E3DD hairline borders */
   --destructive: 9 53% 40%;        /* #A8442F */
   --destructive-foreground: 60 14% 97%;
   --success: 141 32% 34%;          /* #3D6B4F */
@@ -31,9 +36,9 @@
 @theme inline {
   --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-card: hsl(var(--card));
+  --color-background: var(--surface-page);
+  --color-foreground: var(--text-primary);
+  --color-card: var(--surface-card);
   --color-card-foreground: hsl(var(--card-foreground));
   --color-popover: hsl(var(--popover));
   --color-popover-foreground: hsl(var(--popover-foreground));
@@ -42,13 +47,13 @@
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
   --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-muted-foreground: var(--text-secondary);
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--border));
+  --color-border: var(--border);
+  --color-input: var(--border);
   --color-ring: hsl(var(--ring));
   --color-success: hsl(var(--success));
   --color-success-foreground: hsl(var(--success-foreground));
@@ -61,7 +66,7 @@
 @utility pp-glass {
   background-color: hsl(var(--card) / 0.85);
   backdrop-filter: blur(8px);
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
@@ -69,12 +74,12 @@
   background-color: hsl(var(--primary) / 0.96);
   color: hsl(var(--primary-foreground));
   backdrop-filter: blur(12px);
-  border-right: 1px solid hsl(var(--border) / 0.2);
+  border-right: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
 }
 
 @utility pp-solid-surface {
   background-color: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
@@ -85,7 +90,7 @@
 .pp-glass {
   background-color: hsl(var(--card) / 0.85);
   backdrop-filter: blur(8px);
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
@@ -93,12 +98,12 @@
   background-color: hsl(var(--primary) / 0.96);
   color: hsl(var(--primary-foreground));
   backdrop-filter: blur(12px);
-  border-right: 1px solid hsl(var(--border) / 0.2);
+  border-right: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
 }
 
 .pp-solid-surface {
   background-color: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 

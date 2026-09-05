@@ -855,3 +855,19 @@
 - HR requires `DATABASE_URL` pointing to `oddo_hr` when started.
 - Local `oddo_hr` database creation is an environment setup action; no existing Payroll data was reset or deleted.
 - This was a documentation/context update only; no application code was changed.
+## 2026-09-05 18:23 +05:30 — Codex Sidebar Navigation Integration
+
+### Summary
+- Integrated the provided rounded glass sidebar navigation with role-aware links and section icons.
+
+### Files Changed
+- `apps/web/components/app-sidebar.tsx`: replaced repeated sidebar `Link` markup with a reusable `NavLink`, updated the visual shell, added time-off/payroll icons, and preserved role-based navigation visibility.
+
+### Reason
+- The sidebar needed to match the supplied UI implementation while keeping the existing PeoplePay360 role scope for admins, HR managers, payroll users, and employees.
+
+### Validation
+- `npx tsc --noEmit` from `apps/web` — passed.
+
+### Notes
+- No new dependencies were added. The existing mock session export remains in place for the current layout wiring.

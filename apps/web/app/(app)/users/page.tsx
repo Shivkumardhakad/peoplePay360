@@ -7,30 +7,37 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Search, ShieldCheck } from "lucide-react";
+import { getRoleMeta, type RoleKey } from "@/lib/role-meta";
+import { StatusBadge, type StatusBadgeTone } from "@/components/status-badge";
 
-type UserRole = "ADMIN" | "HR_MANAGER" | "HR_PAYROLL_USER" | "HR_PAYROLL_MANAGER" | "EMPLOYEE";
+type UserStatus = "Active" | "Inactive";
 
 const MOCK_USERS = [
-  { id: "USR-001", name: "Admin User", email: "admin@peoplepay360.local", role: "ADMIN" as UserRole, status: "Active" },
-  { id: "USR-002", name: "Bob Smith", email: "hr.manager@peoplepay360.local", role: "HR_MANAGER" as UserRole, status: "Active" },
-  { id: "USR-003", name: "Alice Johnson", email: "payroll.manager@peoplepay360.local", role: "HR_PAYROLL_MANAGER" as UserRole, status: "Active" },
-  { id: "USR-004", name: "Charlie Davis", email: "payroll.user@peoplepay360.local", role: "HR_PAYROLL_USER" as UserRole, status: "Active" },
-  { id: "USR-005", name: "Emily Watson", email: "employee@peoplepay360.local", role: "EMPLOYEE" as UserRole, status: "Active" },
+  { id: "USR-001", name: "Admin User", email: "admin@peoplepay360.local", role: "ADMIN" as RoleKey, status: "Active" as UserStatus },
+  { id: "USR-002", name: "Bob Smith", email: "hr.manager@peoplepay360.local", role: "HR_MANAGER" as RoleKey, status: "Active" as UserStatus },
+  { id: "USR-003", name: "Alice Johnson", email: "payroll.manager@peoplepay360.local", role: "HR_PAYROLL_MANAGER" as RoleKey, status: "Active" as UserStatus },
+  { id: "USR-004", name: "Charlie Davis", email: "payroll.user@peoplepay360.local", role: "HR_PAYROLL_USER" as RoleKey, status: "Active" as UserStatus },
+  { id: "USR-005", name: "Emily Watson", email: "employee@peoplepay360.local", role: "EMPLOYEE" as RoleKey, status: "Inactive" as UserStatus },
 ];
 
-function formatRoleLabel(role: UserRole) {
-  switch (role) {
-    case "ADMIN":
-      return "Admin";
-    case "HR_MANAGER":
-      return "HR Manager";
-    case "HR_PAYROLL_MANAGER":
-      return "Payroll Manager";
-    case "HR_PAYROLL_USER":
-      return "Payroll User";
-    case "EMPLOYEE":
-      return "Employee";
-  }
+function statusTone(status: UserStatus): StatusBadgeTone {
+  return status === "Active" ? "success" : "neutral";
+}
+
+function RoleBadge({ role }: { role: RoleKey }) {
+  const meta = getRoleMeta(role);
+
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
+      style={{
+        backgroundColor: meta.background,
+        color: meta.foreground,
+      }}
+    >
+      {meta.label}
+    </span>
+  );
 }
 
 export default function UsersPage() {
@@ -40,7 +47,7 @@ export default function UsersPage() {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<UserRole>("HR_MANAGER");
+  const [role, setRole] = useState<RoleKey>("HR_MANAGER");
   const [password, setPassword] = useState("");
 
   const filteredUsers = users.filter(u => 
@@ -58,7 +65,7 @@ export default function UsersPage() {
       name,
       email,
       role,
-      status: "Active",
+      status: "Active" as UserStatus,
     };
 
     setUsers([...users, newUser]);
@@ -82,7 +89,7 @@ export default function UsersPage() {
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button variant="outline" className="gap-2 bg-card">
               <Plus className="w-4 h-4" />
               Add User
             </Button>
@@ -121,11 +128,12 @@ export default function UsersPage() {
                 <select
                   id="role"
                   value={role}
-                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  onChange={(e) => setRole(e.target.value as RoleKey)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   <option value="ADMIN">ADMIN</option>
                   <option value="HR_MANAGER">HR_MANAGER</option>
+                  <option value="PAYROLL_MANAGER">PAYROLL_MANAGER</option>
                   <option value="HR_PAYROLL_MANAGER">HR_PAYROLL_MANAGER</option>
                   <option value="HR_PAYROLL_USER">HR_PAYROLL_USER</option>
                   <option value="EMPLOYEE">EMPLOYEE</option>
@@ -174,33 +182,30 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Solid Surface Table */}
       <div className="pp-solid-surface overflow-hidden">
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
-            <TableRow className="border-b border-border bg-muted/20">
+            <TableRow className="border-b-[0.5px] border-border bg-muted/20 hover:bg-muted/20">
               <TableHead className="w-[100px]">User ID</TableHead>
-              <TableHead>User Name</TableHead>
-              <TableHead>Email Address</TableHead>
-              <TableHead>Assigned Role</TableHead>
-              <TableHead className="text-right">Status</TableHead>
+              <TableHead className="w-[22%]">Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead className="w-[190px]">Role</TableHead>
+              <TableHead className="w-[120px]">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredUsers.map((u) => (
-              <TableRow key={u.id} className="hover:bg-muted/50 border-b border-border/60">
+              <TableRow key={u.id} className="border-b-[0.5px] border-border hover:bg-muted/30">
                 <TableCell className="font-mono text-xs text-muted-foreground">{u.id}</TableCell>
                 <TableCell className="font-medium text-foreground">{u.name}</TableCell>
-                <TableCell className="font-mono text-xs">{u.email}</TableCell>
-                <TableCell>
-                  <span className="font-mono text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-                    {u.role}
-                  </span>
+                <TableCell className="truncate font-mono text-xs text-muted-foreground" title={u.email}>
+                  {u.email}
                 </TableCell>
-                <TableCell className="text-right">
-                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-success/10 text-success">
-                    {u.status}
-                  </span>
+                <TableCell>
+                  <RoleBadge role={u.role} />
+                </TableCell>
+                <TableCell>
+                  <StatusBadge tone={statusTone(u.status)} label={u.status} />
                 </TableCell>
               </TableRow>
             ))}
