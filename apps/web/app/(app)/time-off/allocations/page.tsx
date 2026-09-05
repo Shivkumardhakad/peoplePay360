@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { Search, Plus, Loader2 } from "lucide-react";
+import { getAllocationsAction } from "@/lib/api-actions";
 
 interface AllocationItem {
   id: string;
@@ -18,16 +19,9 @@ interface AllocationItem {
   used: number;
 }
 
-const INITIAL_ALLOCATIONS: AllocationItem[] = [
-  { id: "ALL-001", employee: "Alice Johnson", type: "Annual Leave", allocated: 20, used: 5 },
-  { id: "ALL-002", employee: "Bob Smith", type: "Annual Leave", allocated: 20, used: 20 },
-  { id: "ALL-003", employee: "Charlie Davis", type: "Sick Leave", allocated: 10, used: 1 },
-  { id: "ALL-004", employee: "Emily Watson", type: "Annual Leave", allocated: 22, used: 4 },
-];
-
 export default function TimeOffAllocationsPage() {
   const { toast } = useToast();
-  const [allocations, setAllocations] = useState<AllocationItem[]>(INITIAL_ALLOCATIONS);
+  const [allocations, setAllocations] = useState<AllocationItem[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -36,6 +30,8 @@ export default function TimeOffAllocationsPage() {
   const [employee, setEmployee] = useState("Alice Johnson");
   const [leaveType, setLeaveType] = useState("Annual Leave");
   const [allocatedDays, setAllocatedDays] = useState(15);
+
+  useEffect(() => { getAllocationsAction().then((rows) => setAllocations(rows)); }, []);
 
   const filteredAllocations = allocations.filter(
     (a) =>

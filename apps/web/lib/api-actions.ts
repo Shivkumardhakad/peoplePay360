@@ -3,6 +3,7 @@
 import { prisma } from "@peoplepay360/db";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import { payrollApiFetch } from "@/lib/payroll-api";
 
 const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:4000/api/hr";
 
@@ -275,11 +276,14 @@ export async function createAttendanceAction(data: {
 }) {
   try {
     // 1. Resolve real employee ID (support cuid, employeeNumber, or session name)
+    const requestedEmployeeId = data.employeeId.trim();
+    const linkedUser = await prisma.user.findUnique({ where: { id: requestedEmployeeId }, select: { employeeId: true } });
     const employee = await prisma.employee.findFirst({
       where: {
         OR: [
-          { id: data.employeeId },
-          { employeeNumber: data.employeeId },
+          { id: requestedEmployeeId },
+          { employeeNumber: requestedEmployeeId },
+          ...(linkedUser?.employeeId ? [{ id: linkedUser.employeeId }] : []),
         ],
       },
       include: {
@@ -291,7 +295,7 @@ export async function createAttendanceAction(data: {
     });
 
     if (!employee) {
-      return { success: false, error: `Employee record not found for "${data.employeeId}"` };
+      return { success: false, error: `Employee record not found for "${requestedEmployeeId}"` };
     }
 
     const realEmployeeId = employee.id;
@@ -315,6 +319,11 @@ export async function createAttendanceAction(data: {
     }
 
     // 3. Upsert into PostgreSQL database
+    const employeeExists = await prisma.employee.count({ where: { id: realEmployeeId } });
+    if (employeeExists !== 1) {
+      return { success: false, error: `Employee relation is missing for "${requestedEmployeeId}". Refresh employees and try again.` };
+    }
+
     const record = await prisma.attendance.upsert({
       where: {
         employeeId_date: {
@@ -480,73 +489,122 @@ export async function updateLeaveRequestStatusAction(id: string, status: "APPROV
 // -------------------------------------------------------------
 
 export async function computePayrunAction(payrunId: string) {
-  try {
-    const res = await fetch(`${HR_API_URL}/payroll/payruns/${payrunId}/compute`, {
-      method: "POST",
-      cache: "no-store",
-    });
-    if (res.ok) {
-      revalidatePath(`/payroll/payruns/${payrunId}`);
-      return { success: true, result: await res.json() };
-    }
-  } catch {
-    // Emulated success for client transition
-  }
-
+  const result = await payrollApiFetch(`/api/payroll/payruns/${payrunId}/compute`, { method: "POST" });
   revalidatePath(`/payroll/payruns/${payrunId}`);
-  return { success: true, status: "COMPUTED" };
+  return { success: true, result };
+}
+
+export async function getTimeOffTypesAction() {
+  return prisma.timeOffType.findMany({ orderBy: { name: "asc" } });
+}
+
+export async function getAllocationsAction() {
+  const rows = await prisma.allocation.findMany({ orderBy: { periodStart: "desc" }, include: { employee: true, timeOffType: true } });
+  return rows.map((row) => ({ id: row.id, employeeId: row.employeeId, employee: `${row.employee.firstName} ${row.employee.lastName}`, type: row.timeOffType.name, allocated: Number(row.allocated), used: Number(row.consumed), remaining: Number(row.remaining ?? Number(row.allocated) - Number(row.consumed)) }));
+}
+
+export async function getTimeOffRequestsAction() {
+  const rows = await prisma.timeOffRequest.findMany({ orderBy: { createdAt: "desc" }, include: { employee: true, timeOffType: true } });
+  return rows.map((row) => ({ id: row.id, employeeId: row.employeeId, employee: `${row.employee.firstName} ${row.employee.lastName}`, type: row.timeOffType.name, dates: `${row.startDate.toISOString().slice(0, 10)} to ${row.endDate.toISOString().slice(0, 10)}`, duration: `${Number(row.quantity)} ${row.timeOffType.unit === "DAYS" ? "Days" : "Hours"}`, status: row.status === "APPROVED" ? "Approved" : row.status === "REJECTED" ? "Rejected" : row.status === "CANCELLED" ? "Cancelled" : "Pending" }));
+}
+
+export async function getHrDashboardAction() {
+  const [employees, attendance, pendingLeave, approvedLeave, departments] = await Promise.all([
+    prisma.employee.count({ where: { status: { not: "TERMINATED" } } }),
+    prisma.attendance.findMany({ where: { date: { gte: new Date(Date.now() - 30 * 86400000) } }, select: { status: true } }),
+    prisma.timeOffRequest.count({ where: { status: "SUBMITTED" } }),
+    prisma.timeOffRequest.aggregate({ where: { status: "APPROVED", startDate: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } }, _sum: { quantity: true } }),
+    prisma.department.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { employees: true } } } }),
+  ]);
+  const attendanceRate = attendance.length ? Math.round((attendance.filter((item) => ["PRESENT", "REMOTE"].includes(item.status)).length / attendance.length) * 1000) / 10 : 0;
+  return { headcount: employees, attendanceRate, pendingLeave, approvedLeave: Number(approvedLeave._sum.quantity ?? 0), departments: departments.map((department) => ({ name: department.name, total: department._count.employees })) };
 }
 
 export async function validatePayrunAction(payrunId: string) {
-  try {
-    const res = await fetch(`${HR_API_URL}/payroll/payruns/${payrunId}/validate`, {
-      method: "POST",
-      cache: "no-store",
-    });
-    if (res.ok) {
-      revalidatePath(`/payroll/payruns/${payrunId}`);
-      return { success: true, result: await res.json() };
-    }
-  } catch {
-    // Fallback
-  }
-
+  const result = await payrollApiFetch(`/api/payroll/payruns/${payrunId}/validate`, { method: "POST" });
   revalidatePath(`/payroll/payruns/${payrunId}`);
-  return { success: true, status: "VALIDATED" };
+  return { success: true, result };
 }
 
 export async function markPayrunPaidAction(payrunId: string) {
-  try {
-    const res = await fetch(`${HR_API_URL}/payroll/payruns/${payrunId}/mark-paid`, {
-      method: "POST",
-      cache: "no-store",
-    });
-    if (res.ok) {
-      revalidatePath(`/payroll/payruns/${payrunId}`);
-      return { success: true, result: await res.json() };
-    }
-  } catch {
-    // Fallback
-  }
-
+  const result = await payrollApiFetch(`/api/payroll/payruns/${payrunId}/pay`, { method: "POST" });
   revalidatePath(`/payroll/payruns/${payrunId}`);
-  return { success: true, status: "PAID" };
+  return { success: true, result };
 }
 
 export async function sendPayrunPayslipsAction(payrunId: string) {
-  try {
-    const res = await fetch(`${HR_API_URL}/payroll/payruns/${payrunId}/send-payslips`, {
-      method: "POST",
-      cache: "no-store",
-    });
-    if (res.ok) {
-      return { success: true, message: "Payslips sent to employees via email." };
-    }
-  } catch {
-    // Fallback
-  }
+  return { success: false, message: `Payslip email delivery is not available in Java API yet (payrun ${payrunId}).` };
+}
 
-  return { success: true, message: "Payslips distributed successfully to 124 employees." };
+export async function listPayrollRulesAction() {
+  return payrollApiFetch<unknown[]>("/api/payroll/salary-rules");
+}
+
+export async function listPayrollCategoriesAction() {
+  return payrollApiFetch<unknown[]>("/api/payroll/salary-rule-categories");
+}
+
+export async function createPayrollRuleAction(body: unknown) {
+  try {
+    const result = await payrollApiFetch("/api/payroll/salary-rules", { method: "POST", body });
+    revalidatePath("/payroll/rules");
+    return { success: true, result };
+  } catch (error) {
+    return { success: false, error: payrollUnavailableMessage(error) };
+  }
+}
+
+export async function deactivatePayrollRuleAction(id: string) {
+  try {
+    const result = await payrollApiFetch(`/api/payroll/salary-rules/${id}`, { method: "DELETE" });
+    revalidatePath("/payroll/rules");
+    return { success: true, result };
+  } catch (error) {
+    return { success: false, error: payrollUnavailableMessage(error) };
+  }
+}
+
+export async function listPayrollStructuresAction() {
+  return payrollApiFetch<unknown[]>("/api/payroll/salary-structures");
+}
+
+export async function createPayrollStructureAction(body: unknown) {
+  try {
+    const result = await payrollApiFetch("/api/payroll/salary-structures", { method: "POST", body });
+    revalidatePath("/payroll/structures");
+    return { success: true, result };
+  } catch (error) {
+    return { success: false, error: payrollUnavailableMessage(error) };
+  }
+}
+
+function payrollUnavailableMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "Payroll API request failed.";
+  return message.includes("fetch failed") || message.includes("ECONNREFUSED")
+    ? "Payroll API unavailable. Start the Java service with `pnpm dev:payroll` and try again."
+    : message;
+}
+
+export async function listPayrunsAction() {
+  return payrollApiFetch<unknown[]>("/api/payroll/payruns");
+}
+
+export async function getPayrunAction(id: string) {
+  return payrollApiFetch(`/api/payroll/payruns/${id}`);
+}
+
+export async function createPayrunAction(body: unknown) {
+  const result = await payrollApiFetch("/api/payroll/payruns", { method: "POST", body });
+  revalidatePath("/payroll/payruns");
+  return result;
+}
+
+export async function listPayrunPayslipsAction(payrunId: string) {
+  return payrollApiFetch(`/api/payroll/payruns/${payrunId}/payslips`);
+}
+
+export async function getPayslipAction(id: string) {
+  return payrollApiFetch(`/api/payroll/payslips/${id}`);
 }
 
 // -------------------------------------------------------------

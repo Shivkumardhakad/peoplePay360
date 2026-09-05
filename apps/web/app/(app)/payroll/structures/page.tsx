@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { SalaryStructureForm, type SalaryStructureFormValues } from "@/components/salary-structure-form";
 import { Layers, CheckCircle2, Archive, Loader2, Lock } from "lucide-react";
+import { createPayrollStructureAction, listPayrollRulesAction, listPayrollStructuresAction } from "@/lib/api-actions";
 
 interface StructureItem {
   id: string;
@@ -17,16 +18,11 @@ interface StructureItem {
   status: "Active" | "Draft" | "Archived";
 }
 
-const INITIAL_STRUCTURES: StructureItem[] = [
-  { id: "STR-001", name: "Standard Tech Package", ruleCount: 15, status: "Active" },
-  { id: "STR-002", name: "Executive Leadership Package", ruleCount: 8, status: "Active" },
-  { id: "STR-003", name: "Intern & Trainee Stipend", ruleCount: 3, status: "Draft" },
-];
-
 export default function SalaryStructuresPage() {
   const { data: session } = useSession();
   const { toast } = useToast();
-  const [structures, setStructures] = useState<StructureItem[]>(INITIAL_STRUCTURES);
+  const [structures, setStructures] = useState<StructureItem[]>([]);
+  const [rules, setRules] = useState<any[]>([]);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const role = session?.user?.role || "ADMIN";
@@ -35,14 +31,15 @@ export default function SalaryStructuresPage() {
     role === "HR_PAYROLL_MANAGER" ||
     role === "PAYROLL_MANAGER";
 
+  useEffect(() => {
+    Promise.all([listPayrollStructuresAction(), listPayrollRulesAction()]).then(([loadedStructures, loadedRules]) => {
+      setRules(loadedRules as any[]);
+      setStructures((loadedStructures as any[]).map((structure) => ({ id: structure.id, name: structure.name, ruleCount: structure.rules?.length ?? 0, status: structure.status === "ACTIVE" ? "Active" : structure.status === "DRAFT" ? "Draft" : "Archived" })));
+    }).catch((error) => toast({ title: "Payroll API unavailable", description: error.message, type: "error" }));
+  }, [toast]);
+
   const handleCreated = (data: SalaryStructureFormValues) => {
-    const newStruct: StructureItem = {
-      id: `STR-${String(structures.length + 1).padStart(3, "0")}`,
-      name: data.name,
-      ruleCount: 5,
-      status: data.status === "ACTIVE" ? "Active" : data.status === "DRAFT" ? "Draft" : "Archived",
-    };
-    setStructures([...structures, newStruct]);
+    void data;
   };
 
   const handleToggleStatus = async (id: string) => {
@@ -156,7 +153,16 @@ export default function SalaryStructuresPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-3">
-                <SalaryStructureForm onSuccess={handleCreated} />
+                <SalaryStructureForm
+                  onSuccess={handleCreated}
+                  onSave={async (data) => {
+                    if (!rules.length) throw new Error("Create salary rules before creating a structure");
+                    const saved = await createPayrollStructureAction({ name: data.name, code: data.name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 30), description: "Created from PeoplePay360 payroll UI", rules: rules.slice(0, 10).map((rule, index) => ({ salaryRuleId: rule.id, sequence: (index + 1) * 10 })) });
+                    if (!saved.success) throw new Error(saved.error);
+                    const loaded = await listPayrollStructuresAction();
+                    setStructures((loaded as any[]).map((structure) => ({ id: structure.id, name: structure.name, ruleCount: structure.rules?.length ?? 0, status: structure.status === "ACTIVE" ? "Active" : structure.status === "DRAFT" ? "Draft" : "Archived" })));
+                  }}
+                />
               </CardContent>
             </Card>
           </div>

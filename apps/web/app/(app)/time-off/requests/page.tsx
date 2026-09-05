@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
-import { updateLeaveRequestStatusAction, createTimeOffRequestAction } from "@/lib/api-actions";
+import { updateLeaveRequestStatusAction, createTimeOffRequestAction, getTimeOffRequestsAction } from "@/lib/api-actions";
 import { Search, CheckCircle, XCircle, Plus, Loader2 } from "lucide-react";
 
 interface LeaveRequestItem {
@@ -31,7 +31,7 @@ const INITIAL_REQUESTS: LeaveRequestItem[] = [
 export default function TimeOffRequestsPage() {
   const { data: session } = useSession();
   const { toast } = useToast();
-  const [requests, setRequests] = useState<LeaveRequestItem[]>(INITIAL_REQUESTS);
+  const [requests, setRequests] = useState<LeaveRequestItem[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submittingRequest, setSubmittingRequest] = useState(false);
@@ -42,6 +42,8 @@ export default function TimeOffRequestsPage() {
   const [startDate, setStartDate] = useState("2023-12-10");
   const [endDate, setEndDate] = useState("2023-12-12");
   const [reason, setReason] = useState("");
+
+  useEffect(() => { getTimeOffRequestsAction().then((rows) => setRequests(rows as LeaveRequestItem[])); }, []);
 
   const role = session?.user?.role || "ADMIN";
   const isEmployee = role === "EMPLOYEE";

@@ -1379,3 +1379,70 @@
 - Live database test with Prisma client — **Passed**: verified `attendance.upsert` successfully creates and updates records.
 
 
+## 2026-09-06 00:00 IST — HR Manager live database pages
+
+### Summary
+- Replaced HR Manager page mock defaults with live Prisma database queries for employees, contracts, attendance, leave types, allocations, leave requests, and HR dashboard KPIs.
+- Added database-backed HR dashboard headcount, attendance rate, pending leave, approved leave, and department distribution data.
+- Removed the users page fallback that displayed dummy users when the database was empty or unavailable.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added HR dashboard and time-off read actions.
+- `apps/web/app/(app)/employees/page.tsx`: Load employee directory from Prisma.
+- `apps/web/app/(app)/contracts/page.tsx`: Keep empty/live DB state without mock fallback.
+- `apps/web/app/(app)/attendance/page.tsx`: Keep empty/live DB state without mock fallback.
+- `apps/web/app/(app)/time-off/types/page.tsx`: Load time-off policies from Prisma.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: Load allocations and balances from Prisma.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Load requests from Prisma.
+- `apps/web/app/(app)/dashboard/page.tsx`: Use live HR KPI and department data.
+- `apps/web/app/(app)/users/page.tsx`: Do not display dummy users on load failure.
+
+### Reason
+- HR Manager screens must represent current HR database records rather than presentation-only fixtures.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `pnpm --filter web exec tsc --noEmit` — blocked by sandbox permissions while pnpm attempted to access `C:\Users\DELL`.
+
+### Notes
+- Existing payroll-related working-tree changes were preserved.
+- Create/edit forms still use their existing action implementations; this change focuses on removing dummy read data from HR Manager pages.
+## 2026-09-06 00:30 IST — Attendance employee foreign-key guard
+
+### Summary
+- Fixed attendance recording when the UI submits a user ID or employee number instead of the HR employee primary key.
+- Removed the attendance form's static employee fallback and prevented quick check-in from using fabricated employee IDs.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Resolve linked user/employee identifiers and verify the employee relation before attendance upsert.
+- `apps/web/components/attendance-form.tsx`: Load employee options only from the database.
+- `apps/web/app/(app)/attendance/page.tsx`: Stop check-in when the authenticated user is not linked to an employee.
+
+### Reason
+- Attendance inserts were failing with `Attendance_employeeId_fkey` because stale/mock identifiers could be submitted.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+
+### Notes
+- If an existing login has no `employeeId` link in the `User` table, it must be linked to an employee before quick check-in can be used.
+## 2026-09-06 01:00 IST — Graceful Payroll API unavailable handling
+
+### Summary
+- Prevented salary rule and salary structure create actions from surfacing unhandled Next.js 500 errors when Java Payroll is offline.
+- Added a clear action error instructing developers to start `pnpm dev:payroll`.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Catch payroll create/delete connection failures and return structured errors.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: Surface structured API errors in the form toast.
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Surface structured API errors in the form toast.
+
+### Reason
+- The UI was correctly targeting `localhost:8080`, but the Java Payroll service was not listening, causing `ECONNREFUSED` and server-action 500 logs.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- The Java Payroll service still must be running for real payroll data and writes: `pnpm dev:payroll`.

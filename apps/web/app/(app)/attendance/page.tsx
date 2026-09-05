@@ -22,17 +22,10 @@ interface AttendanceRecord {
   status: "Present" | "Late" | "Absent" | "Half Day";
 }
 
-const INITIAL_ATTENDANCE: AttendanceRecord[] = [
-  { id: "ATT-001", employee: "Alice Johnson", date: "2023-10-01", checkIn: "08:55", checkOut: "17:05", workedHours: "8.16", status: "Present" },
-  { id: "ATT-002", employee: "Bob Smith", date: "2023-10-01", checkIn: "09:15", checkOut: "17:00", workedHours: "7.75", status: "Late" },
-  { id: "ATT-003", employee: "Charlie Davis", date: "2023-10-01", checkIn: "-", checkOut: "-", workedHours: "0.00", status: "Absent" },
-  { id: "ATT-004", employee: "Emily Watson", date: "2023-10-01", checkIn: "09:00", checkOut: "17:30", workedHours: "8.50", status: "Present" },
-];
-
 export default function AttendancePage() {
   const { data: session } = useSession();
   const { toast } = useToast();
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(INITIAL_ATTENDANCE);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
@@ -40,9 +33,7 @@ export default function AttendancePage() {
 
   useEffect(() => {
     getAttendanceAction().then((live) => {
-      if (live && live.length > 0) {
-        setAttendance(live);
-      }
+      setAttendance(live);
     });
   }, []);
 
@@ -85,7 +76,13 @@ export default function AttendancePage() {
     if (type === "IN") setCheckingIn(true);
     else setCheckingOut(true);
 
-    const empId = session?.user?.employeeId || session?.user?.id || "EMP-001";
+    const empId = session?.user?.employeeId || session?.user?.id;
+    if (!empId) {
+      toast({ title: "Attendance error", description: "Your login is not linked to an employee record.", type: "error" });
+      if (type === "IN") setCheckingIn(false);
+      else setCheckingOut(false);
+      return;
+    }
     const timeParts = new Date().toTimeString().split(" ");
     const timeNow = (timeParts[0] || "09:00").slice(0, 5);
 
@@ -98,9 +95,7 @@ export default function AttendancePage() {
           type: "success",
         });
         const live = await getAttendanceAction();
-        if (live && live.length > 0) {
-          setAttendance(live);
-        }
+        setAttendance(live);
       } else {
         toast({
           title: "Attendance error",

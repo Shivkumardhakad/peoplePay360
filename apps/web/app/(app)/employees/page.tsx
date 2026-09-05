@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { EmployeeForm, type EmployeeFormValues } from "@/components/employee-form";
 import { Plus, Search, Users, ArrowUpRight, List, LayoutGrid, Building2, Briefcase, UserCheck, Clock, UserX } from "lucide-react";
+import { getEmployeesAction } from "@/lib/api-actions";
 
 interface EmployeeItem {
   id: string;
@@ -34,10 +35,12 @@ const KANBAN_COLUMNS: { status: EmployeeItem["status"]; title: string; icon: any
 
 export default function EmployeesPage() {
   const { data: session } = useSession();
-  const [employees, setEmployees] = useState<EmployeeItem[]>(INITIAL_EMPLOYEES);
+  const [employees, setEmployees] = useState<EmployeeItem[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+
+  useEffect(() => { getEmployeesAction().then((rows) => setEmployees(rows.map((row) => ({ ...row, status: row.status === "ACTIVE" ? "Active" : row.status === "ON_LEAVE" ? "On Leave" : "Inactive" })))); }, []);
 
   const role = session?.user?.role || "ADMIN";
   const canAddEmployee =

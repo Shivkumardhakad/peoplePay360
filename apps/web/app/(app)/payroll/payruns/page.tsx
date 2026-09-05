@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Search, ArrowRight, Loader2 } from "lucide-react";
@@ -8,39 +8,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-const MOCK_PAYRUNS = [
-  {
-    id: "PR-2023-10",
-    name: "October 2023 Payroll",
-    periodStart: "2023-10-01",
-    periodEnd: "2023-10-31",
-    structure: "Standard Tech Package",
-    employees: 124,
-    netTotal: 460000,
-    status: "PAID" as const,
-  },
-  {
-    id: "PR-2023-11",
-    name: "November 2023 Payroll",
-    periodStart: "2023-11-01",
-    periodEnd: "2023-11-30",
-    structure: "Standard Tech Package",
-    employees: 126,
-    netTotal: 0,
-    status: "DRAFT" as const,
-  },
-];
+import { listPayrunsAction } from "@/lib/api-actions";
 
 export default function PayrunsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [payruns, setPayruns] = useState<any[]>([]);
 
-  const filteredPayruns = MOCK_PAYRUNS.filter(
+  useEffect(() => {
+    listPayrunsAction().then((result) => setPayruns(result as any[])).catch(() => setPayruns([]));
+  }, []);
+
+  const filteredPayruns = payruns.filter(
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.structure.toLowerCase().includes(search.toLowerCase()) ||
+      p.salaryStructureId.toLowerCase().includes(search.toLowerCase()) ||
       p.status.toLowerCase().includes(search.toLowerCase()) ||
       p.id.toLowerCase().includes(search.toLowerCase())
   );
@@ -118,10 +101,10 @@ export default function PayrunsPage() {
                     <TableCell className="font-mono text-[11px] text-muted-foreground">
                       {payrun.periodStart} → {payrun.periodEnd}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{payrun.structure}</TableCell>
-                    <TableCell className="text-right font-mono text-xs">{payrun.employees}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{payrun.salaryStructureId}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{payrun.payslips?.length ?? 0}</TableCell>
                     <TableCell className="text-right font-mono text-xs font-semibold">
-                      ${payrun.netTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      ${(payrun.payslips ?? []).reduce((total: number, slip: any) => total + Number(slip.netAmount ?? 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge

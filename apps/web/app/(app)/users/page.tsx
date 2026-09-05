@@ -51,7 +51,7 @@ function formatRoleLabel(role: SystemUserRole) {
 
 export default function UsersPage() {
   const { toast } = useToast();
-  const [users, setUsers] = useState<SystemUser[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<SystemUser[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -67,7 +67,7 @@ export default function UsersPage() {
   const loadUsers = async () => {
     try {
       const res = await getUsersAction();
-      if (res.success && res.users && res.users.length > 0) {
+      if (res.success && res.users) {
         setUsers(
           res.users.map((u) => ({
             id: u.id,
@@ -80,7 +80,7 @@ export default function UsersPage() {
         );
       }
     } catch {
-      // Keep initial users on network failure
+      setError("Unable to load users from the database.");
     } finally {
       setLoading(false);
     }

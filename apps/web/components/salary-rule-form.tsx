@@ -27,9 +27,11 @@ export type SalaryRuleFormValues = z.output<typeof ruleSchema>;
 export function SalaryRuleForm({
   defaultValues,
   onSuccess,
+  onSave,
 }: {
   defaultValues?: Partial<SalaryRuleFormInput>;
   onSuccess?: (val: SalaryRuleFormValues) => void;
+  onSave?: (val: SalaryRuleFormValues) => Promise<void>;
 }) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
@@ -53,16 +55,16 @@ export function SalaryRuleForm({
 
   const onSubmit = async (data: SalaryRuleFormValues) => {
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 400));
-    setSubmitting(false);
-
-    toast({
-      title: "Salary Rule Configured",
-      description: `Rule ${data.code} (${data.name}) added to active catalog.`,
-      type: "success",
-    });
-    onSuccess?.(data);
-    reset();
+    try {
+      await onSave?.(data);
+      toast({ title: "Salary Rule Configured", description: `Rule ${data.code} (${data.name}) added to active catalog.`, type: "success" });
+      onSuccess?.(data);
+      reset();
+    } catch (error) {
+      toast({ title: "Unable to save rule", description: error instanceof Error ? error.message : "Payroll API request failed.", type: "error" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

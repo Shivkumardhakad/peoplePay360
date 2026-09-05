@@ -22,24 +22,15 @@ interface ContractItem {
   status: "Active" | "Ended";
 }
 
-const INITIAL_CONTRACTS: ContractItem[] = [
-  { id: "CON-1001", employee: "Alice Johnson", position: "Senior Frontend Engineer", department: "Engineering", startDate: "2023-01-15", endDate: "-", wage: 120000, status: "Active" },
-  { id: "CON-1002", employee: "Bob Smith", position: "HR Manager", department: "Human Resources", startDate: "2021-06-01", endDate: "-", wage: 95000, status: "Active" },
-  { id: "CON-1003", employee: "Charlie Davis", position: "Payroll Specialist", department: "Finance & Accounting", startDate: "2022-03-10", endDate: "2023-12-31", wage: 75000, status: "Ended" },
-  { id: "CON-1004", employee: "Emily Watson", position: "Lead UX Designer", department: "Product & Design", startDate: "2023-08-01", endDate: "-", wage: 110000, status: "Active" },
-];
-
 export default function ContractsPage() {
   const { data: session } = useSession();
-  const [contracts, setContracts] = useState<ContractItem[]>(INITIAL_CONTRACTS);
+  const [contracts, setContracts] = useState<ContractItem[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     getContractsAction().then((liveContracts) => {
-      if (liveContracts && liveContracts.length > 0) {
-        setContracts(liveContracts);
-      }
+      setContracts(liveContracts);
     });
   }, []);
 
@@ -61,9 +52,7 @@ export default function ContractsPage() {
 
   const handleCreated = async () => {
     const live = await getContractsAction();
-    if (live && live.length > 0) {
-      setContracts(live);
-    }
+    setContracts(live);
     setDialogOpen(false);
   };
 
