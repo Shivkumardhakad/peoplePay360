@@ -103,6 +103,7 @@ export function AppSidebar({ session }: { session: Session }) {
           <>
             <NavLink href="/employees" icon={Users}>Employees</NavLink>
             <NavLink href="/contracts" icon={FileText}>Contracts</NavLink>
+            <NavLink href="/working-schedules" icon={CalendarDays}>Working Schedules</NavLink>
           </>
         )}
 
@@ -134,6 +135,7 @@ export function AppSidebar({ session }: { session: Session }) {
                 <NavLink href="/payroll/structures" icon={ListChecks} nested>Structures</NavLink>
                 <NavLink href="/payroll/rules" icon={SlidersHorizontal} nested>Rules</NavLink>
                 <NavLink href="/reports" icon={BarChart3} nested>Reports</NavLink>
+                <NavLink href="/audit-logs" icon={Shield} nested>Audit &amp; Logs</NavLink>
               </>
             ) : (
               <NavLink href="/payroll/payslips" icon={Receipt} nested>My Payslips</NavLink>

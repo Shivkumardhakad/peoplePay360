@@ -2117,3 +2117,30 @@
 
 ### Notes
 - PDF downloads require the Payroll API to be running and the payslip to be `VALIDATED` or `PAID`.
+## 2026-09-06 12:10 IST — Complete schedules, audit logs, and PDF delivery batch
+
+### Summary
+- Added live working-schedule CRUD with weekly day/time definitions, calculated weekly hours, contract usage counts, and safe deactivation.
+- Added role-protected aggregated payroll audit/logs view from live payrun audit endpoints.
+- Added generated payslip PDF attachments to bulk email delivery.
+
+### Files Changed
+- `apps/web/app/(app)/working-schedules/page.tsx`: Added working schedule management UI.
+- `apps/web/app/(app)/audit-logs/page.tsx`: Added payroll audit history UI.
+- `apps/web/lib/api-actions.ts`: Added schedule persistence/actions, audit aggregation, and PDF email attachments.
+- `apps/web/components/app-sidebar.tsx`: Added schedule and audit navigation.
+- `apps/web/middleware.ts`: Added route protection for schedules and audit logs.
+- `CHANGELOG_AGENTS.md`: Recorded this batch.
+
+### Reason
+- Close the remaining MVP gaps around schedule configuration, operational audit visibility, and actual PDF payslip delivery.
+
+### Validation
+- `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `pnpm --filter web build` — passed.
+- `git diff --check` — passed.
+- `mvn test -q` in `apps/payroll` — not run; Maven is not installed in this environment.
+
+### Notes
+- Audit logs currently aggregate payroll audit findings; a full cross-module immutable activity-log store would be a separate compliance enhancement.
+- Schedule deactivation is blocked while active contracts reference the schedule.
