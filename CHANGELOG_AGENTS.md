@@ -1702,3 +1702,25 @@
 
 ### Notes
 - Internal IDs remain available to the application for routing, lookup, and row actions.
+## 2026-09-06 03:30 IST — Connect payslip screens to Java Payroll API
+
+### Summary
+- Replaced displayed mock payslips with live Java Payroll API payslip data.
+- Enriched payroll payslips with employee, department, position, and contract details from the HR database.
+- Kept employee-role payslip scoping based on the authenticated employee.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added Java payslip list/detail actions and HR record enrichment.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Load and filter live payslips.
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: Load live payslip detail before rendering/PDF generation.
+
+### Reason
+- Payslip pages were still rendering static demo salary data despite the Java Payroll API being available.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- The Java Payroll service must be running on `PAYROLL_API_URL` for these screens to show records.
+- Payrun wizard/detail and remaining payroll mock screens are the next integration slice.

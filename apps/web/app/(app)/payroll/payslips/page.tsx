@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Search, Download, ArrowRight, Loader2 } from "lucide-react";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { generatePayslipPDF } from "@/lib/payslip-pdf";
+import { listPayrollPayslipsAction } from "@/lib/api-actions";
 
 const MOCK_PAYSLIPS = [
   {
@@ -104,6 +105,9 @@ export default function PayslipsPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [livePayslips, setLivePayslips] = useState<any[]>([]);
+
+  useEffect(() => { listPayrollPayslipsAction().then(setLivePayslips).catch((error) => toast({ title: "Payroll API unavailable", description: error.message, type: "error" })); }, [toast]);
 
   const role = session?.user?.role || "ADMIN";
   const isEmployee = role === "EMPLOYEE";
@@ -112,12 +116,12 @@ export default function PayslipsPage() {
 
   // RBAC Scoping: Employees see ONLY their own payslips. Managers see all company payslips.
   const scopedPayslips = isEmployee
-    ? MOCK_PAYSLIPS.filter(
+    ? livePayslips.filter(
         (p) =>
           p.employeeId === currentEmpId ||
           p.employeeName.toLowerCase() === currentUserName.toLowerCase()
       )
-    : MOCK_PAYSLIPS;
+    : livePayslips;
 
   const filteredPayslips = scopedPayslips.filter(
     (p) =>
@@ -127,7 +131,7 @@ export default function PayslipsPage() {
       p.id.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleDownload = async (slip: (typeof MOCK_PAYSLIPS)[0]) => {
+  const handleDownload = async (slip: any) => {
     setDownloadingId(slip.id);
     await new Promise((r) => setTimeout(r, 500));
 

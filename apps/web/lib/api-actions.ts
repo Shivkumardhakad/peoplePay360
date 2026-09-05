@@ -635,7 +635,16 @@ export async function listPayrunPayslipsAction(payrunId: string) {
 }
 
 export async function getPayslipAction(id: string) {
-  return payrollApiFetch(`/api/payroll/payslips/${id}`);
+  const payslip = await payrollApiFetch<any>(`/api/payroll/payslips/${id}`);
+  const employee = await prisma.employee.findUnique({ where: { id: payslip.employeeId }, include: { department: true, jobPosition: true } });
+  const contract = await prisma.contract.findUnique({ where: { id: payslip.contractId } });
+  return { ...payslip, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : payslip.employeeId, department: employee?.department?.name ?? "-", position: employee?.jobPosition?.title ?? "-", contractRef: contract?.title ?? payslip.contractId, period: `${String(payslip.periodStart).slice(0, 10)} → ${String(payslip.periodEnd).slice(0, 10)}`, gross: Number(payslip.grossAmount), deductions: Number(payslip.deductionAmount), net: Number(payslip.netAmount), lines: (payslip.lines ?? []).map((line: any) => ({ rule: line.name, category: line.code, amount: Number(line.amount), type: line.amount < 0 ? "DEDUCTION" : "EARNING" })) };
+}
+
+export async function listPayrollPayslipsAction() {
+  const payruns = await payrollApiFetch<any[]>("/api/payroll/payruns");
+  const slips = (await Promise.all(payruns.flatMap((payrun) => (payrun.payslips ?? []).map((summary: any) => getPayslipAction(summary.id))))).flat();
+  return slips;
 }
 
 // -------------------------------------------------------------
