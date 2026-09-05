@@ -176,6 +176,26 @@
 - Existing legacy HR fields (`baseSalary`, `payrollProfileCode`, `days`, and single `User.role`) remain for backward compatibility.
 - Payroll API currently owns its separate Spring database; these Prisma payroll models provide the normalized shared application model requested in `temp/one` and should be reconciled before production migrations.
 
+## 2026-09-05 18:10 IST — Add HR CRUD workflow endpoints
+
+### Summary
+- Added employee, department, job-position, contract, attendance, and time-off create/update/detail/decision endpoints.
+
+### Files Changed
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Added database operations and transactional leave approval balance consumption.
+- `apps/hr-api/src/modules/*/*.controller.ts`: Added CRUD and workflow routes while preserving existing list routes.
+- `apps/hr-api/package.json`: Declared the Prisma client as a direct HR API dependency.
+- `CHANGELOG_AGENTS.md`: Recorded the API work.
+
+### Reason
+- The API layer previously exposed only read-only list endpoints.
+
+### Validation
+- `pnpm --filter @peoplepay360/hr-api build` — initially failed because `@prisma/client` was not declared directly; dependency fix pending verification.
+
+### Notes
+- Request DTOs currently use Prisma input types; shared Zod validation and authorization guards should be added before production exposure.
+
 ## 2026-09-05 14:05 IST — Modularize HR API source
 
 ### Summary
@@ -602,23 +622,65 @@
 - Full payrun compute, validate, and paid lifecycle requires the HR API `/contracts` endpoint to be running and returning period-valid active contracts.
 - Local smoke records were created in the development database for verification.
 
-## 2026-09-05 17:05 IST — Fix database seed execution
+## 2026-09-05 16:47 +05:30 — Complete HR API model routes
 
 ### Summary
-- Fixed the seed script’s misspelled Prisma delegate and added missing bcryptjs TypeScript declarations.
+- Added backend API routes for the remaining normalized PeoplePay360 models and payroll workflow operations.
+- Added a basic payrun compute lifecycle that generates/upserts payslips from active contracts and salary structure rules.
 
 ### Files Changed
-- `packages/db/prisma/seed.ts`: Changed `workingScwhedule` to the valid `workingSchedule` delegate.
-- `packages/db/package.json`: Added `@types/bcryptjs` for seed compilation.
-- `CHANGELOG_AGENTS.md`: Recorded the seed fix.
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Added bank account, working schedule, time-off type, allocation, salary rule/category/structure, payrun, payslip, RBAC, and user operations.
+- `apps/hr-api/src/modules/bank-accounts/bank-accounts.controller.ts`: Added bank account CRUD routes.
+- `apps/hr-api/src/modules/working-schedules/working-schedules.controller.ts`: Added working schedule and schedule-day CRUD routes.
+- `apps/hr-api/src/modules/payroll/payroll.controller.ts`: Added salary, payrun, payslip, and payroll lifecycle routes.
+- `apps/hr-api/src/modules/rbac/rbac.controller.ts`: Added role, permission, role-permission, and user-role assignment routes.
+- `apps/hr-api/src/modules/time-off/time-off.controller.ts`: Added time-off type and allocation routes.
+- `apps/hr-api/src/modules/users/users.controller.ts`: Added user detail/create/update/delete routes.
+- `apps/hr-api/src/modules/hr.module.ts`: Registered the new API controllers.
+- `CHANGELOG_AGENTS.md`: Recorded this API work.
 
 ### Reason
-- `pnpm db:seed` failed before execution due to a TypeScript declaration error and an invalid Prisma client property.
+- The normalized schema had models that were not reachable through the API layer, leaving large parts of the backend workflow unavailable.
 
 ### Validation
-- `pnpm install --filter @peoplepay360/db` — passed
-- `pnpm --filter @peoplepay360/db exec prisma generate` — passed
-- `pnpm db:seed` — passed
+- `pnpm --filter @peoplepay360/hr-api build` — passed
+
+### Notes
+- Controllers currently follow the existing pattern of accepting Prisma input types directly; DTO validation and authorization guards are still needed before production exposure.
+- Payrun computation supports fixed and percentage rules. Formula rules currently compute as zero until a formula engine/parser is defined.
+
+## 2026-09-05 17:17 +05:30 — Capture hackathon product context
+
+### Summary
+- Added the HR & Payroll hackathon brief, role scope, demo priorities, and expected payroll deliverables to the agent instructions.
+
+### Files Changed
+- `AGENTS.md`: Added hackathon context, delivery priorities, role permissions, two-step payrun workflow, live dashboard expectations, and PDF/email deliverables.
+- `CHANGELOG_AGENTS.md`: Recorded this documentation update.
+
+### Reason
+- Future repository work needs to align with the provided hackathon problem statement and prioritize real HR/payroll business flows over static UI.
+
+### Validation
+- `git diff --check` — passed
+
+### Notes
+- This was a documentation/context update only; no application code was changed.
+
+## 2026-09-05 17:38 +05:30 — Expand hackathon scope details
+
+### Summary
+- Expanded the agent instructions with the full HR & Payroll module breakdown, end-to-end flow requirements, dashboard expectations, and technical delivery guidelines.
+
+### Files Changed
+- `AGENTS.md`: Added detailed requirements for employee management, contracts, working schedules, attendance, time off, salary structures/rules, payruns, payslips, payroll dashboard, PDF/email delivery, demo flows, and technical priorities.
+- `CHANGELOG_AGENTS.md`: Recorded this documentation update.
+
+### Reason
+- The earlier context update summarized the product statement but did not preserve enough detail for future implementation decisions.
+
+### Validation
+- `git diff --check -- AGENTS.md CHANGELOG_AGENTS.md` — passed
 
 ### Notes
 - Prisma package.json configuration deprecation warning remains non-blocking.
@@ -708,3 +770,4 @@
 ### Notes
 - HR requires `DATABASE_URL` pointing to `oddo_hr` when started.
 - Local `oddo_hr` database creation is an environment setup action; no existing Payroll data was reset or deleted.
+- This was a documentation/context update only; no application code was changed.
