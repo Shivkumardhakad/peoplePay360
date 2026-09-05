@@ -733,6 +733,34 @@
 - `Get-Process` — terminated lingering node processes.
 - `Remove-Item apps/web/.next` — cleared stale `.next` build cache.
 - `pnpm dev` — running in background task `7b92bd24-c012-4faa-a062-748a8eccbedc/task-709`.
+
+## 2026-09-05 20:27 IST — Fix Supabase DB Connection + Schema Push + Seed
+
+### Summary
+- Fixed `P1001: Can't reach database server` by switching `apps/hr-api/.env` and `apps/web/.env` from port `5432` (direct Postgres, blocked externally) to port `6543` (Supabase PgBouncer transaction pooler).
+- Ran `prisma db push` via `packages/db` (which already used port 6543) — schema successfully synced to Supabase.
+- Ran `prisma db seed` — demo data seeded: departments, job positions, working schedules, employees, contracts, allocations, salary structures, salary rules, and admin user.
+- Restarted `pnpm dev` — both `@peoplepay360/hr-api` (port 4000) and `web` (port 3000) are running.
+
+### Files Changed
+- `apps/hr-api/.env`: Changed `DATABASE_URL` and `DIRECT_URL` from port 5432 to port 6543 with `?pgbouncer=true`.
+- `apps/web/.env`: Changed `DATABASE_URL` and `DIRECT_URL` from port 5432 to port 6543 with `?pgbouncer=true`.
+- `CHANGELOG_AGENTS.md`: Recorded this fix.
+
+### Reason
+- Supabase external connections must go through the PgBouncer pooler (port 6543). Port 5432 is a direct connection that Supabase blocks for external IP addresses, causing `P1001` unreachable server errors and cascading HTTP 500 responses from the HR API.
+
+### Validation
+- `prisma db push` — `Your database is now in sync with your Prisma schema. Done in 7.78s` ✅
+- `prisma db seed` — `The seed command has been executed.` ✅
+- HR API startup log — `[PrismaService] Connected to PostgreSQL database successfully.` ✅
+- `[HR-API] Running on http://localhost:4000/api/hr` ✅
+- Next.js dev — `✓ Starting... on http://localhost:3000` ✅
+
+### Notes
+- Login credentials: Admin `admin@peoplepay360.com` / `Admin123!` · Employee `employee@peoplepay360.com` / `Employee123!`
+- The `DIRECT_URL` in `packages/db/.env` still uses port 5432 for migration commands (Prisma requires a non-pooled connection for schema migrations); this works because migrations are run from the local machine where Supabase allows the direct port.
+
 ## 2026-09-05 17:17 +05:30 — Capture hackathon product context
 
 ### Summary
@@ -914,3 +942,126 @@
 
 ### Notes
 - No new dependencies were added. The existing mock session export remains in place for the current layout wiring.
+
+## 2026-09-05 18:54 +05:30 — Codex Logout Button Fix
+
+### Summary
+- Wired the web app logout button to NextAuth sign-out and redirected users to the login page after logout.
+
+### Files Changed
+- `apps/web/components/app-topbar.tsx`: converted the topbar to a client component and added a `signOut` handler to the Logout button.
+- `CHANGELOG_AGENTS.md`: recorded this logout fix.
+
+### Reason
+- The Logout button rendered without any click handler, so it did not clear the authenticated session or navigate away from protected pages.
+
+### Validation
+- `pnpm --filter web lint` — failed; `next lint` prompted for ESLint setup instead of running non-interactively.
+- `npx tsc --noEmit` from `apps/web` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- The repository's lint script should be migrated away from deprecated `next lint` before it can run in CI-style non-interactive mode.
+
+## 2026-09-05 18:55 +05:30 — Codex Employee Login Seed
+
+### Summary
+- Added a seeded employee login account for demo and employee-role testing.
+
+### Files Changed
+- `packages/db/prisma/seed.ts`: added `employee@peoplepay360.local` with role `EMPLOYEE`, password `Employee123!`, and a link to seeded employee `EMP-003`.
+- `CHANGELOG_AGENTS.md`: recorded this seed-data change.
+
+### Reason
+- The app used credentials-based login but the seed data only created an admin user, so there was no real employee credential for testing employee access.
+
+### Validation
+- `pnpm --filter @peoplepay360/db db:seed` — failed; root `.env` database host was unreachable.
+- `$env:DATABASE_URL='postgresql://postgres:root@localhost:5432/oddo_hr'; pnpm --filter @peoplepay360/db db:seed` — failed; local PostgreSQL was not reachable on `localhost:5432`.
+- `pnpm --filter @peoplepay360/db db:seed` — passed on retry against the configured database.
+- Employee login verification query — passed; `employee@peoplepay360.local` exists with role `EMPLOYEE`, employee `EMP-003`, and a matching password hash.
+- `pnpm --filter @peoplepay360/db exec tsc --noEmit` — passed.
+
+### Notes
+- This is demo seed data only; production credentials must be created through a secure user-management flow.
+
+## 2026-09-05 19:18 +05:30 — Codex Employee Self-Service Panel And HR RBAC
+
+### Summary
+- Added HR API JWT authentication, role guards, employee-scoped `/api/hr/me/**` endpoints, and a dedicated Employee self-service panel for dashboard, attendance, time off, and profile.
+- Guarded existing HR admin endpoints so Employee-role tokens cannot access HR/admin/payroll administration APIs.
+
+### Files Changed
+- `apps/hr-api/src/modules/auth/*`: added JWT auth, role metadata, and role guard utilities.
+- `apps/hr-api/src/modules/me/me.controller.ts`: added authenticated employee self-service endpoints.
+- `apps/hr-api/src/modules/shared/hr.service.ts`: added employee-scoped profile, dashboard, attendance, time-off, allocation, and type methods.
+- `apps/hr-api/src/modules/*/*.controller.ts`: applied class-level auth and role guards without changing method bodies, routes, DTOs, or response construction.
+- `apps/hr-api/src/modules/hr.module.ts`: registered the new controller and guard providers.
+- `apps/hr-api/package.json`, `apps/web/package.json`, `pnpm-lock.yaml`: declared JWT/auth dependencies used directly by each app.
+- `apps/web/lib/hr-api.ts`: added server-side HR API token minting and fetch helper.
+- `apps/web/app/(app)/self/*`: added employee dashboard, attendance, time-off, profile pages, and local formatting helpers.
+- `apps/web/app/(app)/layout.tsx`: switched the app shell from mock session data to the authenticated NextAuth session.
+- `apps/web/components/app-sidebar.tsx`: routed Employee users to `/self/**` pages while leaving admin route components intact.
+- `apps/web/middleware.ts`: blocked Employee-role direct access to admin/HR/payroll routes and allowed `/self/**`.
+- `AGENTS.md`: updated the HR API reference with auth requirements and `/me` endpoints.
+- `CHANGELOG_AGENTS.md`: recorded this change.
+
+### Reason
+- Employee self-service required server-side employee scoping from authenticated claims, and existing unguarded HR endpoints needed RBAC so Employee users cannot access or mutate other employees' data.
+
+### Validation
+- Phase 0 audit — completed; audited HR endpoints had no auth check at all before this change, not JWT-only/no-role-check behavior.
+- `pnpm install` — passed; lockfile updated for explicit `jose` and `bcryptjs` dependencies.
+- `pnpm --filter @peoplepay360/hr-api build` — passed.
+- `npx tsc --noEmit` from `apps/web` — passed.
+- Live HR API smoke test on `PORT=4100` with `HR_API_JWT_SECRET=codex-test-secret` — passed: missing token returned `401`, Employee token returned `403` on `/api/hr/employees`, Admin/HR/Payroll tokens returned `200` on allowed admin endpoints, and Employee token returned `200` on `/api/hr/me/profile`, `/api/hr/me/attendance`, `/api/hr/me/time-off`, `/api/hr/me/time-off/allocations`, and `/api/hr/me/time-off/types`.
+- Admin-facing page diff check — passed; existing admin route pages inspected in the audit (`dashboard`, `attendance`, `time-off/requests`, `time-off/allocations`, `employees`) have no source diffs.
+
+### Notes
+- Existing HR automated tests are still a placeholder, so authorization behavior was verified with live smoke requests.
+- The employee panel intentionally excludes HR admin actions, attendance correction/editing, leave approval/refusal, allocation management, user/RBAC management, and payroll/payslip access.
+
+## 2026-09-05 19:27 +05:30 — Codex Local HR API Self-Service Startup Fix
+
+### Summary
+- Added a development-only shared JWT secret fallback for local web-to-HR API self-service calls.
+
+### Files Changed
+- `apps/hr-api/src/modules/auth/jwt-auth.guard.ts`: uses `peoplepay360-dev-secret` only outside production when no explicit HR API or NextAuth secret is configured.
+- `apps/web/lib/hr-api.ts`: uses the same development-only fallback when minting HR API bearer tokens.
+- `CHANGELOG_AGENTS.md`: recorded this runtime fix.
+
+### Reason
+- The local `.env` does not define `HR_API_JWT_SECRET` or `NEXTAUTH_SECRET`; after restarting the HR API with the new guards, local self-service calls need a matching non-production secret unless the developer configures one explicitly.
+
+### Validation
+- Restarted the stale HR API process on port `4000` — passed; startup logs mapped `/api/hr/me/dashboard`.
+- Live HR API smoke check on `http://localhost:4000/api/hr` — passed: Admin token returned `200` on `/employees`, missing token returned `401` on `/employees`, Employee token returned `403` on `/employees`, and Employee token returned `200` on `/me/dashboard` and `/me/profile`.
+- `pnpm --filter @peoplepay360/hr-api build` — passed.
+- `npx tsc --noEmit` from `apps/web` — passed.
+
+### Notes
+- Production still requires an explicit `HR_API_JWT_SECRET` or `NEXTAUTH_SECRET`.
+
+## 2026-09-05 19:32 +05:30 — Codex HR API JWT Secret Alignment
+
+### Summary
+- Made local HR API bearer-token signing and verification prefer the same development fallback even when only the web process has `NEXTAUTH_SECRET`.
+
+### Files Changed
+- `apps/web/lib/hr-api.ts`: changed HR API token signing to use `HR_API_JWT_SECRET`, then the shared dev fallback outside production.
+- `apps/hr-api/src/modules/auth/jwt-auth.guard.ts`: changed HR API token verification to use the same secret precedence.
+- `CHANGELOG_AGENTS.md`: recorded this runtime auth fix.
+
+### Reason
+- Employee self-service calls could return `401 Invalid bearer token` when the Next.js process had a `NEXTAUTH_SECRET` value that the HR API process did not share.
+
+### Validation
+- Restarted the stale HR API and Next.js dev processes on ports `4000` and `3000` — passed.
+- Live HR API smoke check with the shared development secret — passed: Admin token returned `200` on `/employees`, Employee token returned `200` on `/me/dashboard`, and Employee token returned `403` on `/employees`.
+- Anonymous request to `http://localhost:3000/self/dashboard` — passed; middleware returned `307` to `/login?callbackUrl=%2Fself%2Fdashboard`.
+- `pnpm --filter @peoplepay360/hr-api build` — passed.
+- `npx tsc --noEmit` from `apps/web` — passed.
+
+### Notes
+- Production still requires explicitly shared `HR_API_JWT_SECRET` or `NEXTAUTH_SECRET` configuration.

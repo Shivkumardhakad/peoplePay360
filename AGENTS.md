@@ -16,7 +16,7 @@ The repository contains two backend APIs. Keep this endpoint map synchronized wi
 - Source: `apps/hr-api`
 - Start: `pnpm dev:hr`
 - Build: `pnpm --filter @peoplepay360/hr-api build`
-- Current controllers are read-only list/dashboard endpoints:
+- HR admin endpoints require a Bearer JWT. Employee-role users must use the scoped `/api/hr/me/**` self-service endpoints instead of admin endpoints.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
@@ -29,7 +29,22 @@ The repository contains two backend APIs. Keep this endpoint map synchronized wi
 | GET | `/api/hr/users` | List users |
 | GET | `/api/hr/dashboard` | Get HR dashboard data |
 
-The HR API uses a dedicated PostgreSQL database through Prisma and requires `DATABASE_URL` (local development: `postgresql://postgres:root@localhost:5432/oddo_hr`). Do not point HR at the Payroll `oddo` database because their schemas are different. Apply the HR schema with `pnpm --filter @peoplepay360/db exec prisma migrate deploy` after setting `DATABASE_URL`. CORS defaults to `http://localhost:3000`; the port defaults to `3001` and can be changed with `PORT`. The HR API currently has no real automated test suite; its package `test` script is a placeholder.
+#### HR employee self-service endpoints
+
+All self-service endpoints resolve the employee from the authenticated JWT `employeeId` claim and reject requests without an authenticated employee context.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/hr/me/dashboard` | Get the logged-in employee's leave, attendance, and pending-request summary |
+| GET | `/api/hr/me/profile` | Get the logged-in employee's own profile |
+| GET | `/api/hr/me/attendance` | List the logged-in employee's attendance records |
+| POST | `/api/hr/me/attendance` | Create an attendance entry for the logged-in employee |
+| GET | `/api/hr/me/time-off` | List the logged-in employee's time-off requests |
+| GET | `/api/hr/me/time-off/allocations` | List the logged-in employee's leave allocations and balances |
+| GET | `/api/hr/me/time-off/types` | List active time-off types available for employee requests |
+| POST | `/api/hr/me/time-off/requests` | Create a time-off request for the logged-in employee |
+
+The HR API uses a dedicated PostgreSQL database through Prisma and requires `DATABASE_URL` (local development: `postgresql://postgres:root@localhost:5432/oddo_hr`). Do not point HR at the Payroll `oddo` database because their schemas are different. Apply the HR schema with `pnpm --filter @peoplepay360/db exec prisma migrate deploy` after setting `DATABASE_URL`. CORS defaults to `http://localhost:3000`; the port defaults to `3001` and can be changed with `PORT`. Authenticated HR API calls require `HR_API_JWT_SECRET` or `NEXTAUTH_SECRET` for Bearer JWT verification. The HR API currently has no real automated test suite; its package `test` script is a placeholder.
 
 ### Payroll API — Java/Spring Boot
 

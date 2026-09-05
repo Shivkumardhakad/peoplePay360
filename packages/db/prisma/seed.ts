@@ -6,7 +6,8 @@ const prisma = new PrismaClient();
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
 async function main() {
-  const passwordHash = await bcrypt.hash("Admin123!", 10);
+  const adminPasswordHash = await bcrypt.hash("Admin123!", 10);
+  const employeePasswordHash = await bcrypt.hash("Employee123!", 10);
 
   const schedule = await prisma.workingSchedule.upsert({
     where: { name: "Standard 40 Hour Week" },
@@ -198,15 +199,36 @@ async function main() {
     where: { employeeNumber: "EMP-001" }
   });
 
+  const employeeUserProfile = await prisma.employee.findUniqueOrThrow({
+    where: { employeeNumber: "EMP-003" }
+  });
+
   await prisma.user.upsert({
     where: { email: "admin@peoplepay360.local" },
     update: {},
     create: {
       email: "admin@peoplepay360.local",
       name: "PeoplePay360 Admin",
-      passwordHash,
+      passwordHash: adminPasswordHash,
       role: "ADMIN",
       employeeId: adminEmployee.id
+    }
+  });
+
+  await prisma.user.upsert({
+    where: { email: "employee@peoplepay360.local" },
+    update: {
+      name: "Noah Kim",
+      passwordHash: employeePasswordHash,
+      role: "EMPLOYEE",
+      employeeId: employeeUserProfile.id
+    },
+    create: {
+      email: "employee@peoplepay360.local",
+      name: "Noah Kim",
+      passwordHash: employeePasswordHash,
+      role: "EMPLOYEE",
+      employeeId: employeeUserProfile.id
     }
   });
 }

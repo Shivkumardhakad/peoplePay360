@@ -6,8 +6,27 @@ export default withAuth(
     const role = request.nextauth.token?.role;
     const pathname = request.nextUrl.pathname;
 
-    if (pathname.startsWith("/payroll") && role === "EMPLOYEE") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    if (role === "EMPLOYEE") {
+      const employeeRoutes = ["/self"];
+      const redirectedEmployeeRoutes: Record<string, string> = {
+        "/dashboard": "/self/dashboard",
+        "/attendance": "/self/attendance",
+        "/time-off": "/self/time-off"
+      };
+
+      if (employeeRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
+        return NextResponse.next();
+      }
+
+      for (const [adminRoute, selfRoute] of Object.entries(redirectedEmployeeRoutes)) {
+        if (pathname === adminRoute || pathname.startsWith(`${adminRoute}/`)) {
+          return NextResponse.redirect(new URL(selfRoute, request.url));
+        }
+      }
+
+      if (pathname.startsWith("/employees") || pathname.startsWith("/contracts") || pathname.startsWith("/payroll") || pathname.startsWith("/users")) {
+        return NextResponse.redirect(new URL("/self/dashboard", request.url));
+      }
     }
 
     return NextResponse.next();
@@ -23,5 +42,5 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/employees/:path*", "/contracts/:path*", "/attendance/:path*", "/time-off/:path*", "/payroll/:path*"]
+  matcher: ["/dashboard/:path*", "/employees/:path*", "/contracts/:path*", "/attendance/:path*", "/time-off/:path*", "/payroll/:path*", "/users/:path*", "/self/:path*"]
 };

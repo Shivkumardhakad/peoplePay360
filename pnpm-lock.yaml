@@ -32,9 +32,15 @@ importers:
       '@prisma/client':
         specifier: 6.15.0
         version: 6.15.0(prisma@6.15.0(typescript@5.9.2))(typescript@5.9.2)
+      bcryptjs:
+        specifier: 2.4.3
+        version: 2.4.3
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
+      jose:
+        specifier: 4.15.9
+        version: 4.15.9
       reflect-metadata:
         specifier: 0.2.2
         version: 0.2.2
@@ -42,6 +48,9 @@ importers:
         specifier: 7.8.2
         version: 7.8.2
     devDependencies:
+      '@types/bcryptjs':
+        specifier: 2.4.6
+        version: 2.4.6
       '@types/node':
         specifier: 22.15.29
         version: 22.15.29
@@ -78,6 +87,9 @@ importers:
       date-fns:
         specifier: 4.1.0
         version: 4.1.0
+      jose:
+        specifier: 4.15.9
+        version: 4.15.9
       jspdf:
         specifier: 3.0.2
         version: 3.0.2

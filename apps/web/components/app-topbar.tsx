@@ -1,4 +1,7 @@
+"use client";
+
 import { LogOut } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import type { Session } from "@/components/app-sidebar";
 
@@ -16,7 +19,13 @@ export function AppTopbar({ session }: { session: Session }) {
         <p className="text-sm font-medium">{session.user.name}</p>
         <p className="text-xs text-muted-foreground">{formatRole(session.user.role)}</p>
       </div>
-      <Button variant="ghost" size="sm" className="gap-2">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="gap-2"
+        onClick={() => signOut({ callbackUrl: "/login" })}
+      >
         <LogOut className="h-4 w-4" />
         Logout
       </Button>

@@ -1,5 +1,5 @@
-import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
-import { ComputationType, ContractStatus, Prisma } from "@prisma/client";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable } from "@nestjs/common";
+import { AttendanceStatus, ComputationType, ContractStatus, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 
@@ -12,6 +12,22 @@ type CreateUserInput = Omit<Prisma.UserUncheckedCreateInput, "passwordHash"> & {
 type UpdateUserInput = Prisma.UserUncheckedUpdateInput & {
   password?: string;
   temporaryPassword?: string;
+};
+
+type CreateMyAttendanceInput = {
+  date: string | Date;
+  checkIn?: string | Date | null;
+  checkOut?: string | Date | null;
+  breakMinutes?: number;
+  status?: AttendanceStatus;
+};
+
+type CreateMyTimeOffRequestInput = {
+  timeOffTypeId: string;
+  startDate: string | Date;
+  endDate: string | Date;
+  quantity: Prisma.Decimal | number | string;
+  reason?: string | null;
 };
 
 @Injectable()
@@ -36,6 +52,111 @@ export class HrService {
   createEmployee(data: Prisma.EmployeeUncheckedCreateInput) { return this.prisma.client.employee.create({ data }); }
   updateEmployee(id: string, data: Prisma.EmployeeUncheckedUpdateInput) { return this.prisma.client.employee.update({ where: { id }, data }); }
   terminateEmployee(id: string) { return this.prisma.client.employee.update({ where: { id }, data: { status: "TERMINATED" } }); }
+
+  requireAuthenticatedEmployeeId(employeeId: string | null | undefined) {
+    if (!employeeId) {
+      throw new ForbiddenException("Authenticated user is not linked to an employee profile");
+    }
+
+    return employeeId;
+  }
+
+  getMyProfile(employeeId: string) {
+    return this.prisma.client.employee.findUniqueOrThrow({
+      where: { id: employeeId },
+      include: {
+        department: true,
+        jobPosition: true,
+        contracts: {
+          include: {
+            department: true,
+            position: true,
+            workingSchedule: { include: { scheduleDays: true } },
+            salaryStructure: true
+          },
+          orderBy: { startDate: "desc" }
+        },
+        allocations: { include: { timeOffType: true }, orderBy: { periodStart: "desc" } }
+      }
+    });
+  }
+
+  async getMyDashboard(employeeId: string) {
+    const today = new Date();
+    const startOfToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const endOfToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + 1));
+    const [allocations, todayAttendance, pendingRequests] = await Promise.all([
+      this.listMyAllocations(employeeId),
+      this.prisma.client.attendance.findFirst({
+        where: { employeeId, date: { gte: startOfToday, lt: endOfToday } },
+        orderBy: { date: "desc" }
+      }),
+      this.prisma.client.timeOffRequest.findMany({
+        where: { employeeId, status: "SUBMITTED" },
+        include: { timeOffType: true },
+        orderBy: { createdAt: "desc" },
+        take: 5
+      })
+    ]);
+
+    return { allocations, todayAttendance, pendingRequests };
+  }
+
+  listMyAttendance(employeeId: string) {
+    return this.prisma.client.attendance.findMany({
+      where: { employeeId },
+      include: { workingSchedule: true },
+      orderBy: { date: "desc" },
+      take: 100
+    });
+  }
+
+  createMyAttendance(employeeId: string, data: CreateMyAttendanceInput) {
+    return this.createAttendance({
+      employeeId,
+      date: new Date(data.date),
+      checkIn: data.checkIn ? new Date(data.checkIn) : undefined,
+      checkOut: data.checkOut ? new Date(data.checkOut) : undefined,
+      breakMinutes: data.breakMinutes ?? 0,
+      status: data.status ?? "PRESENT"
+    });
+  }
+
+  listMyTimeOffRequests(employeeId: string) {
+    return this.prisma.client.timeOffRequest.findMany({
+      where: { employeeId },
+      include: { timeOffType: true, approvedBy: { select: { id: true, name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 100
+    });
+  }
+
+  listMyAllocations(employeeId: string) {
+    return this.prisma.client.allocation.findMany({
+      where: { employeeId },
+      include: { timeOffType: true },
+      orderBy: { periodStart: "desc" }
+    });
+  }
+
+  listMyTimeOffTypes() {
+    return this.prisma.client.timeOffType.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: { name: "asc" }
+    });
+  }
+
+  createMyTimeOffRequest(employeeId: string, data: CreateMyTimeOffRequestInput) {
+    return this.createTimeOffRequest({
+      employeeId,
+      timeOffTypeId: data.timeOffTypeId,
+      startDate: new Date(data.startDate),
+      endDate: new Date(data.endDate),
+      quantity: data.quantity,
+      reason: data.reason ?? undefined,
+      status: "SUBMITTED"
+    });
+  }
 
   listBankAccounts() { return this.prisma.client.bankAccount.findMany({ include: { employee: true }, orderBy: { accountName: "asc" } }); }
   getBankAccount(id: string) { return this.prisma.client.bankAccount.findUniqueOrThrow({ where: { id }, include: { employee: true } }); }

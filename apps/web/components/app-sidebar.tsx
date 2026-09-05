@@ -19,7 +19,7 @@ export type Session = {
   user: {
     id: string;
     name: string;
-    role: "ADMIN" | "HR_MANAGER" | "HR_PAYROLL_USER" | "HR_PAYROLL_MANAGER" | "EMPLOYEE";
+    role: "ADMIN" | "HR_MANAGER" | "HR_PAYROLL_USER" | "HR_PAYROLL_MANAGER" | "PAYROLL_MANAGER" | "EMPLOYEE";
     employeeId: string | null;
   }
 };
@@ -64,7 +64,6 @@ export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
   const isEmployee = role === "EMPLOYEE";
   const isHRManagerOnly = role === "HR_MANAGER";
   const isAdmin = role === "ADMIN";
-  const employeeProfileHref = session.user.employeeId ? `/employees/${session.user.employeeId}` : "/employees";
 
   return (
     <div className="p-4">
@@ -77,7 +76,9 @@ export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3">
-          {!isEmployee && (
+          {isEmployee ? (
+            <NavLink href="/self/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
+          ) : (
             <NavLink href="/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
           )}
 
@@ -87,7 +88,7 @@ export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
           )}
 
           {isEmployee ? (
-            <NavLink href={employeeProfileHref} icon={Users}>My Profile</NavLink>
+            <NavLink href="/self/profile" icon={Users}>My Profile</NavLink>
           ) : (
             <>
               <NavLink href="/employees" icon={Users}>Employees</NavLink>
@@ -95,7 +96,7 @@ export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
             </>
           )}
 
-          <NavLink href="/attendance" icon={Clock}>Attendance</NavLink>
+          <NavLink href={isEmployee ? "/self/attendance" : "/attendance"} icon={Clock}>Attendance</NavLink>
 
           <div className="px-3 pt-4 pb-1">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">Time Off</p>
@@ -107,7 +108,7 @@ export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
               <NavLink href="/time-off/types" icon={Settings2} nested>Types</NavLink>
             </>
           ) : (
-            <NavLink href="/time-off/requests" icon={CalendarClock} nested>My Requests</NavLink>
+            <NavLink href="/self/time-off" icon={CalendarClock} nested>My Time Off</NavLink>
           )}
 
           {/* Payroll section - hidden entirely for HR Manager, per role permissions */}
