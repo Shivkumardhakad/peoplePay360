@@ -1,6 +1,18 @@
-import { Injectable } from "@nestjs/common";
-import { ComputationType, Prisma } from "@prisma/client";
+import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
+import { ComputationType, ContractStatus, Prisma } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
+
+type CreateUserInput = Omit<Prisma.UserUncheckedCreateInput, "passwordHash"> & {
+  password?: string;
+  temporaryPassword?: string;
+  passwordHash?: string;
+};
+
+type UpdateUserInput = Prisma.UserUncheckedUpdateInput & {
+  password?: string;
+  temporaryPassword?: string;
+};
 
 @Injectable()
 export class HrService {
@@ -61,8 +73,21 @@ export class HrService {
     });
   }
   getContract(id: string) { return this.prisma.client.contract.findUniqueOrThrow({ where: { id }, include: { employee: true, department: true, position: true, workingSchedule: true, salaryStructure: true } }); }
-  createContract(data: Prisma.ContractUncheckedCreateInput) { return this.prisma.client.contract.create({ data }); }
-  updateContract(id: string, data: Prisma.ContractUncheckedUpdateInput) { return this.prisma.client.contract.update({ where: { id }, data }); }
+  async createContract(data: Prisma.ContractUncheckedCreateInput) {
+    await this.ensureContractDoesNotOverlap(data.employeeId, new Date(data.startDate), data.endDate ? new Date(data.endDate) : null, data.status as ContractStatus, undefined);
+    return this.prisma.client.contract.create({ data });
+  }
+  async updateContract(id: string, data: Prisma.ContractUncheckedUpdateInput) {
+    const current = await this.prisma.client.contract.findUniqueOrThrow({ where: { id } });
+    await this.ensureContractDoesNotOverlap(
+      (data.employeeId as string | undefined) ?? current.employeeId,
+      (data.startDate as Date | undefined) ?? current.startDate,
+      data.endDate === undefined ? current.endDate : (data.endDate as Date | null),
+      (data.status as ContractStatus | undefined) ?? current.status,
+      id
+    );
+    return this.prisma.client.contract.update({ where: { id }, data });
+  }
 
   listWorkingSchedules() {
     return this.prisma.client.workingSchedule.findMany({
@@ -72,11 +97,24 @@ export class HrService {
   }
   getWorkingSchedule(id: string) { return this.prisma.client.workingSchedule.findUniqueOrThrow({ where: { id }, include: { scheduleDays: true, contracts: true } }); }
   createWorkingSchedule(data: Prisma.WorkingScheduleUncheckedCreateInput) { return this.prisma.client.workingSchedule.create({ data }); }
-  updateWorkingSchedule(id: string, data: Prisma.WorkingScheduleUncheckedUpdateInput) { return this.prisma.client.workingSchedule.update({ where: { id }, data }); }
+  async updateWorkingSchedule(id: string, data: Prisma.WorkingScheduleUncheckedUpdateInput) {
+    const schedule = await this.prisma.client.workingSchedule.update({ where: { id }, data });
+    return this.recalculateScheduleHours(schedule.id);
+  }
   deleteWorkingSchedule(id: string) { return this.prisma.client.workingSchedule.delete({ where: { id } }); }
-  createWorkingScheduleDay(data: Prisma.WorkingScheduleDayUncheckedCreateInput) { return this.prisma.client.workingScheduleDay.create({ data }); }
-  updateWorkingScheduleDay(id: string, data: Prisma.WorkingScheduleDayUncheckedUpdateInput) { return this.prisma.client.workingScheduleDay.update({ where: { id }, data }); }
-  deleteWorkingScheduleDay(id: string) { return this.prisma.client.workingScheduleDay.delete({ where: { id } }); }
+  async createWorkingScheduleDay(data: Prisma.WorkingScheduleDayUncheckedCreateInput) {
+    const day = await this.prisma.client.workingScheduleDay.create({ data });
+    return this.recalculateScheduleHours(day.workingScheduleId);
+  }
+  async updateWorkingScheduleDay(id: string, data: Prisma.WorkingScheduleDayUncheckedUpdateInput) {
+    const day = await this.prisma.client.workingScheduleDay.update({ where: { id }, data });
+    return this.recalculateScheduleHours(day.workingScheduleId);
+  }
+  async deleteWorkingScheduleDay(id: string) {
+    const day = await this.prisma.client.workingScheduleDay.delete({ where: { id } });
+    await this.recalculateScheduleHours(day.workingScheduleId);
+    return day;
+  }
 
   listAttendance() {
     return this.prisma.client.attendance.findMany({
@@ -88,8 +126,12 @@ export class HrService {
       take: 100
     });
   }
-  createAttendance(data: Prisma.AttendanceUncheckedCreateInput) { return this.prisma.client.attendance.create({ data }); }
-  correctAttendance(id: string, data: Prisma.AttendanceUncheckedUpdateInput) { return this.prisma.client.attendance.update({ where: { id }, data: { ...data, corrected: true } }); }
+  async createAttendance(data: Prisma.AttendanceUncheckedCreateInput) {
+    return this.prisma.client.attendance.create({ data: this.withWorkedMinutes(data) });
+  }
+  async correctAttendance(id: string, data: Prisma.AttendanceUncheckedUpdateInput) {
+    return this.prisma.client.attendance.update({ where: { id }, data: { ...data, ...this.withWorkedMinutes(data), corrected: true } });
+  }
 
   listTimeOffRequests() {
     return this.prisma.client.timeOffRequest.findMany({
@@ -101,12 +143,23 @@ export class HrService {
       take: 100
     });
   }
-  createTimeOffRequest(data: Prisma.TimeOffRequestUncheckedCreateInput) { return this.prisma.client.timeOffRequest.create({ data }); }
+  async createTimeOffRequest(data: Prisma.TimeOffRequestUncheckedCreateInput) {
+    if (new Date(data.endDate) < new Date(data.startDate)) throw new BadRequestException("Time-off end date must be on or after start date");
+    if (Number(data.quantity) <= 0) throw new BadRequestException("Time-off quantity must be greater than zero");
+    return this.prisma.client.timeOffRequest.create({ data });
+  }
   async decideTimeOff(id: string, status: "APPROVED" | "REJECTED" | "CANCELLED", approvedById?: string) {
     return this.prisma.client.$transaction(async (tx) => {
+      const existing = await tx.timeOffRequest.findUniqueOrThrow({ where: { id }, include: { timeOffType: true } });
+      if (existing.status === "APPROVED" && status === "APPROVED") return existing;
+      if (!["SUBMITTED", "DRAFT"].includes(existing.status) && status !== "CANCELLED") {
+        throw new ConflictException(`Cannot change a ${existing.status.toLowerCase()} time-off request`);
+      }
       const request = await tx.timeOffRequest.update({ where: { id }, data: { status, approvedById: status === "APPROVED" ? approvedById : undefined, approvedAt: status === "APPROVED" ? new Date() : undefined } });
       if (status === "APPROVED") {
         const allocation = await tx.allocation.findFirst({ where: { employeeId: request.employeeId, timeOffTypeId: request.timeOffTypeId, periodStart: { lte: request.startDate }, periodEnd: { gte: request.endDate } } });
+        if (existing.timeOffType.requiresAllocation && !allocation) throw new BadRequestException("No valid leave allocation exists for this request");
+        if (allocation && Number(allocation.remaining ?? 0) < Number(request.quantity)) throw new BadRequestException("Insufficient leave balance");
         if (allocation) await tx.allocation.update({ where: { id: allocation.id }, data: { consumed: { increment: request.quantity }, remaining: { decrement: request.quantity } } });
       }
       return request;
@@ -167,20 +220,37 @@ export class HrService {
   getPayrun(id: string) {
     return this.prisma.client.payrun.findUniqueOrThrow({
       where: { id },
-      include: { salaryStructure: true, createdBy: true, payslips: { include: { employee: true, lines: true } } }
+      include: { salaryStructure: true, createdBy: true, selectedEmployees: { include: { employee: true } }, payslips: { include: { employee: true, lines: true } } }
     });
   }
-  createPayrun(data: Prisma.PayrunUncheckedCreateInput) { return this.prisma.client.payrun.create({ data }); }
+  async createPayrun(data: Prisma.PayrunUncheckedCreateInput & { employeeIds?: string[] }) {
+    const { employeeIds, ...payrunData } = data;
+    if (!employeeIds?.length) throw new BadRequestException("Select at least one employee for the payrun");
+    const employees = await this.prisma.client.employee.count({ where: { id: { in: employeeIds }, status: "ACTIVE" } });
+    if (employees !== new Set(employeeIds).size) throw new BadRequestException("One or more selected employees are not active or do not exist");
+    return this.prisma.client.payrun.create({ data: { ...payrunData, selectedEmployees: { create: [...new Set(employeeIds)].map((employeeId) => ({ employeeId })) } } });
+  }
   updatePayrun(id: string, data: Prisma.PayrunUncheckedUpdateInput) { return this.prisma.client.payrun.update({ where: { id }, data }); }
-  validatePayrun(id: string) { return this.prisma.client.payrun.update({ where: { id }, data: { status: "VALIDATED", validatedAt: new Date() } }); }
-  markPayrunPaid(id: string) {
+  async validatePayrun(id: string) {
+    const warnings = await this.getPayrunWarnings(id);
+    if (warnings.some((warning) => warning.blocking)) throw new BadRequestException({ message: "Payrun has blocking validation errors", warnings });
+    return this.prisma.client.payrun.update({ where: { id }, data: { status: "VALIDATED", validatedAt: new Date() } });
+  }
+  async markPayrunPaid(id: string) {
     return this.prisma.client.$transaction(async (tx) => {
+      const current = await tx.payrun.findUniqueOrThrow({ where: { id }, include: { payslips: true } });
+      if (current.status !== "VALIDATED") throw new ConflictException("Only a validated payrun can be marked paid");
+      if (current.payslips.length === 0) throw new BadRequestException("Cannot pay a payrun without payslips");
       const payrun = await tx.payrun.update({ where: { id }, data: { status: "PAID", paidAt: new Date() } });
       await tx.payslip.updateMany({ where: { payrunId: id }, data: { status: "PAID" } });
       return payrun;
     });
   }
-  cancelPayrun(id: string) { return this.prisma.client.payrun.update({ where: { id }, data: { status: "CANCELLED" } }); }
+  async cancelPayrun(id: string) {
+    const current = await this.prisma.client.payrun.findUniqueOrThrow({ where: { id } });
+    if (["PAID", "CANCELLED"].includes(current.status)) throw new ConflictException(`Cannot cancel a ${current.status.toLowerCase()} payrun`);
+    return this.prisma.client.payrun.update({ where: { id }, data: { status: "CANCELLED" } });
+  }
 
   async computePayrun(id: string) {
     return this.prisma.client.$transaction(async (tx) => {
@@ -198,8 +268,11 @@ export class HrService {
         }
       });
 
+      const selected = await tx.payrunEmployee.findMany({ where: { payrunId: id }, select: { employeeId: true } });
+      if (selected.length === 0) throw new BadRequestException("Payrun has no selected employees");
       const contracts = await tx.contract.findMany({
         where: {
+          employeeId: { in: selected.map(({ employeeId }) => employeeId) },
           salaryStructureId: payrun.salaryStructureId,
           status: "ACTIVE",
           startDate: { lte: payrun.periodEnd },
@@ -327,8 +400,36 @@ export class HrService {
       }
     });
   }
-  createUser(data: Prisma.UserUncheckedCreateInput) { return this.prisma.client.user.create({ data }); }
-  updateUser(id: string, data: Prisma.UserUncheckedUpdateInput) { return this.prisma.client.user.update({ where: { id }, data }); }
+  async createUser(data: CreateUserInput) {
+    const { email, password, temporaryPassword, passwordHash, ...userData } = data;
+    if (!email?.trim()) throw new BadRequestException("Email is required");
+
+    return this.prisma.client.user.create({
+      data: {
+        ...userData,
+        email: email.toLowerCase().trim(),
+        passwordHash: (await this.resolvePasswordHash({ password, temporaryPassword, passwordHash }, true))!
+      },
+      select: this.userSelect()
+    });
+  }
+  async updateUser(id: string, data: UpdateUserInput) {
+    const { password, temporaryPassword, passwordHash, email, ...userData } = data;
+    const resolvedPasswordHash = await this.resolvePasswordHash(
+      { password, temporaryPassword, passwordHash: typeof passwordHash === "string" ? passwordHash : undefined },
+      false
+    );
+
+    return this.prisma.client.user.update({
+      where: { id },
+      data: {
+        ...userData,
+        ...(typeof email === "string" ? { email: email.toLowerCase().trim() } : {}),
+        ...(resolvedPasswordHash ? { passwordHash: resolvedPasswordHash } : {})
+      },
+      select: this.userSelect()
+    });
+  }
   deleteUser(id: string) { return this.prisma.client.user.delete({ where: { id } }); }
 
   async getDashboardData() {
@@ -352,5 +453,111 @@ export class HrService {
     const numericValue = Number(value ?? 0);
     if (type === "PERCENTAGE") return Number(baseSalary) * (numericValue / 100);
     return numericValue;
+  }
+
+  private async ensureContractDoesNotOverlap(
+    employeeId: string,
+    startDate: Date,
+    endDate: Date | null | undefined,
+    status: ContractStatus | undefined,
+    excludeId?: string
+  ) {
+    if (status !== "ACTIVE") return;
+    if (endDate && new Date(endDate) < new Date(startDate)) throw new BadRequestException("Contract end date must be on or after start date");
+    const overlap = await this.prisma.client.contract.findFirst({
+      where: {
+        employeeId,
+        status: "ACTIVE",
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+        startDate: { lte: endDate ?? new Date("9999-12-31") },
+        OR: [{ endDate: null }, { endDate: { gte: startDate } }]
+      }
+    });
+    if (overlap) throw new ConflictException("Employee already has an overlapping active contract");
+  }
+
+  private async recalculateScheduleHours(id: string) {
+    const schedule = await this.prisma.client.workingSchedule.findUniqueOrThrow({ where: { id }, include: { scheduleDays: true } });
+    const weeklyHours = schedule.scheduleDays.reduce((total, day) => {
+      if (!day.isWorkingDay || !day.startTime || !day.endTime) return total;
+      const start = this.timeToMinutes(day.startTime);
+      const end = this.timeToMinutes(day.endTime);
+      const duration = end >= start ? end - start : (24 * 60 - start) + end;
+      return total + Math.max(0, duration - day.breakMinutes) / 60;
+    }, 0);
+    return this.prisma.client.workingSchedule.update({ where: { id }, data: { weeklyHours } });
+  }
+
+  private timeToMinutes(value: string) {
+    const [hours = NaN, minutes = NaN] = value.split(":").map(Number);
+    if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      throw new BadRequestException(`Invalid schedule time: ${value}`);
+    }
+    return hours * 60 + minutes;
+  }
+
+  private withWorkedMinutes<T extends { checkIn?: unknown; checkOut?: unknown; breakMinutes?: unknown }>(data: T) {
+    if (!data.checkIn || !data.checkOut) return data;
+    const workedMinutes = Math.max(0, Math.round((new Date(data.checkOut as string | Date).getTime() - new Date(data.checkIn as string | Date).getTime()) / 60000) - Number(data.breakMinutes ?? 0));
+    return { ...data, workedMinutes };
+  }
+
+  private async resolvePasswordHash(
+    credentials: { password?: string; temporaryPassword?: string; passwordHash?: string },
+    required: boolean
+  ) {
+    const suppliedPassword = credentials.password ?? credentials.temporaryPassword;
+    if (suppliedPassword) return bcrypt.hash(this.validatePlainPassword(suppliedPassword), 10);
+
+    if (credentials.passwordHash) {
+      if (this.isBcryptHash(credentials.passwordHash)) return credentials.passwordHash;
+      return bcrypt.hash(this.validatePlainPassword(credentials.passwordHash), 10);
+    }
+
+    if (required) throw new BadRequestException("Temporary password is required");
+    return undefined;
+  }
+
+  private validatePlainPassword(password: string) {
+    const trimmedPassword = password.trim();
+    if (trimmedPassword.length < 8) throw new BadRequestException("Temporary password must be at least 8 characters");
+    return trimmedPassword;
+  }
+
+  private isBcryptHash(value: string) {
+    return /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(value);
+  }
+
+  private userSelect() {
+    return {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      employeeId: true,
+      createdAt: true,
+      updatedAt: true
+    } satisfies Prisma.UserSelect;
+  }
+
+  async getPayrunWarnings(id: string) {
+    const payrun = await this.prisma.client.payrun.findUniqueOrThrow({
+      where: { id },
+      include: {
+        salaryStructure: { include: { rules: { include: { salaryRule: true } } } },
+        payslips: { include: { employee: { include: { bankAccount: true } }, contract: true } }
+      }
+    });
+    const warnings: Array<{ code: string; message: string; blocking: boolean; employeeId?: string }> = [];
+    if (payrun.status === "PAID") warnings.push({ code: "PAYRUN_PAID", message: "Payrun is already paid", blocking: true });
+    if (payrun.salaryStructure.rules.length === 0) warnings.push({ code: "NO_SALARY_RULES", message: "Salary structure has no active rules", blocking: true });
+    if (payrun.payslips.length === 0) warnings.push({ code: "NO_PAYSLIPS", message: "Compute the payrun before validation", blocking: true });
+    for (const payslip of payrun.payslips) {
+      if (!payslip.employee.bankAccount) warnings.push({ code: "MISSING_BANK_ACCOUNT", message: `Employee ${payslip.employee.employeeNumber} has no bank account`, blocking: true, employeeId: payslip.employeeId });
+      if (payslip.contract.startDate > payrun.periodEnd || (payslip.contract.endDate && payslip.contract.endDate < payrun.periodStart)) warnings.push({ code: "INVALID_CONTRACT_PERIOD", message: `Employee ${payslip.employee.employeeNumber} has no valid contract for this period`, blocking: true, employeeId: payslip.employeeId });
+    }
+    const attendanceExceptions = await this.prisma.client.attendance.count({ where: { status: "EXCEPTION", date: { gte: payrun.periodStart, lte: payrun.periodEnd }, employeeId: { in: payrun.payslips.map((slip) => slip.employeeId) } } });
+    if (attendanceExceptions > 0) warnings.push({ code: "ATTENDANCE_EXCEPTIONS", message: `${attendanceExceptions} attendance exceptions need review`, blocking: false });
+    return warnings;
   }
 }
