@@ -38,14 +38,7 @@ export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
   const isEmployee = role === "EMPLOYEE";
   const isHRManagerOnly = role === "HR_MANAGER";
   const isAdmin = role === "ADMIN";
-  const employeeProfileHref = session.user.employeeId
-    ? `/employees/${session.user.employeeId}`
-    : "/employees";
-
-  const isActive = (href: string) => {
-    if (href === "/dashboard") return pathname === "/dashboard";
-    return pathname.startsWith(href);
-  };
+  const employeeProfileHref = session.user.employeeId ? `/employees/${session.user.employeeId}` : "/employees";
 
   return (
     <aside className="w-56 shrink-0 min-h-screen flex flex-col border-r border-border bg-sidebar bg-muted/20 select-none">
@@ -60,220 +53,59 @@ export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
         </div>
       </div>
 
-      {/* Nav List */}
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-        {!isEmployee && (
-          <Link
-            href="/dashboard"
-            className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-              isActive("/dashboard")
-                ? "bg-secondary text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <LayoutDashboard className="w-3.5 h-3.5 shrink-0 opacity-70" />
-            <span>Dashboard</span>
-          </Link>
-        )}
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3">
+          {!isEmployee && (
+            <NavLink href="/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
+          )}
 
-        {isAdmin && (
-          <Link
-            href="/users"
-            className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-              isActive("/users")
-                ? "bg-secondary text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5 shrink-0 opacity-70" />
-            <span>Team & Roles</span>
-          </Link>
-        )}
+          {/* Admin-only: user & role management */}
+          {isAdmin && (
+            <NavLink href="/users" icon={Shield} accent>Team &amp; Roles</NavLink>
+          )}
 
-        <div className="pt-2.5 pb-1 px-2">
-          <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider font-mono">
-            Core HR
-          </span>
-        </div>
+          {isEmployee ? (
+            <NavLink href={employeeProfileHref} icon={Users}>My Profile</NavLink>
+          ) : (
+            <>
+              <NavLink href="/employees" icon={Users}>Employees</NavLink>
+              <NavLink href="/contracts" icon={FileText}>Contracts</NavLink>
+            </>
+          )}
 
-        {isEmployee ? (
-          <Link
-            href={employeeProfileHref}
-            className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-              isActive("/employees")
-                ? "bg-secondary text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <Users className="w-3.5 h-3.5 shrink-0 opacity-70" />
-            <span>My Profile</span>
-          </Link>
-        ) : (
-          <>
-            <Link
-              href="/employees"
-              className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-                isActive("/employees")
-                  ? "bg-secondary text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-              }`}
-            >
-              <Users className="w-3.5 h-3.5 shrink-0 opacity-70" />
-              <span>Employees</span>
-            </Link>
-            <Link
-              href="/contracts"
-              className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-                isActive("/contracts")
-                  ? "bg-secondary text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5 shrink-0 opacity-70" />
-              <span>Contracts</span>
-            </Link>
-          </>
-        )}
+          <NavLink href="/attendance" icon={Clock}>Attendance</NavLink>
 
-        <Link
-          href="/attendance"
-          className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-            isActive("/attendance")
-              ? "bg-secondary text-foreground font-semibold"
-              : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5 shrink-0 opacity-70" />
-          <span>Attendance</span>
-        </Link>
+          <div className="px-3 pt-4 pb-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">Time Off</p>
+          </div>
+          {!isEmployee ? (
+            <>
+              <NavLink href="/time-off/requests" icon={CalendarClock} nested>Requests</NavLink>
+              <NavLink href="/time-off/allocations" icon={CalendarRange} nested>Allocations</NavLink>
+              <NavLink href="/time-off/types" icon={Settings2} nested>Types</NavLink>
+            </>
+          ) : (
+            <NavLink href="/time-off/requests" icon={CalendarClock} nested>My Requests</NavLink>
+          )}
 
-        <div className="pt-2.5 pb-1 px-2">
-          <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider font-mono">
-            Time & Leave
-          </span>
-        </div>
-
-        {!isEmployee ? (
-          <>
-            <Link
-              href="/time-off/requests"
-              className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-                isActive("/time-off/requests")
-                  ? "bg-secondary text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-              }`}
-            >
-              <CalendarDays className="w-3.5 h-3.5 shrink-0 opacity-70" />
-              <span>Requests</span>
-            </Link>
-            <Link
-              href="/time-off/allocations"
-              className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-                isActive("/time-off/allocations")
-                  ? "bg-secondary text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5 shrink-0 opacity-70" />
-              <span>Allocations</span>
-            </Link>
-            <Link
-              href="/time-off/types"
-              className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-                isActive("/time-off/types")
-                  ? "bg-secondary text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 shrink-0 opacity-70" />
-              <span>Leave Policies</span>
-            </Link>
-          </>
-        ) : (
-          <Link
-            href="/time-off/requests"
-            className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-              isActive("/time-off/requests")
-                ? "bg-secondary text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5 shrink-0 opacity-70" />
-            <span>My Requests</span>
-          </Link>
-        )}
-
-        {!isHRManagerOnly && (
-          <>
-            <div className="pt-2.5 pb-1 px-2">
-              <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider font-mono">
-                Payroll
-              </span>
-            </div>
-
-            {!isEmployee ? (
-              <>
-                <Link
-                  href="/payroll/payruns"
-                  className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-                    isActive("/payroll/payruns")
-                      ? "bg-secondary text-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                  }`}
-                >
-                  <CreditCard className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                  <span>Payruns</span>
-                </Link>
-                <Link
-                  href="/payroll/payslips"
-                  className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-                    isActive("/payroll/payslips")
-                      ? "bg-secondary text-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                  <span>Payslips</span>
-                </Link>
-                <Link
-                  href="/payroll/structures"
-                  className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-                    isActive("/payroll/structures")
-                      ? "bg-secondary text-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                  <span>Structures</span>
-                </Link>
-                <Link
-                  href="/payroll/rules"
-                  className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-                    isActive("/payroll/rules")
-                      ? "bg-secondary text-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                  <span>Salary Rules</span>
-                </Link>
-              </>
-            ) : (
-              <Link
-                href="/payroll/payslips"
-                className={`flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
-                  isActive("/payroll/payslips")
-                    ? "bg-secondary text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                <span>My Payslips</span>
-              </Link>
-            )}
-          </>
-        )}
-      </nav>
+          {/* Payroll section - hidden entirely for HR Manager, per role permissions */}
+          {!isHRManagerOnly && (
+            <>
+              <div className="px-3 pt-4 pb-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">Payroll</p>
+              </div>
+              {!isEmployee ? (
+                <>
+                  <NavLink href="/payroll/payruns" icon={Wallet} nested>Payruns</NavLink>
+                  <NavLink href="/payroll/payslips" icon={Receipt} nested>Payslips</NavLink>
+                  <NavLink href="/payroll/structures" icon={ListChecks} nested>Structures</NavLink>
+                  <NavLink href="/payroll/rules" icon={SlidersHorizontal} nested>Rules</NavLink>
+                </>
+              ) : (
+                <NavLink href="/payroll/payslips" icon={Receipt} nested>My Payslips</NavLink>
+              )}
+            </>
+          )}
+        </nav>
 
       {/* Footer */}
       <div className="p-3 border-t border-border flex items-center justify-between text-[11px] font-mono text-muted-foreground">

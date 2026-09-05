@@ -1,4 +1,4 @@
-## 2026-09-05 11:58 IST — CI workflow
+﻿## 2026-09-05 11:58 IST ΓÇö CI workflow
 
 ### Summary
 - Added a GitHub Actions CI workflow that runs for every pushed commit and pull request.
@@ -11,13 +11,13 @@
 - Provide automated checks for each commit while keeping the workflow usable before application source files and package metadata are added.
 
 ### Validation
-- `git diff --check` — passed
-- `git status --short` — reviewed
+- `git diff --check` ΓÇö passed
+- `git status --short` ΓÇö reviewed
 
 ### Notes
 - The current repository has no `package.json`, so Node.js checks will be skipped until one is added.
 
-## 2026-09-05 12:15 IST — Fix pnpm CI runtime
+## 2026-09-05 12:15 IST ΓÇö Fix pnpm CI runtime
 
 ### Summary
 - Updated CI for the pnpm monorepo and current Node.js runner runtime.
@@ -30,13 +30,13 @@
 - CI failed because it requested deprecated Node 20 and attempted npm dependency caching without a `package-lock.json`.
 
 ### Validation
-- `git diff --check` — passed
-- `git status --short` — reviewed
+- `git diff --check` ΓÇö passed
+- `git status --short` ΓÇö reviewed
 
 ### Notes
 - CI uses `pnpm install --no-frozen-lockfile` because the repository does not currently contain a `pnpm-lock.yaml`.
 
-## 2026-09-05 12:25 IST — Allow required pnpm build scripts
+## 2026-09-05 12:25 IST ΓÇö Allow required pnpm build scripts
 
 ### Summary
 - Added an explicit pnpm 11 build-script allowlist for CI dependency installation.
@@ -49,11 +49,11 @@
 - pnpm 11 rejected the install because dependency build scripts were not approved, preventing CI from completing dependency installation.
 
 ### Validation
-- `git diff --check` — passed
+- `git diff --check` ΓÇö passed
 
 ### Notes
 - The allowlist is limited to packages reported by the failing CI install and avoids enabling arbitrary dependency scripts. pnpm's current build-script policy is documented at https://pnpm.io/cli/approve-builds.
-## 2026-09-05 11:20 +05:30 — Codex Project Scaffold
+## 2026-09-05 11:20 +05:30 ΓÇö Codex Project Scaffold
 
 ### Summary
 - Scaffolded the PeoplePay360 pnpm/Turborepo monorepo with database, validation, payroll engine, UI, config, and Next.js web app packages.
@@ -94,17 +94,17 @@
 - The project requirements asked for an initial PeoplePay360 monorepo setup that establishes the data spine, validation layer, isolated payroll logic, Next.js route shape, seeded sample data, and authentication boundaries before feature work begins.
 
 ### Validation
-- `pnpm install` — not run yet.
-- `pnpm --filter @peoplepay360/payroll-engine test` — not run yet.
-- `pnpm build` — not run yet.
-- `pnpm db:migrate` — not run because a MySQL `DATABASE_URL` was not provided.
-- `pnpm db:seed` — not run because migration/database setup was not completed.
+- `pnpm install` ΓÇö not run yet.
+- `pnpm --filter @peoplepay360/payroll-engine test` ΓÇö not run yet.
+- `pnpm build` ΓÇö not run yet.
+- `pnpm db:migrate` ΓÇö not run because a MySQL `DATABASE_URL` was not provided.
+- `pnpm db:seed` ΓÇö not run because migration/database setup was not completed.
 
 ### Notes
 - The Prisma schema is based on the provided setup brief and repository domain rules because the referenced `PeoplePay360_Technical_Requirements.md` was not present in the workspace.
 - `.env` remains uncommitted per repository security rules; create it locally with a MySQL `DATABASE_URL` before running migrations.
 
-## 2026-09-05 11:41 +05:30 — Codex Node/Spring Ownership Split
+## 2026-09-05 11:41 +05:30 ΓÇö Codex Node/Spring Ownership Split
 
 ### Summary
 - Reworked the scaffold so Node/NestJS owns HR resources and Java/Spring Boot owns payroll resources.
@@ -126,16 +126,16 @@
 - The requested architecture assigns HR responsibilities to the Node/NestJS API and payroll responsibilities to the Java/Spring Boot service, so the initial monorepo scaffold needed to reflect that service boundary before setup could be considered complete.
 
 ### Validation
-- `pnpm install --fetch-timeout 600000` — failed/stopped; npm registry downloads repeatedly stalled and no `pnpm-lock.yaml` or `node_modules` were created.
-- `pnpm --filter @peoplepay360/hr-api build` — not run because dependencies were not installed.
-- `pnpm --filter web build` — not run because dependencies were not installed.
-- `mvn -q -f apps/payroll-api/pom.xml test` — started but stopped after it produced no output within the quick validation window, likely while resolving dependencies.
-- `pnpm db:migrate` — not run because a MySQL `DATABASE_URL` was not provided.
-- `pnpm db:seed` — not run because migration/database setup was not completed.
+- `pnpm install --fetch-timeout 600000` ΓÇö failed/stopped; npm registry downloads repeatedly stalled and no `pnpm-lock.yaml` or `node_modules` were created.
+- `pnpm --filter @peoplepay360/hr-api build` ΓÇö not run because dependencies were not installed.
+- `pnpm --filter web build` ΓÇö not run because dependencies were not installed.
+- `mvn -q -f apps/payroll-api/pom.xml test` ΓÇö started but stopped after it produced no output within the quick validation window, likely while resolving dependencies.
+- `pnpm db:migrate` ΓÇö not run because a MySQL `DATABASE_URL` was not provided.
+- `pnpm db:seed` ΓÇö not run because migration/database setup was not completed.
 
 ### Notes
 - Payroll and HR database ownership are separated at the code level. Cross-service links use stable identifiers such as `employeeId`, `contractId`, and `payrollProfileCode` rather than ORM relations across services.
-## 2026-09-05 12:35 IST — PeoplePay360 Next.js workspace UI
+## 2026-09-05 12:35 IST ΓÇö PeoplePay360 Next.js workspace UI
 
 ### Summary
 - Implemented a polished PeoplePay360 dashboard shell and populated the dashboard and employee directory with representative HR/payroll workflow data.
@@ -150,13 +150,13 @@
 - Turned the Next.js route shell into an actionable frontend representation of the normalized employee, attendance, leave, contract, and payroll architecture described in `temp/one`.
 
 ### Validation
-- `pnpm --filter web build` — not completed; pnpm terminated with an environment `EPERM` while accessing `C:\Users\DELL`.
+- `pnpm --filter web build` ΓÇö not completed; pnpm terminated with an environment `EPERM` while accessing `C:\Users\DELL`.
 
 ### Notes
 - The displayed records are static UI fixtures until API wiring is added.
 - Existing placeholder routes remain available and were not changed; contracts and payruns now have representative workflow screens.
 
-## 2026-09-05 13:40 IST — Complete normalized schema
+## 2026-09-05 13:40 IST ΓÇö Complete normalized schema
 
 ### Summary
 - Added the complete relational model set described in `temp/one` to the Prisma schema.
@@ -169,14 +169,14 @@
 - The previous schema covered only a subset of HR entities and did not represent the complete employee-to-payslip and role-permission relationships.
 
 ### Validation
-- `git diff --check` — passed
-- Prisma validation — not run; local dependencies are not installed and pnpm is blocked by the environment’s `C:\Users\DELL` access restriction.
+- `git diff --check` ΓÇö passed
+- Prisma validation ΓÇö not run; local dependencies are not installed and pnpm is blocked by the environmentΓÇÖs `C:\Users\DELL` access restriction.
 
 ### Notes
 - Existing legacy HR fields (`baseSalary`, `payrollProfileCode`, `days`, and single `User.role`) remain for backward compatibility.
 - Payroll API currently owns its separate Spring database; these Prisma payroll models provide the normalized shared application model requested in `temp/one` and should be reconciled before production migrations.
 
-## 2026-09-05 18:10 IST — Add HR CRUD workflow endpoints
+## 2026-09-05 18:10 IST ΓÇö Add HR CRUD workflow endpoints
 
 ### Summary
 - Added employee, department, job-position, contract, attendance, and time-off create/update/detail/decision endpoints.
@@ -191,12 +191,12 @@
 - The API layer previously exposed only read-only list endpoints.
 
 ### Validation
-- `pnpm --filter @peoplepay360/hr-api build` — initially failed because `@prisma/client` was not declared directly; dependency fix pending verification.
+- `pnpm --filter @peoplepay360/hr-api build` ΓÇö initially failed because `@prisma/client` was not declared directly; dependency fix pending verification.
 
 ### Notes
 - Request DTOs currently use Prisma input types; shared Zod validation and authorization guards should be added before production exposure.
 
-## 2026-09-05 14:05 IST — Modularize HR API source
+## 2026-09-05 14:05 IST ΓÇö Modularize HR API source
 
 ### Summary
 - Reorganized HR API source into feature-oriented module directories and introduced a dedicated `HrModule` composition boundary.
@@ -213,13 +213,13 @@
 - Establish a maintainable source architecture while preserving all existing `/api/hr` routes.
 
 ### Validation
-- `git diff --check` — pending
-- NestJS build/tests — not run; dependencies and Maven are unavailable in the local environment.
+- `git diff --check` ΓÇö pending
+- NestJS build/tests ΓÇö not run; dependencies and Maven are unavailable in the local environment.
 
 ### Notes
 - `HrService` remains a shared application service for now; domain-specific services can be extracted next without changing the route contract.
 
-## 2026-09-05 14:25 IST — Fix Prisma enum syntax for CI
+## 2026-09-05 14:25 IST ΓÇö Fix Prisma enum syntax for CI
 
 ### Summary
 - Converted newly added inline Prisma enums to multiline enum definitions supported by Prisma 6.15.
@@ -232,13 +232,13 @@
 - CI failed during `prisma generate` with P1012 because Prisma requires one enum value per line.
 
 ### Validation
-- `git diff --check` — pending
-- Prisma generate — not run locally; dependency installation is unavailable in the local environment.
+- `git diff --check` ΓÇö pending
+- Prisma generate ΓÇö not run locally; dependency installation is unavailable in the local environment.
 
 ### Notes
 - Turborepo telemetry and Prisma package.json deprecation messages are warnings and were not the failure cause.
 
-## 2026-09-05 14:45 IST — Fix bank account relation validation
+## 2026-09-05 14:45 IST ΓÇö Fix bank account relation validation
 
 ### Summary
 - Marked the employee bank-account foreign key as unique for the intended one-to-one relationship.
@@ -251,13 +251,13 @@
 - CI failed during Prisma DMMF generation with P1012 because one-to-one defining relation fields must be unique.
 
 ### Validation
-- `git diff --check` — pending
-- Prisma generate — not run locally; CI is the available validation environment.
+- `git diff --check` ΓÇö pending
+- Prisma generate ΓÇö not run locally; CI is the available validation environment.
 
 ### Notes
 - Turborepo telemetry and output warnings remain non-blocking.
 
-## 2026-09-05 15:05 IST — Standardize databases on PostgreSQL
+## 2026-09-05 15:05 IST ΓÇö Standardize databases on PostgreSQL
 
 ### Summary
 - Switched the Prisma HR database and Spring payroll database configuration from MySQL to PostgreSQL.
@@ -271,17 +271,17 @@
 - `CHANGELOG_AGENTS.md`: Recorded the database switch.
 
 ### Reason
-- PostgreSQL matches the company’s database standard and gives the hackathon a consistent database story across both services.
+- PostgreSQL matches the companyΓÇÖs database standard and gives the hackathon a consistent database story across both services.
 
 ### Validation
-- `git diff --check` — pending
-- Prisma generate — not run locally; dependencies are unavailable.
-- Maven tests — not run locally; Maven is unavailable.
+- `git diff --check` ΓÇö pending
+- Prisma generate ΓÇö not run locally; dependencies are unavailable.
+- Maven tests ΓÇö not run locally; Maven is unavailable.
 
 ### Notes
 - Existing MySQL databases are not migrated automatically. A fresh PostgreSQL database and new Prisma/Flyway migrations are required.
 
-## 2026-09-05 15:25 IST — Modernize TypeScript module resolution
+## 2026-09-05 15:25 IST ΓÇö Modernize TypeScript module resolution
 
 ### Summary
 - Updated the HR API TypeScript configuration to use the modern Node16 module and module-resolution pair.
@@ -294,13 +294,13 @@
 - CI/editor TypeScript reported that the legacy `node10` resolution strategy is deprecated.
 
 ### Validation
-- `git diff --check` — pending
-- TypeScript build — not run locally; dependencies are unavailable.
+- `git diff --check` ΓÇö pending
+- TypeScript build ΓÇö not run locally; dependencies are unavailable.
 
 ### Notes
 - The Node16 pair keeps Node-aware resolution while preserving CommonJS behavior for this NestJS package because it does not declare ESM in its package metadata.
 
-## 2026-09-05 15:45 IST — Fix dashboard icon typing
+## 2026-09-05 15:45 IST ΓÇö Fix dashboard icon typing
 
 ### Summary
 - Added an explicit Lucide icon type to the dashboard pending-actions fixture.
@@ -313,13 +313,13 @@
 - CI `web:build` failed because an untyped mixed tuple inferred `Icon` without a callable JSX component signature.
 
 ### Validation
-- `git diff --check` — pending
-- `pnpm build` — not run locally; dependencies are unavailable.
+- `git diff --check` ΓÇö pending
+- `pnpm build` ΓÇö not run locally; dependencies are unavailable.
 
 ### Notes
 - This is a compile-time typing fix only; displayed dashboard data remains static fixture data.
 
-## 2026-09-05 16:25 IST — Fix employee directory color typing
+## 2026-09-05 16:25 IST ΓÇö Fix employee directory color typing
 
 ### Summary
 - Made the employee fixture a readonly tuple so its avatar color key remains a valid indexed literal under strict TypeScript checks.
@@ -332,12 +332,12 @@
 - CI `web:build` failed because array destructuring widened the avatar color value to possibly undefined.
 
 ### Validation
-- `git diff --check` — pending
-- `pnpm build` — not run locally; dependencies are unavailable.
+- `git diff --check` ΓÇö pending
+- `pnpm build` ΓÇö not run locally; dependencies are unavailable.
 
 ### Notes
 - Dashboard data remains static fixture data.
-## 2026-09-05 14:35 IST — Payroll database initialization
+## 2026-09-05 14:35 IST ΓÇö Payroll database initialization
 
 ### Summary
 - Added Spring Data JPA entities for the payroll models defined in the Prisma schema.
@@ -356,13 +356,13 @@
 - The Java payroll app had no persistence models, so Spring Boot could not initialize the payroll tables represented by `schema.prisma`.
 
 ### Validation
-- `mvn -f apps/payroll/pom.xml test` — failed because the active shell used Java 8 while Spring Boot 4.1.1 requires Java 17+.
-- `JAVA_HOME="C:\\Program Files\\Java\\jdk-21.0.10" mvn -f apps/payroll/pom.xml test` — passed; Spring Boot connected to PostgreSQL and Hibernate created the payroll tables.
+- `mvn -f apps/payroll/pom.xml test` ΓÇö failed because the active shell used Java 8 while Spring Boot 4.1.1 requires Java 17+.
+- `JAVA_HOME="C:\\Program Files\\Java\\jdk-21.0.10" mvn -f apps/payroll/pom.xml test` ΓÇö passed; Spring Boot connected to PostgreSQL and Hibernate created the payroll tables.
 
 ### Notes
 - Hibernate `ddl-auto: update` initializes or updates the payroll tables at application startup. Existing data is preserved by this setting.
 
-## 2026-09-05 14:45 IST — Add PayslipLine entity
+## 2026-09-05 14:45 IST ΓÇö Add PayslipLine entity
 
 ### Summary
 - Added the missing Java JPA entity for the Prisma `PayslipLine` model.
@@ -374,12 +374,12 @@
 - `PayslipLine` is part of the payroll schema and was missing from the Java persistence models.
 
 ### Validation
-- `JAVA_HOME="C:\\Program Files\\Java\\jdk-21.0.10" mvn -f apps/payroll/pom.xml test` — run after implementation.
+- `JAVA_HOME="C:\\Program Files\\Java\\jdk-21.0.10" mvn -f apps/payroll/pom.xml test` ΓÇö run after implementation.
 
 ### Notes
 - The entity follows the existing Java package name `com.dj.payroll.entities`.
 
-## 2026-09-05 15:00 IST — JWT authorization for payroll API
+## 2026-09-05 15:00 IST ΓÇö JWT authorization for payroll API
 
 ### Summary
 - Added bearer JWT validation and role-based authorization to the Java payroll service.
@@ -393,12 +393,12 @@
 - Payroll endpoints must validate the incoming JWT and allow access only to `ADMIN`, `PAYROLL_MANAGER`, or `HR_MANAGER` users.
 
 ### Validation
-- `JAVA_HOME="C:\\Program Files\\Java\\jdk-21.0.10" JWT_SECRET="<32+ characters>" mvn -f apps/payroll/pom.xml test` — passed; 1 test succeeded after fixing the claim converter generic type.
+- `JAVA_HOME="C:\\Program Files\\Java\\jdk-21.0.10" JWT_SECRET="<32+ characters>" mvn -f apps/payroll/pom.xml test` ΓÇö passed; 1 test succeeded after fixing the claim converter generic type.
 
 ### Notes
 - The application requires `JWT_SECRET` to be at least 32 characters and expects a signed bearer JWT in the `Authorization` header.
 
-## 2026-09-05 15:05 IST — Align JWT application configuration
+## 2026-09-05 15:05 IST ΓÇö Align JWT application configuration
 
 ### Summary
 - Moved the JWT secret configuration under Spring Boot's standard resource-server property path.
@@ -411,12 +411,12 @@
 - Keep Maven dependencies in `pom.xml` and JWT runtime configuration in `application.yaml` using the standard Spring Security property structure.
 
 ### Validation
-- `mvn -f apps/payroll/pom.xml clean compile -DskipTests` — run after configuration update.
+- `mvn -f apps/payroll/pom.xml clean compile -DskipTests` ΓÇö run after configuration update.
 
 ### Notes
 - `JWT_SECRET` must contain at least 32 characters when the application starts.
 
-## 2026-09-05 15:10 IST — Fix SecurityConfig import
+## 2026-09-05 15:10 IST ΓÇö Fix SecurityConfig import
 
 ### Summary
 - Corrected the `HttpSecurity` import typo in the JWT security configuration.
@@ -428,12 +428,12 @@
 - Maven could not resolve `HttpSecurity` because the package name was misspelled.
 
 ### Validation
-- `mvn -U -f apps/payroll/pom.xml clean compile -DskipTests` — run after the import fix.
+- `mvn -U -f apps/payroll/pom.xml clean compile -DskipTests` ΓÇö run after the import fix.
 
 ### Notes
 - No authorization behavior was changed; this was a compile-fix only.
 
-## 2026-09-05 15:20 IST — Standardize Java 21 Maven project
+## 2026-09-05 15:20 IST ΓÇö Standardize Java 21 Maven project
 
 ### Summary
 - Added a root Maven project that includes the payroll service as a Java 21 module.
@@ -448,12 +448,12 @@
 - A root Maven project gives the IDE a clear Maven entry point and keeps the payroll service compatible with Java 21.
 
 ### Validation
-- `mvn -f pom.xml -pl apps/payroll -am clean compile -DskipTests` — run after the Maven project update.
+- `mvn -f pom.xml -pl apps/payroll -am clean compile -DskipTests` ΓÇö run after the Maven project update.
 
 ### Notes
 - Open or reload the repository root `pom.xml` as a Maven project in IntelliJ.
 
-## 2026-09-05 15:30 IST — Complete Java 21 Spring dependencies
+## 2026-09-05 15:30 IST ΓÇö Complete Java 21 Spring dependencies
 
 ### Summary
 - Added the direct Spring Security modules used by `SecurityConfig` and the validation starter to the payroll module.
@@ -465,13 +465,13 @@
 - Make every package directly used by the Java 21 payroll application explicit in Maven so IDE and command-line builds resolve the same compatible dependencies.
 
 ### Validation
-- `mvn -f pom.xml -pl apps/payroll -am clean compile -DskipTests` — run after dependency update.
-- `mvn -f pom.xml -pl apps/payroll -am test` — run after dependency update.
+- `mvn -f pom.xml -pl apps/payroll -am clean compile -DskipTests` ΓÇö run after dependency update.
+- `mvn -f pom.xml -pl apps/payroll -am test` ΓÇö run after dependency update.
 
 ### Notes
 - Dependency versions remain managed by the Spring Boot 4.1.1 parent; no individual Spring Security versions were hardcoded.
 
-## 2026-09-05 15:40 IST — Centralize Java dependencies in root Maven POM
+## 2026-09-05 15:40 IST ΓÇö Centralize Java dependencies in root Maven POM
 
 ### Summary
 - Converted the root Maven project into the Spring Boot parent project.
@@ -487,12 +487,12 @@
 - Centralizing them makes the root project the single Maven entry point.
 
 ### Validation
-- `mvn -f pom.xml -pl apps/payroll -am test` — run after centralizing dependencies.
+- `mvn -f pom.xml -pl apps/payroll -am test` ΓÇö run after centralizing dependencies.
 
 ### Notes
 - Java source and target remain Java 21, and Spring dependency versions continue to come from Spring Boot 4.1.1.
 
-## 2026-09-05 15:40 IST — Verify payroll runtime startup
+## 2026-09-05 15:40 IST ΓÇö Verify payroll runtime startup
 
 ### Summary
 - Started the payroll Spring Boot application with Java 21, JWT configuration, and PostgreSQL enabled.
@@ -504,13 +504,13 @@
 - Confirm the application works beyond compilation and tests.
 
 ### Validation
-- `mvn -f apps/payroll/pom.xml spring-boot:run` — passed; application started on port 8080 with Java 21.0.10 and connected to PostgreSQL.
-- `curl.exe http://localhost:8080/` — returned HTTP 401, confirming security protection is active.
+- `mvn -f apps/payroll/pom.xml spring-boot:run` ΓÇö passed; application started on port 8080 with Java 21.0.10 and connected to PostgreSQL.
+- `curl.exe http://localhost:8080/` ΓÇö returned HTTP 401, confirming security protection is active.
 
 ### Notes
 - The test process was stopped gracefully after the startup and authorization checks.
 
-## 2026-09-05 16:20 IST — Use HR API for contract selection
+## 2026-09-05 16:20 IST ΓÇö Use HR API for contract selection
 
 ### Summary
 - Replaced the payroll service's direct `Contract` table query with an HR API integration.
@@ -532,7 +532,7 @@
 ### Notes
 - Payrun computation requires the HR API at `HR_API_URL` and its `/contracts` endpoint to be available.
 
-## 2026-09-05 15:50 IST — Add local JWT fallback configuration
+## 2026-09-05 15:50 IST ΓÇö Add local JWT fallback configuration
 
 ### Summary
 - Added a development fallback JWT secret so the payroll app can start from IntelliJ when no environment variable is configured.
@@ -544,12 +544,12 @@
 - IntelliJ was starting without the user-level `JWT_SECRET`, causing `SecurityConfig` construction to fail.
 
 ### Validation
-- `mvn -f apps/payroll/pom.xml spring-boot:run` — run after the configuration update.
+- `mvn -f apps/payroll/pom.xml spring-boot:run` ΓÇö run after the configuration update.
 
 ### Notes
 - A real production `JWT_SECRET` environment variable overrides this development fallback and must be configured in production.
 
-## 2026-09-05 15:55 IST — Implement payroll MVC REST API
+## 2026-09-05 15:55 IST ΓÇö Implement payroll MVC REST API
 
 ### Summary
 - Added DTO, repository, service, and controller layers for payroll rule categories, salary rules, salary structures, payruns, and payslips.
@@ -567,15 +567,15 @@
 - The Java payroll service had persistence entities but no production API flow for managing salary configuration or processing payroll.
 
 ### Validation
-- `mvn -f apps/payroll/pom.xml clean compile -DskipTests` — passed; 32 Java source files compiled with Java 21.
-- `mvn -f pom.xml -pl apps/payroll -am test` — passed; 1 test succeeded and 7 repositories loaded against PostgreSQL.
-- `git diff --check` — passed.
+- `mvn -f apps/payroll/pom.xml clean compile -DskipTests` ΓÇö passed; 32 Java source files compiled with Java 21.
+- `mvn -f pom.xml -pl apps/payroll -am test` ΓÇö passed; 1 test succeeded and 7 repositories loaded against PostgreSQL.
+- `git diff --check` ΓÇö passed.
 
 ### Notes
 - Formula salary rules intentionally return a controlled error until a formula engine is configured; fixed and percentage rules are implemented.
 - Payrun computation reads active contracts from the shared Prisma PostgreSQL schema for the requested period.
 
-## 2026-09-05 16:10 IST — Harden payroll transaction boundaries
+## 2026-09-05 16:10 IST ΓÇö Harden payroll transaction boundaries
 
 ### Summary
 - Added pessimistic payrun row locking for compute, validate, pay, and cancel transitions.
@@ -591,13 +591,13 @@
 - Prevent concurrent requests from processing the same payrun twice and preserve schema-level duplicate protections.
 
 ### Validation
-- `mvn -f apps/payroll/pom.xml clean compile -DskipTests` — run after transaction hardening.
-- `mvn -f pom.xml -pl apps/payroll -am test` — run after transaction hardening.
+- `mvn -f apps/payroll/pom.xml clean compile -DskipTests` ΓÇö run after transaction hardening.
+- `mvn -f pom.xml -pl apps/payroll -am test` ΓÇö run after transaction hardening.
 
 ### Notes
 - Service methods use Spring's default `REQUIRED` transaction propagation; runtime business exceptions roll back the complete payrun operation.
 
-## 2026-09-05 16:08 IST � Verify and harden payroll APIs
+## 2026-09-05 16:08 IST ∩┐╜ Verify and harden payroll APIs
 
 ### Summary
 - Added explicit RestClient builder configuration for the HR contract client.
@@ -613,16 +613,16 @@
 - The application context could not start without a RestClient builder, and structure updates could conflict with the unique structure-rule constraint.
 
 ### Validation
-- `mvn -f pom.xml -pl apps/payroll -am test` � passed; 4 tests succeeded.
-- Runtime smoke checks on port 8081 � authentication, CRUD, validation, not-found handling, payrun reads, payslip listing, and structure update passed.
+- `mvn -f pom.xml -pl apps/payroll -am test` ∩┐╜ passed; 4 tests succeeded.
+- Runtime smoke checks on port 8081 ∩┐╜ authentication, CRUD, validation, not-found handling, payrun reads, payslip listing, and structure update passed.
 - Payrun compute returned controlled HTTP 503 because the configured HR API was unavailable.
-- `git diff --check` � passed.
+- `git diff --check` ∩┐╜ passed.
 
 ### Notes
 - Full payrun compute, validate, and paid lifecycle requires the HR API `/contracts` endpoint to be running and returning period-valid active contracts.
 - Local smoke records were created in the development database for verification.
 
-## 2026-09-05 16:47 +05:30 — Complete HR API model routes
+## 2026-09-05 16:47 +05:30 ΓÇö Complete HR API model routes
 
 ### Summary
 - Added backend API routes for the remaining normalized PeoplePay360 models and payroll workflow operations.
@@ -643,13 +643,13 @@
 - The normalized schema had models that were not reachable through the API layer, leaving large parts of the backend workflow unavailable.
 
 ### Validation
-- `pnpm --filter @peoplepay360/hr-api build` — passed
+- `pnpm --filter @peoplepay360/hr-api build` ΓÇö passed
 
 ### Notes
 - Controllers currently follow the existing pattern of accepting Prisma input types directly; DTO validation and authorization guards are still needed before production exposure.
 - Payrun computation supports fixed and percentage rules. Formula rules currently compute as zero until a formula engine/parser is defined.
 
-## 2026-09-05 17:04 IST — HR API Server Port Update
+## 2026-09-05 17:04 IST ΓÇö HR API Server Port Update
 
 ### Summary
 - Moved `@peoplepay360/hr-api` server configuration from port 3001 to port 4000 (`http://localhost:4000/api/hr`).
@@ -665,9 +665,9 @@
 - Avoid local port conflicts on 3001 and expose the NestJS HR API at a dedicated server endpoint (`http://localhost:4000`).
 
 ### Validation
-- NestJS application startup — verified routes initialized on port 4000.
+- NestJS application startup ΓÇö verified routes initialized on port 4000.
 
-## 2026-09-05 17:33 IST — PeoplePay360 Full UI Overhaul Execution
+## 2026-09-05 17:33 IST ΓÇö PeoplePay360 Full UI Overhaul Execution
 
 ### Summary
 - Restyled all remaining screens in `apps/web/app/(app)/` (`contracts`, `attendance`, `time-off/requests`, `time-off/allocations`, `time-off/types`, `payroll/structures`, `payroll/rules`, `payroll/payruns`, `payroll/payslips`, `dashboard`) to conform strictly to the design system rules.
@@ -690,9 +690,9 @@
 - Fulfill the PeoplePay360 Full UI Overhaul Execution prompt brief to establish visual consistency and role-gated interfaces across the entire frontend.
 
 ### Validation
-- `npx tsc --noEmit` from `apps/web` — passed (0 errors).
+- `npx tsc --noEmit` from `apps/web` ΓÇö passed (0 errors).
 
-## 2026-09-05 17:53 IST — Login Page Full Redesign & Real Auth Wiring
+## 2026-09-05 17:53 IST ΓÇö Login Page Full Redesign & Real Auth Wiring
 
 ### Summary
 - Rewrote `apps/web/app/login/page.tsx` as a Client Component using `react-hook-form` and `zodResolver(loginSchema)`.
@@ -713,10 +713,10 @@
 - Complete the Login Page Full Redesign + Real Auth Wiring execution brief.
 
 ### Validation
-- `npx tsc --noEmit` from `apps/web` — passed with zero errors.
-- `git status --short` — verified zero `package.json` modifications or new dependencies added.
+- `npx tsc --noEmit` from `apps/web` ΓÇö passed with zero errors.
+- `git status --short` ΓÇö verified zero `package.json` modifications or new dependencies added.
 
-## 2026-09-05 17:55 IST — Server Restart and Build Cache Clearance
+## 2026-09-05 17:55 IST ΓÇö Server Restart and Build Cache Clearance
 
 ### Summary
 - Killed lingering Node/pnpm processes on ports 3000 and 4000.
@@ -730,10 +730,10 @@
 - Address user request ("restart the server , changes are not visible whatsoever") caused by stale Next.js build cache and server timeout.
 
 ### Validation
-- `Get-Process` — terminated lingering node processes.
-- `Remove-Item apps/web/.next` — cleared stale `.next` build cache.
-- `pnpm dev` — running in background task `7b92bd24-c012-4faa-a062-748a8eccbedc/task-709`.
-## 2026-09-05 17:17 +05:30 — Capture hackathon product context
+- `Get-Process` ΓÇö terminated lingering node processes.
+- `Remove-Item apps/web/.next` ΓÇö cleared stale `.next` build cache.
+- `pnpm dev` ΓÇö running in background task `7b92bd24-c012-4faa-a062-748a8eccbedc/task-709`.
+## 2026-09-05 17:17 +05:30 ΓÇö Capture hackathon product context
 
 ### Summary
 - Added the HR & Payroll hackathon brief, role scope, demo priorities, and expected payroll deliverables to the agent instructions.
@@ -746,12 +746,12 @@
 - Future repository work needs to align with the provided hackathon problem statement and prioritize real HR/payroll business flows over static UI.
 
 ### Validation
-- `git diff --check` — passed
+- `git diff --check` ΓÇö passed
 
 ### Notes
 - This was a documentation/context update only; no application code was changed.
 
-## 2026-09-05 — Strengthen HR and payroll business rules
+## 2026-09-05 ΓÇö Strengthen HR and payroll business rules
 
 ### Summary
 - Added backend safeguards for contract periods, schedules, attendance, time-off approvals, and payrun validation.
@@ -765,13 +765,13 @@
 - The HR modules existed as CRUD endpoints, but key operational rules from the hackathon requirements were not enforced consistently at the backend boundary.
 
 ### Validation
-- `pnpm --filter @peoplepay360/hr-api build` — passed (`tsc --noEmit`).
-- `git diff --check` — passed.
+- `pnpm --filter @peoplepay360/hr-api build` ΓÇö passed (`tsc --noEmit`).
+- `git diff --check` ΓÇö passed.
 
 ### Notes
 - Employee-selection persistence for the payrun wizard, authentication guards, formula evaluation, PDF generation, bulk email delivery, and automated API tests are still follow-up work.
 
-## 2026-09-05 — Add selected employees to payruns
+## 2026-09-05 ΓÇö Add selected employees to payruns
 
 ### Summary
 - Added persistent employee selection to payruns so computation is limited to explicitly selected active employees.
@@ -787,14 +787,14 @@
 - The required two-step payrun workflow needs an explicit employee-selection boundary instead of silently processing every matching contract.
 
 ### Validation
-- `pnpm --filter @peoplepay360/hr-api build` — passed (`tsc --noEmit`).
-- Prisma client generation — attempted; Windows reported an `EPERM` rename because the Prisma query engine file was in use. Run `pnpm --filter @peoplepay360/db exec prisma generate` after stopping running Node/Prisma processes.
-- `git diff --check` — passed.
+- `pnpm --filter @peoplepay360/hr-api build` ΓÇö passed (`tsc --noEmit`).
+- Prisma client generation ΓÇö attempted; Windows reported an `EPERM` rename because the Prisma query engine file was in use. Run `pnpm --filter @peoplepay360/db exec prisma generate` after stopping running Node/Prisma processes.
+- `git diff --check` ΓÇö passed.
 
 ### Notes
 - The database migration must be deployed before using employee selection: `pnpm --filter @peoplepay360/db exec prisma migrate deploy`.
 
-## 2026-09-05 — Add backend RBAC, attendance rules, and bulk payslip email
+## 2026-09-05 ΓÇö Add backend RBAC, attendance rules, and bulk payslip email
 
 ### Summary
 - Added authenticated backend access with role checks, derived attendance status/worked time, and SMTP-based bulk payslip delivery.
@@ -819,16 +819,16 @@
 - Payroll and administrative APIs needed server-side authorization, attendance needed business-derived status, and the payrun workflow needed an actual backend bulk delivery action.
 
 ### Validation
-- `pnpm --filter @peoplepay360/db exec prisma generate --no-engine` — passed.
-- `pnpm --filter @peoplepay360/hr-api build` — passed (`tsc --noEmit`).
-- `git diff --check` — pending final review.
+- `pnpm --filter @peoplepay360/db exec prisma generate --no-engine` ΓÇö passed.
+- `pnpm --filter @peoplepay360/hr-api build` ΓÇö passed (`tsc --noEmit`).
+- `git diff --check` ΓÇö pending final review.
 
 ### Notes
 - Set `AUTH_SECRET` for bearer-token signing.
 - Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, and optionally `SMTP_SECURE` before using bulk email.
 - The bulk email currently sends an HTML payslip summary; PDF attachment generation remains separate work.
 
-## 2026-09-05 17:38 +05:30 — Expand hackathon scope details
+## 2026-09-05 17:38 +05:30 ΓÇö Expand hackathon scope details
 
 ### Summary
 - Expanded the agent instructions with the full HR & Payroll module breakdown, end-to-end flow requirements, dashboard expectations, and technical delivery guidelines.
@@ -841,12 +841,12 @@
 - The earlier context update summarized the product statement but did not preserve enough detail for future implementation decisions.
 
 ### Validation
-- `git diff --check -- AGENTS.md CHANGELOG_AGENTS.md` — passed
+- `git diff --check -- AGENTS.md CHANGELOG_AGENTS.md` ΓÇö passed
 
 ### Notes
 - Prisma package.json configuration deprecation warning remains non-blocking.
 
-## 2026-09-05  — Fix Payroll API root scripts
+## 2026-09-05  ΓÇö Fix Payroll API root scripts
 
 ### Summary
 - Corrected root Payroll API commands to use the actual Maven project directory.
@@ -859,9 +859,9 @@
 - The configured `apps/payroll-api` path does not contain the Maven project; the source and `pom.xml` are under `apps/payroll`.
 
 ### Validation
-- `mvn -q test` from `apps/payroll` — could not complete initially because Maven attempted to write to inaccessible `C:\.m2\repository`.
-- `mvn "-Dmaven.repo.local=D:\\oddo1\\peoplePay360\\.m2-local" test -q` with Java 21 — passed; 4 tests succeeded.
-- `git diff --check` — passed.
+- `mvn -q test` from `apps/payroll` ΓÇö could not complete initially because Maven attempted to write to inaccessible `C:\.m2\repository`.
+- `mvn "-Dmaven.repo.local=D:\\oddo1\\peoplePay360\\.m2-local" test -q` with Java 21 ΓÇö passed; 4 tests succeeded.
+- `git diff --check` ΓÇö passed.
 
 ### Notes
 - Existing Surefire reports showed 4 Payroll tests passing before this change.
@@ -869,7 +869,7 @@
 - HR package validation was not completed because pnpm could not verify the locked pnpm 11.19.0 registry signature in the local environment.
 - `apps/payroll/src/main/java/com/dj/payroll/exception/ApiErrorResponse.java` had a pre-existing whitespace-only modification and was not changed.
 
-## 2026-09-05  — Document Payroll API endpoints
+## 2026-09-05  ΓÇö Document Payroll API endpoints
 
 ### Summary
 - Added a complete local-use and endpoint reference for the Java Payroll API.
@@ -882,13 +882,13 @@
 - The Java API needed a single reference that can be used to manually verify every available endpoint and its request format.
 
 ### Validation
-- Controller and DTO source inspection — passed; all currently mapped Java endpoints are included.
-- `git diff --check` — passed.
+- Controller and DTO source inspection ΓÇö passed; all currently mapped Java endpoints are included.
+- `git diff --check` ΓÇö passed.
 
 ### Notes
 - Swagger/OpenAPI is not currently configured, so the Markdown document is the source-level endpoint reference.
 
-## 2026-09-05  — Add API reference to AGENTS instructions
+## 2026-09-05  ΓÇö Add API reference to AGENTS instructions
 
 ### Summary
 - Added the HR and Payroll API endpoint maps and runtime requirements to the agent instructions.
@@ -901,13 +901,13 @@
 - Agents need the complete API contract in the repository instructions when implementing or validating backend changes.
 
 ### Validation
-- Controller source inspection — passed; HR and Payroll endpoint mappings were checked against source controllers.
-- `git diff --check` — passed.
+- Controller source inspection ΓÇö passed; HR and Payroll endpoint mappings were checked against source controllers.
+- `git diff --check` ΓÇö passed.
 
 ### Notes
 - Request-body examples remain in `docs/PAYROLL_API.md`.
 
-## 2026-09-05  — Verify APIs with separate HR database
+## 2026-09-05  ΓÇö Verify APIs with separate HR database
 
 ### Summary
 - Created the local `oddo_hr` database, applied the committed HR Prisma migration, and completed live checks for both APIs.
@@ -921,18 +921,18 @@
 - The HR API returned `500` because its Prisma tables were missing and the Payroll database contained incompatible schema/data. A separate HR database preserves the Payroll schema and allows HR migrations to apply cleanly.
 
 ### Validation
-- `pnpm --filter @peoplepay360/db exec prisma generate` — passed.
-- `pnpm --filter @peoplepay360/db exec prisma migrate deploy` against `oddo_hr` — passed.
-- HR TypeScript check — passed.
-- HR live endpoints — all 8 returned `200`; dashboard returned zero-count data.
-- Payroll live startup with Java 21 — passed on port `8080`; protected payrun endpoint returned expected `401` without a JWT.
-- `git diff --check` — passed.
+- `pnpm --filter @peoplepay360/db exec prisma generate` ΓÇö passed.
+- `pnpm --filter @peoplepay360/db exec prisma migrate deploy` against `oddo_hr` ΓÇö passed.
+- HR TypeScript check ΓÇö passed.
+- HR live endpoints ΓÇö all 8 returned `200`; dashboard returned zero-count data.
+- Payroll live startup with Java 21 ΓÇö passed on port `8080`; protected payrun endpoint returned expected `401` without a JWT.
+- `git diff --check` ΓÇö passed.
 
 ### Notes
 - HR requires `DATABASE_URL` pointing to `oddo_hr` when started.
 - Local `oddo_hr` database creation is an environment setup action; no existing Payroll data was reset or deleted.
 - This was a documentation/context update only; no application code was changed.
-## 2026-09-05 18:23 +05:30 — Codex Sidebar Navigation Integration
+## 2026-09-05 18:23 +05:30 ΓÇö Codex Sidebar Navigation Integration
 
 ### Summary
 - Integrated the provided rounded glass sidebar navigation with role-aware links and section icons.
@@ -944,12 +944,12 @@
 - The sidebar needed to match the supplied UI implementation while keeping the existing PeoplePay360 role scope for admins, HR managers, payroll users, and employees.
 
 ### Validation
-- `npx tsc --noEmit` from `apps/web` — passed.
+- `npx tsc --noEmit` from `apps/web` ΓÇö passed.
 
 ### Notes
 - No new dependencies were added. The existing mock session export remains in place for the current layout wiring.
 
-## 2026-09-05 19:10 +05:30 — Employee Seed Login Fix
+## 2026-09-05 19:10 +05:30 ΓÇö Employee Seed Login Fix
 
 ### Summary
 - Added login-capable demo users for all seeded employees.
@@ -964,17 +964,17 @@
 - Seeded employees had no `User` records, and users created from the admin flow could have no `employeeId`, so employee login/profile resolution was incomplete.
 
 ### Validation
-- `pnpm --filter @peoplepay360/hr-api build` — passed.
-- `pnpm --filter @peoplepay360/db exec prisma validate` — blocked because `DIRECT_URL` is not set in the local environment.
-- `pnpm --filter web exec tsc --noEmit` — blocked by the sandbox pnpm launcher failing with `EPERM` while resolving `C:\Users\DELL`.
-- `git diff --check -- CHANGELOG_AGENTS.md apps/hr-api/src/modules/shared/hr.service.ts packages/db/prisma/seed.ts` — passed.
+- `pnpm --filter @peoplepay360/hr-api build` ΓÇö passed.
+- `pnpm --filter @peoplepay360/db exec prisma validate` ΓÇö blocked because `DIRECT_URL` is not set in the local environment.
+- `pnpm --filter web exec tsc --noEmit` ΓÇö blocked by the sandbox pnpm launcher failing with `EPERM` while resolving `C:\Users\DELL`.
+- `git diff --check -- CHANGELOG_AGENTS.md apps/hr-api/src/modules/shared/hr.service.ts packages/db/prisma/seed.ts` ΓÇö passed.
 
 ### Notes
 - Seed command was not executed because the same sandbox pnpm launcher error prevented Prisma execution.
 - Demo employee password is `Employee123!`; admin password remains `Admin123!`.
 - The current Employees page is still presentation scaffolding; the live employee-user path is Team & Roles with role `EMPLOYEE`.
 
-## 2026-09-05 20:00 +05:30 — Shadcn UI Design System & Interactive Loading Buttons Revamp
+## 2026-09-05 20:00 +05:30 ΓÇö Shadcn UI Design System & Interactive Loading Buttons Revamp
 
 ### Summary
 - Overhauled the PeoplePay360 web application to a pure Shadcn UI aesthetic (clean Zinc theme, high-density compact typography `text-xs`/`text-[11px]`, clean borders `#e4e4e7`, tight padding `p-2`/`p-3`/`p-4`).
@@ -1026,8 +1026,8 @@
 - Fulfill user request for compact Shadcn UI aesthetic, small fonts, tight SaaS margins, and ensure every button across the entire UI is functional, displays visible loading feedback when clicked, and gives explicit user feedback.
 
 ### Validation
-- `pnpm --filter web build` — **Passed (Exit Code 0)** with all 18 routes compiled and static pages generated.
-- `git status` — verified all files.
+- `pnpm --filter web build` ΓÇö **Passed (Exit Code 0)** with all 18 routes compiled and static pages generated.
+- `git status` ΓÇö verified all files.
 
 ### Notes
 - PDF generation uses pure client-side `jspdf` without external server dependencies.
@@ -1141,3 +1141,125 @@
 
 
 
+## 2026-09-05 18:54 +05:30 ΓÇö Codex Logout Button Fix
+
+### Summary
+- Wired the web app logout button to NextAuth sign-out and redirected users to the login page after logout.
+
+### Files Changed
+- `apps/web/components/app-topbar.tsx`: converted the topbar to a client component and added a `signOut` handler to the Logout button.
+- `CHANGELOG_AGENTS.md`: recorded this logout fix.
+
+### Reason
+- The Logout button rendered without any click handler, so it did not clear the authenticated session or navigate away from protected pages.
+
+### Validation
+- `pnpm --filter web lint` ΓÇö failed; `next lint` prompted for ESLint setup instead of running non-interactively.
+- `npx tsc --noEmit` from `apps/web` ΓÇö passed.
+- `git diff --check` ΓÇö passed.
+
+### Notes
+- The repository's lint script should be migrated away from deprecated `next lint` before it can run in CI-style non-interactive mode.
+
+## 2026-09-05 18:55 +05:30 ΓÇö Codex Employee Login Seed
+
+### Summary
+- Added a seeded employee login account for demo and employee-role testing.
+
+### Files Changed
+- `packages/db/prisma/seed.ts`: added `employee@peoplepay360.local` with role `EMPLOYEE`, password `Employee123!`, and a link to seeded employee `EMP-003`.
+- `CHANGELOG_AGENTS.md`: recorded this seed-data change.
+
+### Reason
+- The app used credentials-based login but the seed data only created an admin user, so there was no real employee credential for testing employee access.
+
+### Validation
+- `pnpm --filter @peoplepay360/db db:seed` ΓÇö failed; root `.env` database host was unreachable.
+- `$env:DATABASE_URL='postgresql://postgres:root@localhost:5432/oddo_hr'; pnpm --filter @peoplepay360/db db:seed` ΓÇö failed; local PostgreSQL was not reachable on `localhost:5432`.
+- `pnpm --filter @peoplepay360/db db:seed` ΓÇö passed on retry against the configured database.
+- Employee login verification query ΓÇö passed; `employee@peoplepay360.local` exists with role `EMPLOYEE`, employee `EMP-003`, and a matching password hash.
+- `pnpm --filter @peoplepay360/db exec tsc --noEmit` ΓÇö passed.
+
+### Notes
+- This is demo seed data only; production credentials must be created through a secure user-management flow.
+
+## 2026-09-05 19:18 +05:30 ΓÇö Codex Employee Self-Service Panel And HR RBAC
+
+### Summary
+- Added HR API JWT authentication, role guards, employee-scoped `/api/hr/me/**` endpoints, and a dedicated Employee self-service panel for dashboard, attendance, time off, and profile.
+- Guarded existing HR admin endpoints so Employee-role tokens cannot access HR/admin/payroll administration APIs.
+
+### Files Changed
+- `apps/hr-api/src/modules/auth/*`: added JWT auth, role metadata, and role guard utilities.
+- `apps/hr-api/src/modules/me/me.controller.ts`: added authenticated employee self-service endpoints.
+- `apps/hr-api/src/modules/shared/hr.service.ts`: added employee-scoped profile, dashboard, attendance, time-off, allocation, and type methods.
+- `apps/hr-api/src/modules/*/*.controller.ts`: applied class-level auth and role guards without changing method bodies, routes, DTOs, or response construction.
+- `apps/hr-api/src/modules/hr.module.ts`: registered the new controller and guard providers.
+- `apps/hr-api/package.json`, `apps/web/package.json`, `pnpm-lock.yaml`: declared JWT/auth dependencies used directly by each app.
+- `apps/web/lib/hr-api.ts`: added server-side HR API token minting and fetch helper.
+- `apps/web/app/(app)/self/*`: added employee dashboard, attendance, time-off, profile pages, and local formatting helpers.
+- `apps/web/app/(app)/layout.tsx`: switched the app shell from mock session data to the authenticated NextAuth session.
+- `apps/web/components/app-sidebar.tsx`: routed Employee users to `/self/**` pages while leaving admin route components intact.
+- `apps/web/middleware.ts`: blocked Employee-role direct access to admin/HR/payroll routes and allowed `/self/**`.
+- `AGENTS.md`: updated the HR API reference with auth requirements and `/me` endpoints.
+- `CHANGELOG_AGENTS.md`: recorded this change.
+
+### Reason
+- Employee self-service required server-side employee scoping from authenticated claims, and existing unguarded HR endpoints needed RBAC so Employee users cannot access or mutate other employees' data.
+
+### Validation
+- Phase 0 audit ΓÇö completed; audited HR endpoints had no auth check at all before this change, not JWT-only/no-role-check behavior.
+- `pnpm install` ΓÇö passed; lockfile updated for explicit `jose` and `bcryptjs` dependencies.
+- `pnpm --filter @peoplepay360/hr-api build` ΓÇö passed.
+- `npx tsc --noEmit` from `apps/web` ΓÇö passed.
+- Live HR API smoke test on `PORT=4100` with `HR_API_JWT_SECRET=codex-test-secret` ΓÇö passed: missing token returned `401`, Employee token returned `403` on `/api/hr/employees`, Admin/HR/Payroll tokens returned `200` on allowed admin endpoints, and Employee token returned `200` on `/api/hr/me/profile`, `/api/hr/me/attendance`, `/api/hr/me/time-off`, `/api/hr/me/time-off/allocations`, and `/api/hr/me/time-off/types`.
+- Admin-facing page diff check ΓÇö passed; existing admin route pages inspected in the audit (`dashboard`, `attendance`, `time-off/requests`, `time-off/allocations`, `employees`) have no source diffs.
+
+### Notes
+- Existing HR automated tests are still a placeholder, so authorization behavior was verified with live smoke requests.
+- The employee panel intentionally excludes HR admin actions, attendance correction/editing, leave approval/refusal, allocation management, user/RBAC management, and payroll/payslip access.
+
+## 2026-09-05 19:27 +05:30 ΓÇö Codex Local HR API Self-Service Startup Fix
+
+### Summary
+- Added a development-only shared JWT secret fallback for local web-to-HR API self-service calls.
+
+### Files Changed
+- `apps/hr-api/src/modules/auth/jwt-auth.guard.ts`: uses `peoplepay360-dev-secret` only outside production when no explicit HR API or NextAuth secret is configured.
+- `apps/web/lib/hr-api.ts`: uses the same development-only fallback when minting HR API bearer tokens.
+- `CHANGELOG_AGENTS.md`: recorded this runtime fix.
+
+### Reason
+- The local `.env` does not define `HR_API_JWT_SECRET` or `NEXTAUTH_SECRET`; after restarting the HR API with the new guards, local self-service calls need a matching non-production secret unless the developer configures one explicitly.
+
+### Validation
+- Restarted the stale HR API process on port `4000` ΓÇö passed; startup logs mapped `/api/hr/me/dashboard`.
+- Live HR API smoke check on `http://localhost:4000/api/hr` ΓÇö passed: Admin token returned `200` on `/employees`, missing token returned `401` on `/employees`, Employee token returned `403` on `/employees`, and Employee token returned `200` on `/me/dashboard` and `/me/profile`.
+- `pnpm --filter @peoplepay360/hr-api build` ΓÇö passed.
+- `npx tsc --noEmit` from `apps/web` ΓÇö passed.
+
+### Notes
+- Production still requires an explicit `HR_API_JWT_SECRET` or `NEXTAUTH_SECRET`.
+
+## 2026-09-05 19:32 +05:30 ΓÇö Codex HR API JWT Secret Alignment
+
+### Summary
+- Made local HR API bearer-token signing and verification prefer the same development fallback even when only the web process has `NEXTAUTH_SECRET`.
+
+### Files Changed
+- `apps/web/lib/hr-api.ts`: changed HR API token signing to use `HR_API_JWT_SECRET`, then the shared dev fallback outside production.
+- `apps/hr-api/src/modules/auth/jwt-auth.guard.ts`: changed HR API token verification to use the same secret precedence.
+- `CHANGELOG_AGENTS.md`: recorded this runtime auth fix.
+
+### Reason
+- Employee self-service calls could return `401 Invalid bearer token` when the Next.js process had a `NEXTAUTH_SECRET` value that the HR API process did not share.
+
+### Validation
+- Restarted the stale HR API and Next.js dev processes on ports `4000` and `3000` ΓÇö passed.
+- Live HR API smoke check with the shared development secret ΓÇö passed: Admin token returned `200` on `/employees`, Employee token returned `200` on `/me/dashboard`, and Employee token returned `403` on `/employees`.
+- Anonymous request to `http://localhost:3000/self/dashboard` ΓÇö passed; middleware returned `307` to `/login?callbackUrl=%2Fself%2Fdashboard`.
+- `pnpm --filter @peoplepay360/hr-api build` ΓÇö passed.
+- `npx tsc --noEmit` from `apps/web` ΓÇö passed.
+
+### Notes
+- Production still requires explicitly shared `HR_API_JWT_SECRET` or `NEXTAUTH_SECRET` configuration.
