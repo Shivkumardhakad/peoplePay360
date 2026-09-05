@@ -2077,3 +2077,24 @@
 
 ### Notes
 - Report rows intentionally show business-facing employee and department names instead of internal IDs.
+## 2026-09-06 11:10 IST — Use Payroll API for payslip PDF downloads
+
+### Summary
+- Routed payslip PDF downloads through the Java Payroll API's authenticated PDF endpoint.
+- Restricted PDF downloads to validated or paid payslips and preserved employee ownership checks.
+
+### Files Changed
+- `apps/web/lib/payroll-api.ts`: Added shared authenticated response handling and binary PDF fetching.
+- `apps/web/lib/api-actions.ts`: Added the ownership-checked payslip PDF server action.
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: Downloaded the backend-generated PDF instead of browser-generated output.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payslip PDFs must be generated from finalized payroll records and use the live Java payroll implementation rather than a client-side presentation helper.
+
+### Validation
+- `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check -- apps/web/lib/payroll-api.ts apps/web/lib/api-actions.ts apps/web/app/(app)/payroll/payslips/[id]/page.tsx` — passed.
+
+### Notes
+- The Payroll API must be running and configured for the download to succeed.

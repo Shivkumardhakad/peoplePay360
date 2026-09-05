@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { payrollApiFetch } from "@/lib/payroll-api";
+import { payrollApiFetch, payrollApiFetchBinary } from "@/lib/payroll-api";
 
 const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:4000/api/hr";
 
@@ -848,6 +848,12 @@ export async function getPayslipAction(id: string) {
   const employee = await prisma.employee.findUnique({ where: { id: payslip.employeeId }, include: { department: true, jobPosition: true } });
   const contract = await prisma.contract.findUnique({ where: { id: payslip.contractId } });
   return { ...payslip, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : payslip.employeeId, department: employee?.department?.name ?? "-", position: employee?.jobPosition?.title ?? "-", contractRef: contract?.title ?? payslip.contractId, period: `${String(payslip.periodStart).slice(0, 10)} → ${String(payslip.periodEnd).slice(0, 10)}`, gross: Number(payslip.grossAmount), deductions: Number(payslip.deductionAmount), net: Number(payslip.netAmount), lines: (payslip.lines ?? []).map((line: any) => ({ rule: line.name, category: line.code, amount: Number(line.amount), type: line.amount < 0 ? "DEDUCTION" : "EARNING" })) };
+}
+
+export async function getPayslipPdfAction(id: string) {
+  const payslip = await getPayslipAction(id);
+  if (!["VALIDATED", "PAID"].includes(payslip.status)) throw new Error("Payslip PDF is available only after validation or payment.");
+  return payrollApiFetchBinary(`/api/payroll/payslips/${id}/pdf`);
 }
 
 export async function listPayrollPayslipsAction() {

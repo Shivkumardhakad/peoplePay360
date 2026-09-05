@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
-import { generatePayslipPDF } from "@/lib/payslip-pdf";
-import { getPayslipAction, getPayslipPaymentStatusAction } from "@/lib/api-actions";
+import { getPayslipAction, getPayslipPaymentStatusAction, getPayslipPdfAction } from "@/lib/api-actions";
 import { ArrowLeft, Printer, Download, CheckCircle, FileText, Loader2 } from "lucide-react";
 
 export default function PayslipDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,7 +32,14 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
   const handleDownloadPDF = async () => {
     setDownloading(true);
     try {
-      generatePayslipPDF(payslip);
+      const base64 = await getPayslipPdfAction(payslipId);
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Payslip_${payslipId}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
       toast({
         title: "Payslip Downloaded",
         description: `Exported PDF for ${payslip.employeeName} (${payslipId}).`,
