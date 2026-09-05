@@ -786,6 +786,10 @@ export async function getPayrunAction(id: string) {
   return payrollApiFetch(`/api/payroll/payruns/${id}`);
 }
 
+export async function getPayrollAuditAction(payrunId: string) {
+  return payrollApiFetch(`/api/payroll/payruns/${payrunId}/audit`);
+}
+
 export async function createPayrunAction(body: unknown) {
   const result = await payrollApiFetch("/api/payroll/payruns", { method: "POST", body });
   revalidatePath("/payroll/payruns");

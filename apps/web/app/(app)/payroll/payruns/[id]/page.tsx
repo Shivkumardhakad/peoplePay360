@@ -14,6 +14,7 @@ import {
   sendPayrunPayslipsAction,
   getPayrunAction,
   listPayrunPayslipsAction,
+  getPayrollAuditAction,
 } from "@/lib/api-actions";
 import {
   Calculator,
@@ -46,12 +47,16 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
   const [payrun, setPayrun] = useState<any>(null);
   const [payslips, setPayslips] = useState<any[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>([]);
+  const [audit, setAudit] = useState<any>(null);
 
   const reload = async () => {
     const [loadedPayrun, loadedPayslips] = await Promise.all([getPayrunAction(payrunId), listPayrunPayslipsAction(payrunId)]);
     setPayrun(loadedPayrun);
     setStatus((loadedPayrun as any).status as PayrunStatus);
     setPayslips(loadedPayslips as any[]);
+    if ((loadedPayrun as any).status !== "DRAFT") {
+      try { setAudit(await getPayrollAuditAction(payrunId)); } catch { setAudit(null); }
+    } else setAudit(null);
   };
 
   useEffect(() => { reload().catch((error) => toast({ title: "Unable to load payrun", description: error.message, type: "error" })); }, [payrunId]);
@@ -266,6 +271,20 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {audit && (
+        <div className={`space-y-2 p-3 rounded-lg border ${audit.passed ? "bg-emerald-500/10 border-emerald-500/20" : "bg-rose-500/10 border-rose-500/20"}`}>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold">Payroll Audit {audit.passed ? "Passed" : "Requires Review"}</p>
+            <span className="text-[11px] font-mono">Risk score: {audit.riskScore}</span>
+          </div>
+          {audit.findings?.length ? (
+            <ul className="space-y-1 pl-4 list-disc">
+              {audit.findings.map((finding: any, index: number) => <li key={`${finding.code}-${index}`} className="text-[11px]">{finding.message}</li>)}
+            </ul>
+          ) : <p className="text-[11px] text-muted-foreground">No audit findings for this payrun.</p>}
         </div>
       )}
 

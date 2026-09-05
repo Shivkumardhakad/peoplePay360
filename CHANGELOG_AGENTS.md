@@ -2010,3 +2010,24 @@
 
 ### Notes
 - If the Payroll API or HR database has no active structure/schedule, the corresponding selector remains empty and the required validation prevents an invalid contract.
+## 2026-09-06 09:30 IST — Surface payroll audit findings in payrun review
+
+### Summary
+- Added a web action for the Java Payroll audit endpoint.
+- Added live audit status, risk score, and finding messages to payrun processing after computation.
+- Kept internal employee/payslip identifiers out of the visible findings list.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added `getPayrollAuditAction`.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Loads and renders audit results during payrun review.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- The remote Payroll API already provided persisted-record audit checks, but the payrun UI did not expose those findings before validation/payment.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` on changed files — passed.
+
+### Notes
+- Audit loading is skipped for draft payruns and refreshed after compute/validation actions.
