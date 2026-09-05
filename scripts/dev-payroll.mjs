@@ -14,7 +14,8 @@ if (existsSync(webEnvPath)) {
   const database = new URL(values.DATABASE_URL);
   const username = decodeURIComponent(database.username);
   const password = decodeURIComponent(database.password);
-  env.DB_URL = `jdbc:postgresql://${database.hostname}:${database.port || "5432"}${database.pathname}`;
+  const jdbcQuery = database.port === "6543" ? "?prepareThreshold=0" : "";
+  env.DB_URL = `jdbc:postgresql://${database.hostname}:${database.port || "5432"}${database.pathname}${jdbcQuery}`;
   env.DB_USERNAME = username;
   env.DB_PASSWORD = password;
   if (values.NEXTAUTH_SECRET) env.JWT_SECRET = values.NEXTAUTH_SECRET;
@@ -22,6 +23,8 @@ if (existsSync(webEnvPath)) {
 
 env.HR_API_URL ??= "http://localhost:3001/api/hr";
 env.HR_API_JWT_SECRET ??= env.JWT_SECRET;
+env.PORT = "8080";
+env.SERVER_PORT = "8080";
 
 const command = process.platform === "win32" ? "mvnw.cmd" : "./mvnw";
 const child = spawn(command, ["spring-boot:run"], { cwd: resolve(root, "apps", "payroll"), env, stdio: "inherit", shell: process.platform === "win32" });

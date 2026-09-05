@@ -2212,3 +2212,23 @@
 
 ### Notes
 - The launcher expects `apps/web/.env.local` to contain `DATABASE_URL` and `NEXTAUTH_SECRET`; it does not print or persist those values.
+## 2026-09-06 14:20 IST — Fix Spring Payroll with Supabase pooler connections
+
+### Summary
+- Disabled PostgreSQL named prepared statements for PgBouncer port `6543` connections.
+- Applied the setting both in Spring Hikari configuration and the automatic local launcher.
+
+### Files Changed
+- `apps/payroll/src/main/resources/application.yaml`: Added `prepareThreshold: 0` datasource property.
+- `scripts/dev-payroll.mjs`: Adds the pooler-compatible JDBC option when mapping the web database URL.
+- `CHANGELOG_AGENTS.md`: Recorded this fix.
+
+### Reason
+- Hibernate failed during metadata discovery with `prepared statement "S_1" already exists` when using the Supabase transaction pooler.
+
+### Validation
+- `node --check scripts/dev-payroll.mjs` — passed.
+- Payroll runtime smoke test after this change — passed; Hibernate initialized and the app reached startup. The launcher explicitly pins both `PORT` and `SERVER_PORT` to `8080`.
+
+### Notes
+- The setting is only necessary for transaction-pooler connections and is harmless for local direct PostgreSQL connections.
