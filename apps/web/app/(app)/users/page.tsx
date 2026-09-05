@@ -25,13 +25,6 @@ type SystemUser = {
   createdAt?: string | Date;
 };
 
-const INITIAL_USERS: SystemUser[] = [
-  { id: "USR-001", name: "Admin User", email: "admin@peoplepay360.local", role: "ADMIN" },
-  { id: "USR-002", name: "Bob Smith", email: "hr.manager@peoplepay360.local", role: "HR_MANAGER" },
-  { id: "USR-003", name: "Alice Johnson", email: "payroll.manager@peoplepay360.local", role: "PAYROLL_MANAGER" },
-  { id: "USR-004", name: "Emily Watson", email: "employee@peoplepay360.local", role: "EMPLOYEE" },
-];
-
 function formatRoleLabel(role: SystemUserRole) {
   switch (role) {
     case "ADMIN":

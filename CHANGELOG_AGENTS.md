@@ -1960,3 +1960,32 @@
 
 ### Notes
 - Payroll dashboard data is based on Java payrun records; department and operational alert context is resolved from the HR Prisma database.
+## 2026-09-06 08:30 IST — Harden session and payslip access boundaries
+
+### Summary
+- Removed the unauthenticated mock-session fallback from the protected app layout.
+- Protected direct payslip server actions so employee users can only fetch their own payslips.
+- Scoped employee payslip list retrieval on the server before data reaches the browser.
+- Removed unused mock employee/user records and attendance fallback records.
+- Removed contract employee fallback options so contract forms use only database employees.
+
+### Files Changed
+- `apps/web/app/(app)/layout.tsx`: Redirect missing sessions to login instead of rendering a mock admin session.
+- `apps/web/components/app-sidebar.tsx`: Removed `MOCK_SESSION` fallback.
+- `apps/web/lib/api-actions.ts`: Enforced employee payslip ownership in server actions.
+- `apps/web/app/(app)/attendance/page.tsx`: Removed fake employee attendance fallback and scope by employee ID.
+- `apps/web/app/(app)/employees/page.tsx`: Removed unused mock employee catalog.
+- `apps/web/app/(app)/users/page.tsx`: Removed unused mock user catalog.
+- `apps/web/components/contract-form.tsx`: Removed hardcoded employee options.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Protected pages and sensitive salary actions must never rely on presentation-only identity fallbacks or client-only employee scoping.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` on changed files — passed.
+- `git pull --ff-only origin main` — passed; remote changes fast-forwarded to `b2065f5`.
+
+### Notes
+- Existing unrelated `apps/web/middleware.ts` whitespace and Turbo-generated files remain outside this commit.

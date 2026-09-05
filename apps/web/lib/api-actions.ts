@@ -4,6 +4,8 @@ import { prisma } from "@peoplepay360/db";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { payrollApiFetch } from "@/lib/payroll-api";
 
 const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:4000/api/hr";
@@ -804,15 +806,20 @@ export async function updatePayrollStructureAction(id: string, body: unknown) {
 }
 
 export async function getPayslipAction(id: string) {
+  const session = await getServerSession(authOptions);
   const payslip = await payrollApiFetch<any>(`/api/payroll/payslips/${id}`);
+  if (session?.user?.role === "EMPLOYEE" && payslip.employeeId !== session.user.employeeId) {
+    throw new Error("You are not authorized to view this payslip.");
+  }
   const employee = await prisma.employee.findUnique({ where: { id: payslip.employeeId }, include: { department: true, jobPosition: true } });
   const contract = await prisma.contract.findUnique({ where: { id: payslip.contractId } });
   return { ...payslip, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : payslip.employeeId, department: employee?.department?.name ?? "-", position: employee?.jobPosition?.title ?? "-", contractRef: contract?.title ?? payslip.contractId, period: `${String(payslip.periodStart).slice(0, 10)} → ${String(payslip.periodEnd).slice(0, 10)}`, gross: Number(payslip.grossAmount), deductions: Number(payslip.deductionAmount), net: Number(payslip.netAmount), lines: (payslip.lines ?? []).map((line: any) => ({ rule: line.name, category: line.code, amount: Number(line.amount), type: line.amount < 0 ? "DEDUCTION" : "EARNING" })) };
 }
 
 export async function listPayrollPayslipsAction() {
+  const session = await getServerSession(authOptions);
   const payruns = await payrollApiFetch<any[]>("/api/payroll/payruns");
-  const slips = (await Promise.all(payruns.flatMap((payrun) => (payrun.payslips ?? []).map((summary: any) => getPayslipAction(summary.id).then((payslip) => ({ ...payslip, payrun: payrun.name })))))).flat();
+  const slips = (await Promise.all(payruns.flatMap((payrun) => (payrun.payslips ?? []).filter((summary: any) => session?.user?.role !== "EMPLOYEE" || summary.employeeId === session.user.employeeId).map((summary: any) => getPayslipAction(summary.id).then((payslip) => ({ ...payslip, payrun: payrun.name })))))).flat();
   return slips;
 }
 

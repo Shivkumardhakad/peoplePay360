@@ -32,15 +32,6 @@ export interface Session {
   };
 }
 
-export const MOCK_SESSION: Session = {
-  user: {
-    id: "1",
-    name: "Admin User",
-    role: "ADMIN",
-    employeeId: null,
-  },
-};
-
 function NavLink({
   href,
   icon: Icon,
@@ -75,7 +66,7 @@ function NavLink({
   );
 }
 
-export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
+export function AppSidebar({ session }: { session: Session }) {
   const role = session.user.role;
   const isEmployee = role === "EMPLOYEE";
   const isHRManagerOnly = role === "HR_MANAGER";

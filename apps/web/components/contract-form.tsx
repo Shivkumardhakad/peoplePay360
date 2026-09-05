@@ -39,12 +39,7 @@ export function ContractForm({
 }) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
-  const [employees, setEmployees] = useState<Array<{ id: string; employeeNumber: string; name: string }>>([
-    { id: "EMP-001", employeeNumber: "EMP-001", name: "Alice Johnson" },
-    { id: "EMP-002", employeeNumber: "EMP-002", name: "Bob Smith" },
-    { id: "EMP-003", employeeNumber: "EMP-003", name: "Charlie Davis" },
-    { id: "EMP-004", employeeNumber: "EMP-004", name: "Emily Watson" },
-  ]);
+  const [employees, setEmployees] = useState<Array<{ id: string; employeeNumber: string; name: string }>>([]);
 
   useEffect(() => {
     getEmployeesAction().then((res) => {

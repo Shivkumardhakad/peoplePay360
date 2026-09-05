@@ -20,13 +20,6 @@ interface EmployeeItem {
   status: "Active" | "Inactive" | "On Leave";
 }
 
-const INITIAL_EMPLOYEES: EmployeeItem[] = [
-  { id: "EMP-001", name: "Alice Johnson", department: "Engineering", position: "Senior Frontend Engineer", status: "Active" },
-  { id: "EMP-002", name: "Bob Smith", department: "Human Resources", position: "HR Manager", status: "Active" },
-  { id: "EMP-003", name: "Charlie Davis", department: "Finance & Accounting", position: "Payroll Specialist", status: "On Leave" },
-  { id: "EMP-004", name: "Emily Watson", department: "Product & Design", position: "Lead UX Designer", status: "Active" },
-];
-
 const KANBAN_COLUMNS: { status: EmployeeItem["status"]; title: string; icon: any; color: string; badgeVariant: "success" | "warning" | "secondary" }[] = [
   { status: "Active", title: "Active Employees", icon: UserCheck, color: "border-emerald-500/20 bg-emerald-500/5 text-emerald-500", badgeVariant: "success" },
   { status: "On Leave", title: "On Leave", icon: Clock, color: "border-amber-500/20 bg-amber-500/5 text-amber-500", badgeVariant: "warning" },

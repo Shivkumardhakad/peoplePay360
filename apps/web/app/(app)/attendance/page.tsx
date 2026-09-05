@@ -14,6 +14,7 @@ import { Plus, Search, LogIn, LogOut, Loader2, LayoutList, Kanban, Clock, Calend
 
 interface AttendanceRecord {
   id: string;
+  employeeId: string;
   employee: string;
   date: string;
   checkIn: string;
@@ -46,22 +47,10 @@ export default function AttendancePage() {
     role === "HR_PAYROLL_MANAGER" ||
     role === "PAYROLL_MANAGER" ||
     role === "HR_PAYROLL_USER";
-  const currentUserName = session?.user?.name || "Emily Watson";
+  const currentUserName = session?.user?.name || "";
 
   const scopedAttendance = isEmployee
-    ? (attendance.some((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
-        ? attendance.filter((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
-        : [
-            {
-              id: "ATT-MINE",
-              employee: currentUserName,
-              date: new Date().toISOString().split("T")[0] || "2023-10-01",
-              checkIn: "09:00",
-              checkOut: "-",
-              workedHours: "In Progress",
-              status: "Present" as const,
-            },
-          ])
+    ? attendance.filter((r) => r.employeeId === session?.user?.employeeId)
     : attendance;
 
   const filteredAttendance = scopedAttendance.filter(
