@@ -1,0 +1,833 @@
+Bilkul. Main isko **properly normalized relational schema** ke form mein de raha hoon, jise tum directly implementation ke base ke roop mein use kar sakte ho.
+
+## 1. `employees`
+
+Employee ki identity/profile information. **Salary yahan nahi hogi.**
+
+```text
+employees
+──────────────
+id                 PK
+employee_code      UNIQUE
+first_name
+last_name
+email              UNIQUE
+phone
+date_of_birth
+date_of_joining
+gender
+address
+bank_account_id    FK → bank_accounts.id   [optional]
+status             ENUM(ACTIVE, INACTIVE, TERMINATED)
+created_at
+updated_at
+```
+
+> `wage`, `salary_structure_id`, `contract_id` etc. employee mein **nahi**.
+
+---
+
+## 2. `departments`
+
+```text
+departments
+──────────────
+id                 PK
+name               UNIQUE
+code               UNIQUE
+description
+status
+created_at
+updated_at
+```
+
+Example:
+
+```text
+Engineering
+HR
+Finance
+Sales
+```
+
+---
+
+## 3. `job_positions`
+
+Position/job definition.
+
+```text
+job_positions
+──────────────
+id                 PK
+title
+code               UNIQUE
+department_id      FK → departments.id
+level
+description
+status
+created_at
+updated_at
+```
+
+Example:
+
+```text
+Software Engineer
+Senior Software Engineer
+HR Executive
+```
+
+**Position salary decide nahi karti.**
+
+---
+
+# 4. `contracts`
+
+Ye employee ke **employment terms for a particular period** hain.
+
+```text
+contracts
+──────────────
+id                       PK
+employee_id              FK → employees.id
+position_id              FK → job_positions.id
+department_id            FK → departments.id
+
+employment_type          ENUM(FULL_TIME, PART_TIME, CONTRACT)
+start_date
+end_date                 NULL
+
+wage                     DECIMAL(15,2)
+
+salary_structure_id      FK → salary_structures.id
+working_schedule_id      FK → working_schedules.id
+
+status                   ENUM(DRAFT, ACTIVE, EXPIRED, TERMINATED, CANCELLED)
+
+termination_date         NULL
+termination_reason       NULL
+
+created_at
+updated_at
+```
+
+Example:
+
+```text
+Employee A
+Software Engineer
+₹10 LPA
+Regular Structure
+01-01-2026 → 31-12-2026
+```
+
+Employee B:
+
+```text
+Employee B
+Software Engineer
+₹11 LPA
+Regular Structure
+01-01-2026 → 31-12-2026
+```
+
+Same position + same structure, **different contract wage**.
+
+---
+
+# 5. `working_schedules`
+
+Schedule ka header.
+
+```text
+working_schedules
+──────────────────
+id                 PK
+name
+code               UNIQUE
+description
+status
+created_at
+updated_at
+```
+
+Example:
+
+```text
+Standard 9-6
+Monday-Friday
+```
+
+---
+
+# 6. `working_schedule_days`
+
+Weekly schedule ko normalize karne ke liye.
+
+```text
+working_schedule_days
+──────────────────────
+id                 PK
+working_schedule_id FK → working_schedules.id
+
+day_of_week        ENUM(MON,TUE,WED,THU,FRI,SAT,SUN)
+
+start_time
+end_time
+break_minutes
+
+is_working_day
+
+created_at
+updated_at
+```
+
+Example:
+
+```text
+Schedule #1
+
+MON | 09:00 | 18:00 | 60 | TRUE
+TUE | 09:00 | 18:00 | 60 | TRUE
+WED | 09:00 | 18:00 | 60 | TRUE
+...
+SAT | NULL  | NULL  | 0  | FALSE
+SUN | NULL  | NULL  | 0  | FALSE
+```
+
+---
+
+# 7. `attendance`
+
+Actual employee attendance.
+
+```text
+attendance
+──────────────
+id                 PK
+employee_id        FK → employees.id
+date
+
+check_in           NULL
+check_out          NULL
+
+worked_minutes
+status             ENUM(PRESENT, ABSENT, HALF_DAY, LATE, ON_LEAVE)
+
+remarks
+
+created_at
+updated_at
+
+UNIQUE(employee_id, date)
+```
+
+Important:
+
+```text
+Working Schedule = expected
+Attendance       = actual
+```
+
+`worked_minutes` system calculate karega based on check-in/out + schedule/break.
+
+---
+
+# 8. `time_off_types`
+
+Leave ki definition/policy.
+
+```text
+time_off_types
+───────────────
+id                 PK
+name
+code               UNIQUE
+
+unit               ENUM(DAYS, HOURS)
+
+requires_approval  BOOLEAN
+is_paid            BOOLEAN
+
+payroll_behavior   ENUM(PAID, UNPAID, NONE)
+
+description
+status
+
+created_at
+updated_at
+```
+
+Examples:
+
+```text
+Annual Leave
+Sick Leave
+Casual Leave
+Unpaid Leave
+```
+
+---
+
+# 9. `time_off_allocations`
+
+Employee ko kitni leave allocate hui.
+
+```text
+time_off_allocations
+──────────────────────
+id                 PK
+employee_id        FK → employees.id
+time_off_type_id   FK → time_off_types.id
+
+allocated_amount
+used_amount
+remaining_amount
+
+valid_from
+valid_to
+
+status
+
+created_at
+updated_at
+```
+
+Example:
+
+```text
+Rahul
+Annual Leave
+Allocated = 20
+Used      = 5
+Remaining = 15
+```
+
+**Note:** `remaining_amount` technically derived value hai (`allocated - used`). Agar strict normalization chaho, ise calculate bhi kar sakte ho instead of storing it.
+
+---
+
+# 10. `time_off_requests`
+
+Employee ki actual leave request.
+
+```text
+time_off_requests
+───────────────────
+id                 PK
+employee_id        FK → employees.id
+time_off_type_id   FK → time_off_types.id
+allocation_id      FK → time_off_allocations.id NULL
+
+start_date
+end_date
+
+requested_amount
+
+reason
+
+status             ENUM(PENDING, APPROVED, REJECTED, CANCELLED)
+
+approved_by        FK → users.id NULL
+approved_at        NULL
+
+created_at
+updated_at
+```
+
+Flow:
+
+```text
+Allocation
+    ↓
+Employee requests leave
+    ↓
+Request
+    ↓
+Approved
+    ↓
+Allocation consumed
+```
+
+---
+
+# 11. `salary_structures`
+
+Reusable salary template.
+
+```text
+salary_structures
+──────────────────
+id                 PK
+name
+code               UNIQUE
+description
+status             ENUM(ACTIVE, INACTIVE)
+
+created_at
+updated_at
+```
+
+Example:
+
+```text
+Regular
+Regular Senior
+Contractual
+```
+
+**Actual ₹10L/₹11L yahan nahi hai.**
+
+---
+
+# 12. `salary_rule_categories`
+
+Salary rules ko categories mein organize karega.
+
+```text
+salary_rule_categories
+────────────────────────
+id                 PK
+name
+code               UNIQUE
+type               ENUM(EARNING, DEDUCTION, AGGREGATE)
+
+description
+
+created_at
+updated_at
+```
+
+Examples:
+
+```text
+Basic
+Allowance
+Gross
+Deduction
+Net
+```
+
+---
+
+# 13. `salary_rules`
+
+Actual calculation definitions.
+
+```text
+salary_rules
+──────────────
+id                 PK
+name
+code               UNIQUE
+
+category_id        FK → salary_rule_categories.id
+
+sequence           INTEGER
+
+calculation_type   ENUM(
+                     FIXED,
+                     PERCENTAGE,
+                     FORMULA
+                   )
+
+value              DECIMAL(15,4) NULL
+formula            TEXT NULL
+
+status             ENUM(ACTIVE, INACTIVE)
+
+created_at
+updated_at
+```
+
+Examples:
+
+```text
+Basic
+code = BASIC
+calculation_type = PERCENTAGE
+value = 60
+```
+
+```text
+HRA
+code = HRA
+calculation_type = PERCENTAGE
+formula/value based on BASIC
+```
+
+```text
+PF
+code = PF
+calculation_type = PERCENTAGE
+value = 12
+```
+
+**Important:** engine ko `if code == "HRA"` type hardcoding nahi karni.
+
+---
+
+# 14. `salary_structure_rules`
+
+Salary Structure ↔ Salary Rules ka **many-to-many relationship**.
+
+```text
+salary_structure_rules
+───────────────────────
+id                    PK
+
+salary_structure_id   FK → salary_structures.id
+salary_rule_id        FK → salary_rules.id
+
+sequence              INTEGER
+
+created_at
+
+UNIQUE(
+    salary_structure_id,
+    salary_rule_id
+)
+```
+
+Example:
+
+```text
+Regular Structure
+       │
+       ├── Basic
+       ├── HRA
+       ├── Special Allowance
+       ├── PF
+       └── Net
+```
+
+Is table ki wajah se ek salary rule ko multiple structures mein reuse kar sakte ho.
+
+---
+
+# 15. `payruns`
+
+**Payroll batch/process.**
+
+```text
+payruns
+──────────────
+id                 PK
+
+name
+period_start
+period_end
+
+salary_structure_id FK → salary_structures.id
+
+status             ENUM(
+                     DRAFT,
+                     COMPUTED,
+                     VALIDATED,
+                     PAID,
+                     CANCELLED
+                   )
+
+computed_at
+validated_at
+paid_at
+
+created_by         FK → users.id
+
+created_at
+updated_at
+```
+
+Example:
+
+```text
+September 2026 Payroll
+
+Period:
+01 Sep → 30 Sep
+
+Structure:
+Regular
+
+Employees:
+20
+```
+
+Notice: **Payroll table nahi hai. Payrun payroll batch represent karta hai.**
+
+---
+
+# 16. `payslips`
+
+One employee ka payroll result for one payrun.
+
+```text
+payslips
+──────────────
+id                 PK
+
+payrun_id          FK → payruns.id
+employee_id        FK → employees.id
+contract_id        FK → contracts.id
+
+period_start
+period_end
+
+gross_amount       DECIMAL(15,2)
+deduction_amount   DECIMAL(15,2)
+net_amount         DECIMAL(15,2)
+
+status             ENUM(
+                     DRAFT,
+                     COMPUTED,
+                     VALIDATED,
+                     PAID,
+                     CANCELLED
+                   )
+
+pdf_path           NULL
+created_at
+updated_at
+
+UNIQUE(payrun_id, employee_id)
+```
+
+Example:
+
+```text
+September Payrun
+       ↓
+Rahul Payslip
+       ↓
+Gross = ₹83,000
+Deduction = ₹8,600
+Net = ₹74,400
+```
+
+---
+
+# 17. `payslip_lines`
+
+Payslip ka detailed breakdown.
+
+```text
+payslip_lines
+───────────────
+id                 PK
+
+payslip_id         FK → payslips.id
+salary_rule_id     FK → salary_rules.id
+
+code
+name
+category_id        FK → salary_rule_categories.id
+
+sequence
+
+quantity
+rate
+amount
+
+created_at
+```
+
+Example:
+
+```text
+Payslip #1001
+
+BASIC             ₹55,000
+HRA               ₹18,000
+SPECIAL_ALLOWANCE ₹10,000
+PF                -₹6,600
+TAX               -₹2,000
+NET               ₹74,400
+```
+
+---
+
+# 18. `users`
+
+Login/system users.
+
+```text
+users
+──────────────
+id                 PK
+name
+email              UNIQUE
+password_hash
+employee_id        FK → employees.id NULL
+status
+last_login_at
+created_at
+updated_at
+```
+
+---
+
+# 19. `roles`
+
+RBAC roles.
+
+```text
+roles
+──────────────
+id                 PK
+name               UNIQUE
+description
+created_at
+updated_at
+```
+
+Examples:
+
+```text
+Admin
+HR Manager
+HR Payroll User
+HR Payroll Manager
+Employee
+```
+
+---
+
+# 20. `permissions`
+
+Individual permissions.
+
+```text
+permissions
+──────────────
+id                 PK
+name               UNIQUE
+resource
+action
+description
+```
+
+Examples:
+
+```text
+employee:create
+employee:read
+employee:update
+
+payrun:create
+payrun:read
+payrun:update
+
+salary_rule:create
+salary_rule:read
+```
+
+---
+
+# 21. `role_permissions`
+
+Role ↔ Permission many-to-many.
+
+```text
+role_permissions
+─────────────────
+id                 PK
+role_id            FK → roles.id
+permission_id      FK → permissions.id
+
+UNIQUE(role_id, permission_id)
+```
+
+**But ek table aur chahiye:** `user_roles`, because one user can have one/multiple roles.
+
+### 22. `user_roles`
+
+```text
+user_roles
+────────────
+id                 PK
+user_id            FK → users.id
+role_id            FK → roles.id
+
+UNIQUE(user_id, role_id)
+```
+
+---
+
+# Final complete list
+
+So agar **proper normalized architecture** banani hai, meri recommended list hai:
+
+```text
+1.  employees
+2.  departments
+3.  job_positions
+
+4.  contracts
+
+5.  working_schedules
+6.  working_schedule_days
+7.  attendance
+
+8.  time_off_types
+9.  time_off_allocations
+10. time_off_requests
+
+11. salary_structures
+12. salary_rule_categories
+13. salary_rules
+14. salary_structure_rules
+
+15. payruns
+16. payslips
+17. payslip_lines
+
+18. users
+19. roles
+20. permissions
+21. role_permissions
+22. user_roles
+```
+
+### Core flow in one diagram
+
+```text
+                         ┌──────────────┐
+                         │  EMPLOYEES   │
+                         └──────┬───────┘
+                                │
+              ┌─────────────────┼──────────────────┐
+              ▼                 ▼                  ▼
+         CONTRACTS          ATTENDANCE        TIME OFF
+              │                                  │
+       ┌──────┼──────┐                    ┌──────┴──────┐
+       ▼      ▼      ▼                    ▼             ▼
+   POSITION  DEPT  SCHEDULE             TYPE       ALLOCATION
+                         │                              │
+                         ▼                              ▼
+                  SCHEDULE DAYS                    REQUEST
+
+
+              CONTRACT
+                 │
+                 ▼
+        SALARY STRUCTURE
+                 │
+                 ▼
+        STRUCTURE_RULES
+                 │
+                 ▼
+           SALARY RULES
+                 │
+                 ▼
+              PAYRUN
+                 │
+          ┌──────┴──────┐
+          ▼             ▼
+      PAYSLIP        PAYSLIP
+          │
+          ▼
+    PAYSLIP_LINES
+```
+
+**One architectural correction I'd make before you start coding:** `department_id`, `working_schedule_id`, and similar employment attributes should have a deliberate ownership decision. If they are contract-specific terms, keep them on `contracts`; if they're immutable organizational relationships, reference them elsewhere. For your hackathon, keeping them on `contracts` is defensible because it preserves the employee's historical employment context.
