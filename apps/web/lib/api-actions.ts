@@ -396,8 +396,53 @@ export async function createContractAction(data: {
 }
 
 // -------------------------------------------------------------
+// -------------------------------------------------------------
 // ATTENDANCE
 // -------------------------------------------------------------
+
+export async function getAttendanceAction() {
+  try {
+    const records = await prisma.attendance.findMany({
+      orderBy: { date: "desc" },
+      take: 100,
+      include: {
+        employee: true,
+      },
+    });
+
+    const statusMap: Record<string, "Present" | "Late" | "Absent" | "Half Day"> = {
+      PRESENT: "Present",
+      LATE: "Late",
+      ABSENT: "Absent",
+      HALF_DAY: "Half Day",
+    };
+
+    return records.map((r) => {
+      const checkInStr = r.checkIn
+        ? r.checkIn.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+        : "-";
+      const checkOutStr = r.checkOut
+        ? r.checkOut.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+        : "-";
+
+      const hours = (r.workedMinutes / 60).toFixed(2);
+
+      return {
+        id: r.id.length > 8 ? `ATT-${r.id.slice(-4).toUpperCase()}` : r.id,
+        rawId: r.id,
+        employee: r.employee ? `${r.employee.firstName} ${r.employee.lastName}` : "Staff Member",
+        employeeId: r.employeeId,
+        date: r.date.toISOString().split("T")[0] || "",
+        checkIn: checkInStr,
+        checkOut: checkOutStr,
+        workedHours: r.workedMinutes > 0 ? hours : (r.checkIn && !r.checkOut ? "In Progress" : "0.00"),
+        status: statusMap[r.status] || "Present",
+      };
+    });
+  } catch {
+    return [];
+  }
+}
 
 export async function createAttendanceAction(data: {
   employeeId: string;
@@ -429,21 +474,89 @@ export async function createAttendanceAction(data: {
       return { success: true, attendance: await res.json() };
     }
   } catch {
-    // Fallback
+    // Fallback to direct Prisma handling below
   }
 
   try {
-    const record = await prisma.attendance.create({
-      data: {
-        employeeId: data.employeeId,
-        date: new Date(data.date),
-        checkIn: data.checkIn ? new Date(`${data.date}T${data.checkIn}:00`) : new Date(),
-        checkOut: data.checkOut ? new Date(`${data.date}T${data.checkOut}:00`) : null,
-        status: data.status,
+    // 1. Resolve real employee ID (support cuid, employeeNumber, or session name)
+    const employee = await prisma.employee.findFirst({
+      where: {
+        OR: [
+          { id: data.employeeId },
+          { employeeNumber: data.employeeId },
+        ],
+      },
+      include: {
+        contracts: {
+          where: { status: "ACTIVE" },
+          take: 1,
+        },
       },
     });
+
+    if (!employee) {
+      return { success: false, error: `Employee record not found for "${data.employeeId}"` };
+    }
+
+    const realEmployeeId = employee.id;
+    const workingScheduleId = employee.contracts[0]?.workingScheduleId || null;
+
+    // 2. Format normalized UTC midnight date for unique constraint
+    const dateObj = new Date(data.date);
+    dateObj.setUTCHours(0, 0, 0, 0);
+
+    const checkInDate = data.checkIn ? new Date(`${data.date}T${data.checkIn}:00`) : undefined;
+    const checkOutDate = data.checkOut ? new Date(`${data.date}T${data.checkOut}:00`) : undefined;
+
+    let workedMinutes = 0;
+    if (checkInDate && checkOutDate) {
+      const diffMs = checkOutDate.getTime() - checkInDate.getTime();
+      workedMinutes = Math.max(0, Math.round(diffMs / 60000));
+    } else if (data.status === "PRESENT") {
+      workedMinutes = 480;
+    } else if (data.status === "HALF_DAY") {
+      workedMinutes = 240;
+    }
+
+    // 3. Upsert into PostgreSQL database
+    const record = await prisma.attendance.upsert({
+      where: {
+        employeeId_date: {
+          employeeId: realEmployeeId,
+          date: dateObj,
+        },
+      },
+      update: {
+        checkIn: checkInDate,
+        checkOut: checkOutDate,
+        workedMinutes,
+        status: data.status,
+        correctionReason: data.remarks || null,
+        workingScheduleId,
+      },
+      create: {
+        employeeId: realEmployeeId,
+        date: dateObj,
+        checkIn: checkInDate,
+        checkOut: checkOutDate,
+        workedMinutes,
+        status: data.status,
+        correctionReason: data.remarks || null,
+        workingScheduleId,
+      },
+      include: {
+        employee: true,
+      },
+    });
+
     revalidatePath("/attendance");
-    return { success: true, attendance: record };
+    return {
+      success: true,
+      attendance: {
+        ...record,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+      },
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to record attendance";
     return { success: false, error: msg };
@@ -458,7 +571,7 @@ export async function quickCheckInAction(employeeId: string, type: "IN" | "OUT")
   return createAttendanceAction({
     employeeId,
     date: dateStr,
-    checkIn: type === "IN" ? timeStr : "09:00",
+    checkIn: type === "IN" ? timeStr : undefined,
     checkOut: type === "OUT" ? timeStr : undefined,
     status: "PRESENT",
     remarks: `Quick employee ${type === "IN" ? "Check-in" : "Check-out"} via ledger`,
@@ -495,21 +608,61 @@ export async function createTimeOffRequestAction(data: {
       return { success: true, request: await res.json() };
     }
   } catch {
-    // Fallback
+    // Fallback to direct Prisma handling below
   }
 
   try {
+    const employee = await prisma.employee.findFirst({
+      where: {
+        OR: [
+          { id: data.employeeId },
+          { employeeNumber: data.employeeId },
+        ],
+      },
+    });
+
+    if (!employee) {
+      return { success: false, error: `Employee record not found (${data.employeeId})` };
+    }
+
+    let type = await prisma.timeOffType.findFirst({
+      where: {
+        OR: [
+          { id: data.leaveTypeId },
+          { code: data.leaveTypeId },
+          { name: { contains: data.leaveTypeId, mode: "insensitive" } },
+        ],
+      },
+    });
+
+    if (!type) {
+      type = await prisma.timeOffType.findFirst();
+    }
+
+    if (!type) {
+      return { success: false, error: "No active time off type found." };
+    }
+
+    const start = new Date(data.startDate);
+    const end = new Date(data.endDate);
+    const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
     const req = await prisma.timeOffRequest.create({
       data: {
-        employeeId: data.employeeId,
-        timeOffTypeId: data.leaveTypeId,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        quantity: 1,
+        employeeId: employee.id,
+        timeOffTypeId: type.id,
+        startDate: start,
+        endDate: end,
+        quantity: diffDays,
         reason: data.reason || null,
         status: "SUBMITTED",
       },
+      include: {
+        employee: true,
+        timeOffType: true,
+      },
     });
+
     revalidatePath("/time-off/requests");
     return { success: true, request: req };
   } catch (err: unknown) {

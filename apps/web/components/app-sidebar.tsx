@@ -23,14 +23,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type Session = {
+export interface Session {
   user: {
     id: string;
     name: string;
     role: "ADMIN" | "HR_MANAGER" | "PAYROLL_MANAGER" | "HR_PAYROLL_MANAGER" | "HR_PAYROLL_USER" | "EMPLOYEE";
     employeeId: string | null;
   };
-};
+}
 
 export const MOCK_SESSION: Session = {
   user: {

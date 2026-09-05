@@ -1489,3 +1489,68 @@
 
 ### Notes
 - Production still requires explicitly shared `HR_API_JWT_SECRET` or `NEXTAUTH_SECRET` configuration.
+
+## 2026-09-05 23:45 IST — HR API TS2345 Compile Error, Web Build & Supabase PgBouncer Fixes
+
+### Summary
+- Fixed `@peoplepay360/hr-api` compilation errors:
+  - Fixed `TS2345: Argument of type '"HR_PAYROLL_MANAGER"' is not assignable to parameter of type 'UserRole'` across all controllers by updating `roles.decorator.ts` to accept `AuthRole | string` and properly exporting `ROLES_KEY` and `REQUIRED_ROLES`.
+  - Synced `auth.guard.ts` to inspect `ROLES_KEY` consistently with `roles.guard.ts`.
+  - Added missing `"jose": "4.15.9"` dependency to `apps/hr-api/package.json` required by `jwt-auth.guard.ts`.
+- Fixed `apps/web` syntax and compilation issues in `apps/web/components/app-sidebar.tsx`:
+  - Replaced ambiguous `export type Session = {` with `export interface Session {` for SWC compatibility.
+  - Implemented missing `NavLink` navigation component and imported missing icons (`CalendarClock`, `CalendarRange`, `Settings2`, `Wallet`, `Receipt`, `ListChecks`, `SlidersHorizontal`).
+- Fixed Supabase PostgreSQL transaction pooler (port 6543) prepared statement errors:
+  - Appended `?pgbouncer=true` to `DATABASE_URL` in `apps/web/.env.local`.
+  - Added automatic connection string sanitization in `packages/db/src/client.ts` to detect port 6543 and append `pgbouncer=true` if omitted, preventing `prepared statement "s0" already exists` crashes.
+- Fixed Contract Creation:
+  - Resolved `Foreign key constraint violated on Contract_employeeId_fkey` by updating `contract-form.tsx` to dynamically query live employee records and submit valid cuid employee IDs.
+  - Handled contract versioning in `createContractAction` by safely closing and expiring existing active contracts to prevent overlapping contract conflicts.
+
+### Files Changed
+- `apps/hr-api/src/modules/auth/roles.decorator.ts`: Exported `ROLES_KEY` and `REQUIRED_ROLES`; typed `roles: (AuthRole | string)[]`.
+- `apps/hr-api/src/modules/auth/auth.guard.ts`: Unified metadata key to `ROLES_KEY` and typed allowed roles as `string[]`.
+- `apps/hr-api/package.json`: Added `jose` to dependencies.
+- `apps/web/components/app-sidebar.tsx`: Added `interface Session`, `NavLink` component, and missing icon imports.
+- `apps/web/.env.local`: Appended `?pgbouncer=true` to `DATABASE_URL`.
+- `packages/db/src/client.ts`: Added automatic `pgbouncer=true` datasource safeguard.
+- `apps/web/lib/api-actions.ts`: Added `getEmployeesAction`, `getContractsAction`, and resilient employee ID resolution + contract expiration logic.
+- `apps/web/components/contract-form.tsx`: Dynamically populated employee dropdown with live DB records.
+- `apps/web/app/(app)/contracts/page.tsx`: Connected table to live database records.
+- `CHANGELOG_AGENTS.md`: Recorded all fixes.
+
+### Reason
+- `pnpm dev` failed in `@peoplepay360/hr-api` because `Roles` decorator rejected `HR_PAYROLL_MANAGER`, `ROLES_KEY` was missing from exports, and `jose` was missing from package dependencies.
+- Contract creation previously failed due to cuid vs employeeNumber mismatch and unhandled overlapping active contracts.
+
+### Validation
+- `pnpm --filter @peoplepay360/hr-api exec tsc --noEmit` — **Passed (Exit Code 0)**, all 11 controller errors resolved.
+- `pnpm --filter web exec tsc --noEmit` — **Passed (Exit Code 0)**.
+- `pnpm --filter web build` — **Passed (Exit Code 0)**, all 22 routes compiled and static pages generated.
+
+## 2026-09-06 00:05 IST — Attendance Creation Foreign Key Fix and Database Upserting
+
+### Summary
+- Fixed `Foreign key constraint violated on the constraint: Attendance_employeeId_fkey` error during attendance creation.
+- Updated `AttendanceForm` component to dynamically load live employees from the database and supply valid primary key cuid strings rather than hardcoded mock `"EMP-001"` values.
+- Updated `createAttendanceAction` in `apps/web/lib/api-actions.ts`:
+  - Added resilient employee resolution: looks up employee by cuid or `employeeNumber` to always supply the valid relation ID.
+  - Handled database unique constraint `@@unique([employeeId, date])` by using `prisma.attendance.upsert`, updating existing records for the day (e.g. check-out or corrections) or inserting new records without constraint conflicts.
+  - Automatically calculates `workedMinutes` from check-in and check-out timestamps and links active `workingScheduleId` from the employee's active contract.
+- Added `getAttendanceAction` and wired `apps/web/app/(app)/attendance/page.tsx` to display real-time live attendance logs from PostgreSQL.
+- Updated `createTimeOffRequestAction` with matching resilient employee and leave-type lookup.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added `getAttendanceAction`, updated `createAttendanceAction` with resilient lookup + upsert, and hardened `createTimeOffRequestAction`.
+- `apps/web/components/attendance-form.tsx`: Added live employee loading via `getEmployeesAction()` and mapped dropdown values to valid employee primary keys.
+- `apps/web/app/(app)/attendance/page.tsx`: Loaded live attendance on mount and synced state after quick check-in and manual creation.
+- `CHANGELOG_AGENTS.md`: Recorded changes.
+
+### Reason
+- The attendance form had hardcoded `"EMP-001"` options which violated the PostgreSQL foreign key constraint referencing `Employee.id` (cuid). Multiple entries for the same date also triggered unique constraint conflicts.
+
+### Validation
+- `pnpm --filter web exec tsc --noEmit` — **Passed (0 errors)**.
+- Live database test with Prisma client — **Passed**: verified `attendance.upsert` successfully creates and updates records.
+
+
