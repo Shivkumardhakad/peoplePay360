@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { EmployeeForm, type EmployeeFormValues } from "@/components/employee-form";
-import { Plus, Search, Users, ArrowUpRight, List, LayoutGrid, Building2, Briefcase, UserCheck, Clock, UserX } from "lucide-react";
+import { Plus, Search, Users, ArrowUpRight, List, LayoutGrid, Building2, Briefcase, UserCheck, Clock, UserX, Pencil } from "lucide-react";
+import { getEmployeesAction } from "@/lib/api-actions";
 
 interface EmployeeItem {
   id: string;
@@ -37,15 +38,27 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<EmployeeItem[]>(INITIAL_EMPLOYEES);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingEmp, setEditingEmp] = useState<EmployeeItem | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
+  useEffect(() => {
+    getEmployeesAction().then((liveData) => {
+      if (liveData && liveData.length > 0) {
+        setEmployees(
+          liveData.map((e) => ({
+            id: e.employeeNumber || e.id,
+            name: e.name,
+            department: e.department,
+            position: e.position,
+            status: e.status === "ACTIVE" ? "Active" : e.status === "ON_LEAVE" ? "On Leave" : "Inactive",
+          }))
+        );
+      }
+    });
+  }, []);
+
   const role = session?.user?.role || "ADMIN";
-  const canAddEmployee =
-    role === "ADMIN" ||
-    role === "HR_MANAGER" ||
-    role === "HR_PAYROLL_MANAGER" ||
-    role === "PAYROLL_MANAGER" ||
-    role === "HR_PAYROLL_USER";
+  const canAddEmployee = role === "ADMIN" || role === "HR_MANAGER";
 
   const filteredEmployees = employees.filter(
     (e) =>
@@ -65,6 +78,22 @@ export default function EmployeesPage() {
     };
     setEmployees([newEmp, ...employees]);
     setDialogOpen(false);
+  };
+
+  const handleUpdated = (id: string, data: EmployeeFormValues) => {
+    setEmployees((prev) =>
+      prev.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              name: `${data.firstName} ${data.lastName}`,
+              department: data.department,
+              status: data.status === "ACTIVE" ? "Active" : data.status === "ON_LEAVE" ? "On Leave" : "Inactive",
+            }
+          : e
+      )
+    );
+    setEditingEmp(null);
   };
 
   return (
@@ -93,6 +122,30 @@ export default function EmployeesPage() {
           </Dialog>
         )}
       </div>
+
+      {/* Edit Employee Dialog */}
+      <Dialog open={Boolean(editingEmp)} onOpenChange={(open) => !open && setEditingEmp(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Employee ({editingEmp?.id})</DialogTitle>
+          </DialogHeader>
+          {editingEmp && (
+            <EmployeeForm
+              employeeId={editingEmp.id}
+              defaultValues={{
+                firstName: editingEmp.name.split(" ")[0] || "",
+                lastName: editingEmp.name.split(" ").slice(1).join(" ") || "",
+                email: `${editingEmp.name.toLowerCase().replace(/\s+/g, ".")}@company.com`,
+                department: editingEmp.department,
+                status: editingEmp.status === "Active" ? "ACTIVE" : editingEmp.status === "On Leave" ? "ON_LEAVE" : "INACTIVE",
+                dateOfJoining: "2023-01-15",
+              }}
+              onSuccess={(data) => handleUpdated(editingEmp.id, data)}
+              onCancel={() => setEditingEmp(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Toolbar */}
       <div className="p-2 rounded-lg border border-border bg-card flex items-center justify-between gap-3">
@@ -147,7 +200,7 @@ export default function EmployeesPage() {
                 <TableHead>Department</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead className="text-right">Status</TableHead>
-                <TableHead className="w-[40px]"></TableHead>
+                <TableHead className="w-[70px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -183,12 +236,26 @@ export default function EmployeesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right p-1">
-                      <Link
-                        href={`/employees/${employee.id}`}
-                        className="inline-flex p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                      >
-                        <ArrowUpRight className="w-3.5 h-3.5" />
-                      </Link>
+                      <div className="flex items-center justify-end gap-1">
+                        {canAddEmployee && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => setEditingEmp(employee)}
+                            title="Edit Employee"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        <Link
+                          href={`/employees/${employee.id}`}
+                          className="inline-flex p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                          title="View Profile"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -239,12 +306,26 @@ export default function EmployeesPage() {
                             </Link>
                             <span className="text-[10px] font-mono text-muted-foreground">{emp.id}</span>
                           </div>
-                          <Link
-                            href={`/employees/${emp.id}`}
-                            className="p-1 rounded text-muted-foreground hover:text-foreground opacity-70 group-hover:opacity-100 transition-opacity"
-                          >
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                          </Link>
+                          <div className="flex items-center gap-1">
+                            {canAddEmployee && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground opacity-70 group-hover:opacity-100"
+                                onClick={() => setEditingEmp(emp)}
+                                title="Edit Employee"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                            )}
+                            <Link
+                              href={`/employees/${emp.id}`}
+                              className="p-1 rounded text-muted-foreground hover:text-foreground opacity-70 group-hover:opacity-100 transition-opacity"
+                              title="View Profile"
+                            >
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                            </Link>
+                          </div>
                         </div>
 
                         <div className="space-y-1 text-[11px] text-muted-foreground pt-1 border-t border-border/50">

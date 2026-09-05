@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, ShieldCheck, Loader2, KeyRound } from "lucide-react";
+import { Plus, Search, ShieldCheck, Loader2, KeyRound, LayoutList, Kanban, Mail, UserCheck } from "lucide-react";
 import {
   getUsersAction,
   createUserAction,
@@ -53,6 +53,7 @@ export default function UsersPage() {
   const { toast } = useToast();
   const [users, setUsers] = useState<SystemUser[]>(INITIAL_USERS);
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -102,13 +103,13 @@ export default function UsersPage() {
     );
   }, [search, users]);
 
-  const handleResetPassword = async (id: string, userName: string) => {
-    setActionLoadingId(id);
+  const handleResetPassword = async (userId: string, userName: string) => {
+    setActionLoadingId(userId);
     try {
-      const res = await resetUserPasswordAction(id);
+      const res = await resetUserPasswordAction(userId);
       if (res.success) {
         toast({
-          title: "Password Reset Successful",
+          title: "Password Reset Success",
           description: `Temporary password for ${userName} set to: ${res.temporaryPassword}`,
           type: "success",
         });
@@ -202,6 +203,12 @@ export default function UsersPage() {
     }
   };
 
+  const adminUsers = filteredUsers.filter((u) => u.role === "ADMIN");
+  const hrManagerUsers = filteredUsers.filter((u) => u.role === "HR_MANAGER");
+  const payrollMgrUsers = filteredUsers.filter((u) => u.role === "PAYROLL_MANAGER");
+  const payrollUserUsers = filteredUsers.filter((u) => u.role === "HR_PAYROLL_USER");
+  const employeeUsers = filteredUsers.filter((u) => u.role === "EMPLOYEE");
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -215,89 +222,113 @@ export default function UsersPage() {
           </p>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5 h-8">
-              <Plus className="w-3.5 h-3.5" />
-              Add User
+        <div className="flex items-center gap-2">
+          {/* View Toggle */}
+          <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2.5 text-xs gap-1.5"
+              onClick={() => setViewMode("list")}
+            >
+              <LayoutList className="w-3.5 h-3.5" />
+              List
             </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create System User</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAddUser} className="space-y-4 pt-2">
-              {error && (
-                <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
-                  {error}
-                </p>
-              )}
-              <div className="space-y-1.5">
-                <Label htmlFor="name" className="text-xs font-medium">Full Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g. Sarah Connor"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
+            <Button
+              variant={viewMode === "kanban" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2.5 text-xs gap-1.5"
+              onClick={() => setViewMode("kanban")}
+            >
+              <Kanban className="w-3.5 h-3.5" />
+              Kanban
+            </Button>
+          </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-xs font-medium">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="sarah@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="font-mono text-xs"
-                  required
-                />
-              </div>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1.5 h-8">
+                <Plus className="w-3.5 h-3.5" />
+                Add User
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create System User</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddUser} className="space-y-4 pt-2">
+                {error && (
+                  <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                    {error}
+                  </p>
+                )}
+                <div className="space-y-1.5">
+                  <Label htmlFor="name" className="text-xs font-medium">Full Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g. Sarah Connor"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="role" className="text-xs font-medium">Assigned Role</Label>
-                <select
-                  id="role"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as SystemUserRole)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="ADMIN">ADMIN (Full Access)</option>
-                  <option value="HR_MANAGER">HR_MANAGER (People, Contracts, Time-off)</option>
-                  <option value="PAYROLL_MANAGER">PAYROLL_MANAGER (Payroll & Ledger)</option>
-                  <option value="HR_PAYROLL_USER">HR_PAYROLL_USER (Payroll & Time-off Assistant)</option>
-                  <option value="EMPLOYEE">EMPLOYEE (Self-Service Portal)</option>
-                </select>
-              </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs font-medium">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="sarah@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="font-mono text-xs"
+                    required
+                  />
+                </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-xs font-medium">Temporary Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="font-mono text-xs"
-                  minLength={8}
-                  required
-                />
-              </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="role" className="text-xs font-medium">Assigned Role</Label>
+                  <select
+                    id="role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as SystemUserRole)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="ADMIN">ADMIN (Full Access)</option>
+                    <option value="HR_MANAGER">HR_MANAGER (People, Contracts, Time-off)</option>
+                    <option value="PAYROLL_MANAGER">PAYROLL_MANAGER (Payroll & Ledger)</option>
+                    <option value="HR_PAYROLL_USER">HR_PAYROLL_USER (Payroll & Time-off Assistant)</option>
+                    <option value="EMPLOYEE">EMPLOYEE (Self-Service Portal)</option>
+                  </select>
+                </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-border">
-                <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(false)} disabled={submitting}>
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" disabled={submitting} className="gap-1.5 h-8">
-                  {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {submitting ? "Creating User..." : "Create User"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="space-y-1.5">
+                  <Label htmlFor="password" className="text-xs font-medium">Temporary Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="font-mono text-xs"
+                    minLength={8}
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(false)} disabled={submitting}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" size="sm" disabled={submitting} className="gap-1.5 h-8">
+                    {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {submitting ? "Creating User..." : "Create User"}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -319,78 +350,225 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[110px]">User ID</TableHead>
-              <TableHead>User Name</TableHead>
-              <TableHead>Email Address</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead className="text-right">Status</TableHead>
-              <TableHead className="w-[110px] text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && users.length === 0 ? (
+      {/* Content View */}
+      {viewMode === "list" ? (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                    <span>Loading users...</span>
-                  </div>
-                </TableCell>
+                <TableHead className="w-[110px]">User ID</TableHead>
+                <TableHead>User Name</TableHead>
+                <TableHead>Email Address</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="w-[110px] text-right">Action</TableHead>
               </TableRow>
-            ) : filteredUsers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
-                  No users found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredUsers.map((u) => {
-                const isResetting = actionLoadingId === u.id;
+            </TableHeader>
+            <TableBody>
+              {loading && users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                      <span>Loading users...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                    No users found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((u) => {
+                  const isResetting = actionLoadingId === u.id;
 
-                return (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground truncate max-w-[110px]">{u.id}</TableCell>
-                    <TableCell className="font-medium text-xs">{u.name}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{u.email}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-[10px] font-mono">
-                        {formatRoleLabel(u.role)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="success" className="text-[10px] font-mono">
-                        Active
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right p-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleResetPassword(u.id, u.name)}
-                        disabled={isResetting}
-                        className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1"
-                        title="Reset user password"
-                      >
-                        {isResetting ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <KeyRound className="w-3 h-3 text-muted-foreground" />
-                        )}
-                        <span>{isResetting ? "Resetting..." : "Reset PW"}</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                  return (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground truncate max-w-[110px]">{u.id}</TableCell>
+                      <TableCell className="font-medium text-xs">{u.name}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{u.email}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px] font-mono">
+                          {formatRoleLabel(u.role)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="success" className="text-[10px] font-mono">
+                          Active
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right p-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleResetPassword(u.id, u.name)}
+                          disabled={isResetting}
+                          className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1"
+                          title="Reset user password"
+                        >
+                          {isResetting ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <KeyRound className="w-3 h-3 text-muted-foreground" />
+                          )}
+                          <span>{isResetting ? "Resetting..." : "Reset PW"}</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        /* Kanban View */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
+          {/* Admin Column */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-violet-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  Admin ({adminUsers.length})
+                </h3>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              {adminUsers.map((u) => (
+                <div key={u.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-violet-500/40 transition-all space-y-2">
+                  <div className="flex items-start justify-between gap-1">
+                    <h4 className="text-xs font-semibold text-foreground flex items-center gap-1">
+                      <UserCheck className="w-3.5 h-3.5 text-violet-500" /> {u.name}
+                    </h4>
+                    <Badge variant="outline" className="text-[9px] font-mono shrink-0">
+                      ADMIN
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
+                    <Mail className="w-3 h-3 shrink-0" /> {u.email}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* HR Manager Column */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-sky-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  HR Mgr ({hrManagerUsers.length})
+                </h3>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              {hrManagerUsers.map((u) => (
+                <div key={u.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-sky-500/40 transition-all space-y-2">
+                  <div className="flex items-start justify-between gap-1">
+                    <h4 className="text-xs font-semibold text-foreground">{u.name}</h4>
+                    <Badge variant="outline" className="text-[9px] font-mono shrink-0">
+                      HR MGR
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
+                    <Mail className="w-3 h-3 shrink-0" /> {u.email}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Payroll Manager Column */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  Payroll Mgr ({payrollMgrUsers.length})
+                </h3>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              {payrollMgrUsers.map((u) => (
+                <div key={u.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-emerald-500/40 transition-all space-y-2">
+                  <div className="flex items-start justify-between gap-1">
+                    <h4 className="text-xs font-semibold text-foreground">{u.name}</h4>
+                    <Badge variant="outline" className="text-[9px] font-mono shrink-0">
+                      PAYROLL MGR
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
+                    <Mail className="w-3 h-3 shrink-0" /> {u.email}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Payroll User Column */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  Payroll Asst ({payrollUserUsers.length})
+                </h3>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              {payrollUserUsers.map((u) => (
+                <div key={u.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-amber-500/40 transition-all space-y-2">
+                  <div className="flex items-start justify-between gap-1">
+                    <h4 className="text-xs font-semibold text-foreground">{u.name}</h4>
+                    <Badge variant="outline" className="text-[9px] font-mono shrink-0">
+                      ASST
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
+                    <Mail className="w-3 h-3 shrink-0" /> {u.email}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Employee Column */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  Employees ({employeeUsers.length})
+                </h3>
+              </div>
+            </div>
+            <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+              {employeeUsers.slice(0, 15).map((u) => (
+                <div key={u.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-border transition-all space-y-2 opacity-90">
+                  <div className="flex items-start justify-between gap-1">
+                    <h4 className="text-xs font-semibold text-foreground truncate">{u.name}</h4>
+                    <Badge variant="secondary" className="text-[9px] font-mono shrink-0">
+                      EMP
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
+                    <Mail className="w-3 h-3 shrink-0" /> {u.email}
+                  </p>
+                </div>
+              ))}
+              {employeeUsers.length > 15 && (
+                <p className="text-[11px] font-mono text-center text-muted-foreground pt-1">
+                  + {employeeUsers.length - 15} more employees
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

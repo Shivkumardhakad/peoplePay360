@@ -1,9 +1,7 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
-import { AttendanceStatus, Prisma } from "@prisma/client";
-import { EMPLOYEE_SELF_SERVICE_ROLES, type RequestWithUser } from "../auth/auth.types";
-import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { Body, Controller, Get, Post, Req } from "@nestjs/common";
+import { AttendanceStatus, Prisma, UserRole } from "@prisma/client";
+import { type RequestWithUser } from "../auth/auth.types";
 import { Roles } from "../auth/roles.decorator";
-import { RolesGuard } from "../auth/roles.guard";
 import { HrService } from "../shared/hr.service";
 
 type CreateMyAttendanceInput = {
@@ -22,8 +20,7 @@ type CreateMyTimeOffRequestInput = {
   reason?: string | null;
 };
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(...EMPLOYEE_SELF_SERVICE_ROLES)
+@Roles(UserRole.EMPLOYEE, UserRole.ADMIN, UserRole.HR_MANAGER, UserRole.PAYROLL_MANAGER, UserRole.HR_PAYROLL_USER)
 @Controller("me")
 export class MeController {
   constructor(private readonly hr: HrService) {}

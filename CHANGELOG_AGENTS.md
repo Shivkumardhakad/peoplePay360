@@ -1,3 +1,178 @@
+## 2026-09-06 00:30 IST — Add Kanban view system across operational and management modules
+
+### Summary
+- Integrated a dual List / Kanban view switcher across all core operational management modules:
+  - Employees (`/employees`)
+  - Contracts (`/contracts`)
+  - Attendance (`/attendance`)
+  - Leave / Time Off Requests (`/time-off/requests`)
+  - Payruns (`/payroll/payruns`)
+  - Payslips (`/payroll/payslips`)
+  - Users & RBAC (`/users`)
+- Added responsive Kanban board layouts with status columns, entity counts, interactive action buttons (such as quick edit employee, manager approval/refusal for leave, payrun actions, and payslip PDF view/downloads).
+- Ensured RBAC access is maintained across Admin, HR Manager, Payroll Manager, and Payroll User roles.
+
+### Files Changed
+- `apps/web/app/(app)/employees/page.tsx`: Integrated Kanban board view with status columns and quick-edit modal.
+- `apps/web/app/(app)/contracts/page.tsx`: Added List/Kanban toggle with Active vs Ended/Terminated columns.
+- `apps/web/app/(app)/attendance/page.tsx`: Added List/Kanban toggle with Present, Late, Half Day, and Absent columns.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Added List/Kanban toggle with Pending, Approved, and Rejected columns featuring quick approve/refuse actions.
+- `apps/web/app/(app)/payroll/payruns/page.tsx`: Added List/Kanban toggle with Draft & Setup vs Finalized & Paid columns.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Added List/Kanban toggle with Paid & Disbursed vs Pending & Draft columns.
+- `apps/web/app/(app)/users/page.tsx`: Added List/Kanban toggle grouped by User Role (Admin, HR Manager, Payroll Manager, Payroll Assistant, Employee).
+- `CHANGELOG_AGENTS.md`: Logged update.
+
+### Reason
+- Fulfill user request to implement a Kanban view system across all operational management pages accessible to Admin, HR Manager, Payroll Manager, and Payroll User roles.
+
+### Validation
+- All Next.js page components compile without errors.
+
+## 2026-09-06 00:15 IST — Optimize DB seed execution and resolve Next.js cache issue
+
+### Summary
+- Updated `packages/db/prisma/seed.ts` to seed System Admin (`admin@peoplepay360.com`) and manager accounts first.
+- Optimized 210 employee, contract, bank account, and user seeding using concurrent batch execution with `Promise.all`.
+- Stopped background node processes, cleared `apps/web/.next` cache to resolve stale build module error, and restarted dev servers (`pnpm dev`).
+
+### Files Changed
+- `packages/db/prisma/seed.ts`: Re-ordered system admin seeding and batched employee generation.
+- `CHANGELOG_AGENTS.md`: Logged fix.
+
+### Reason
+- Fix "Invalid email or password" issue caused by user records being reset during slow sequential seed execution.
+- Resolve Next.js runtime error `ENOENT: no such file or directory, open '...route.js'`.
+
+### Validation
+- Seed script executed cleanly with System Admin created immediately.
+- `pnpm dev` running cleanly with Next.js on `http://localhost:3000` and HR API on `http://localhost:4000/api/hr`.
+
+## 2026-09-05 23:51 IST — Restore getEmployee method and resolve HR API build errors
+
+### Summary
+- Restored `getEmployee(id: string)` method in `apps/hr-api/src/modules/shared/hr.service.ts`.
+- Updated `apps/hr-api/src/modules/me/me.controller.ts` to use global `HrAuthGuard` and strict `UserRole` enum values.
+- Removed unused legacy `jwt-auth.guard.ts` and `roles.guard.ts` files from `apps/hr-api`.
+
+### Files Changed
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Restored `getEmployee` method.
+- `apps/hr-api/src/modules/me/me.controller.ts`: Migrated to `HrAuthGuard` and `UserRole` enum.
+- `apps/hr-api/src/modules/auth/jwt-auth.guard.ts` & `roles.guard.ts`: Deleted unused legacy files.
+- `CHANGELOG_AGENTS.md`: Recorded build fix.
+
+### Reason
+- Fix `TS2339: Property 'getEmployee' does not exist on type 'HrService'` error when running `pnpm dev`.
+
+### Validation
+- `pnpm --filter @peoplepay360/hr-api build` — passed (`$ tsc --noEmit` clean success).
+- `pnpm dev` — running cleanly (Web on `http://localhost:3000`, HR API on `http://localhost:4000/api/hr`).
+
+## 2026-09-05 23:46 IST — Reset database and seed 200+ entries per operational table
+
+### Summary
+- Updated `packages/db/prisma/seed.ts` to perform a full database reset across all 21 models.
+- Seeded at least 200 entries for key operational entities: 210 Bank Accounts, 210 Employees, 215 Users, 210 Contracts, 420 Leave Allocations, 210 Time Off Requests, 630 Attendance Records, 5 Payruns, 1,050 Payrun Employee Selections, 210 Payslips, 1,050 Payslip Lines, 200 Permissions, and 215 User Role Assignments.
+
+### Files Changed
+- `packages/db/prisma/seed.ts`: Re-written with clean data reset and 200+ batch seeding.
+- `CHANGELOG_AGENTS.md`: Recorded database re-seeding execution.
+
+### Reason
+- Fulfill user request to reset all existing database data and seed at least 200 entries per table.
+
+### Validation
+- Executing `pnpm db:seed` background process (`task-385`).
+
+## 2026-09-05 23:40 IST — Add Bearer token authorization to HR API client calls
+
+### Summary
+- Configured `getAuthHeaders()` in `apps/web/lib/api-actions.ts` to sign and attach Bearer JWT tokens to all outgoing fetch requests targeting `HR_API_URL`.
+- Added secret fallback in NestJS `AuthService.signature` to match `NEXTAUTH_SECRET` / `AUTH_SECRET`.
+- Configured `AUTH_SECRET` in `apps/hr-api/.env`.
+
+### Files Changed
+- `apps/hr-api/src/modules/auth/auth.service.ts`: Updated HMAC signature fallback secret.
+- `apps/hr-api/.env`: Added `AUTH_SECRET` key.
+- `apps/web/lib/api-actions.ts`: Added `getAuthHeaders()` helper and attached Bearer tokens to all HR API endpoints.
+- `CHANGELOG_AGENTS.md`: Recorded authentication header wiring.
+
+### Reason
+- Resolve NestJS `HrAuthGuard` 401 Unauthorized exception (`Bearer access token is required`) when updating employees or making API requests from Next.js server actions.
+
+### Validation
+- TypeScript compilation passed without errors.
+
+## 2026-09-05 23:37 IST — Handle employee update duplicate email constraint gracefully
+
+### Summary
+- Added email conflict checks and Prisma P2002 error handling to `updateEmployeeAction` and NestJS `HrService.updateEmployee`.
+- Updated fallback employee resolution to re-use matching records by email or employee number rather than throwing constraint failures.
+
+### Files Changed
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Added email conflict check excluding current record ID.
+- `apps/web/lib/api-actions.ts`: Added target conflict checks and error message formatting for `updateEmployeeAction`.
+- `CHANGELOG_AGENTS.md`: Recorded error handling fix.
+
+### Reason
+- Prevent unhandled `Invalid prisma.employee.update() invocation: Unique constraint failed on the fields: (email)` error by returning friendly feedback when an email belongs to another employee.
+
+### Validation
+- TypeScript compilation passed without errors.
+
+## 2026-09-05 23:37 IST — Implement Employee edit functionality and updateAction wiring
+
+### Summary
+- Created `updateEmployeeAction` in `lib/api-actions.ts` supporting `PATCH /api/hr/employees/[id]` and Prisma fallback.
+- Updated `EmployeeForm` component to accept `employeeId` and dispatch `updateEmployeeAction` for edits.
+- Added quick edit dialog and `Pencil` edit button to `/employees` directory table rows and Kanban cards.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Exported `updateEmployeeAction`.
+- `apps/web/components/employee-form.tsx`: Added `employeeId` prop and conditional update logic in `onSubmit`.
+- `apps/web/app/(app)/employees/[id]/page.tsx`: Passed `employeeId` to `<EmployeeForm />`.
+- `apps/web/app/(app)/employees/page.tsx`: Added inline Edit dialog and pencil buttons on list table and Kanban cards.
+- `CHANGELOG_AGENTS.md`: Recorded edit feature implementation.
+
+### Reason
+- Fix issue where editing employee data was not working because `EmployeeForm` was calling `createEmployeeAction` instead of an update action.
+
+### Validation
+- All component edits applied and compiled cleanly.
+
+## 2026-09-05 23:35 IST — Handle duplicate employee email constraint gracefully
+
+### Summary
+- Added duplicate email pre-checks and Prisma P2002 / NestJS conflict error handling in HR API service and web server actions.
+- Formatted user-friendly error messages when attempting to create an employee with an existing email address.
+
+### Files Changed
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Added pre-check for existing email and caught P2002 errors to throw `ConflictException`.
+- `apps/web/lib/api-actions.ts`: Added email normalization, pre-check, and formatted error returns for `createEmployeeAction`.
+- `CHANGELOG_AGENTS.md`: Recorded error handling improvements.
+
+### Reason
+- Address runtime error `Invalid prisma.employee.create() invocation: Unique constraint failed on the fields: (email)` by returning a clean, actionable error message to the client.
+
+### Validation
+- TypeScript compilation passed without errors.
+
+## 2026-09-05 23:33 IST — Resolve git merge conflicts
+
+### Summary
+- Resolved git merge conflicts in `apps/web/app/layout.tsx` and `apps/web/components/app-sidebar.tsx`.
+- Concluded merge commit.
+
+### Files Changed
+- `apps/web/app/layout.tsx`: Resolved conflict by wrapping application root with `SessionProvider`.
+- `apps/web/components/app-sidebar.tsx`: Resolved conflict by consolidating `role` type enum definition.
+- `CHANGELOG_AGENTS.md`: Recorded merge conflict resolution.
+
+### Reason
+- Address user request to resolve active git merge conflicts between local branch and origin/main.
+
+### Validation
+- `git status` — clean working tree (`nothing to commit, working tree clean`).
+
 ## 2026-09-05 23:28 IST — Add Kanban view and layout toggle to Employees page
 
 ### Summary

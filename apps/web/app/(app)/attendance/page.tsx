@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/components/ui/toast";
 import { quickCheckInAction } from "@/lib/api-actions";
 import { AttendanceForm, type AttendanceFormValues } from "@/components/attendance-form";
-import { Plus, Search, LogIn, LogOut, Loader2 } from "lucide-react";
+import { Plus, Search, LogIn, LogOut, Loader2, LayoutList, Kanban, Clock, Calendar } from "lucide-react";
 
 interface AttendanceRecord {
   id: string;
@@ -34,6 +34,7 @@ export default function AttendancePage() {
   const { toast } = useToast();
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(INITIAL_ATTENDANCE);
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
@@ -48,7 +49,6 @@ export default function AttendancePage() {
     role === "HR_PAYROLL_USER";
   const currentUserName = session?.user?.name || "Emily Watson";
 
-  // RBAC Scoping: Employees see ONLY their own records. Managers see company-wide records.
   const scopedAttendance = isEmployee
     ? (attendance.some((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
         ? attendance.filter((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
@@ -86,7 +86,7 @@ export default function AttendancePage() {
 
     try {
       await quickCheckInAction(empId, type);
-      await new Promise((r) => setTimeout(r, 450)); // perceptible smooth loading feedback
+      await new Promise((r) => setTimeout(r, 450));
 
       toast({
         title: type === "IN" ? "Checked In" : "Checked Out",
@@ -112,6 +112,12 @@ export default function AttendancePage() {
           prev.map((r, i) => (i === 0 ? { ...r, checkOut: timeNow, workedHours: "8.00" } : r))
         );
       }
+    } catch {
+      toast({
+        title: "Check-in Error",
+        description: "Failed to record attendance state.",
+        type: "destructive",
+      });
     } finally {
       if (type === "IN") setCheckingIn(false);
       else setCheckingOut(false);
@@ -142,6 +148,11 @@ export default function AttendancePage() {
 
   const isAnyProcessing = checkingIn || checkingOut;
 
+  const presentRecords = filteredAttendance.filter((r) => r.status === "Present");
+  const lateRecords = filteredAttendance.filter((r) => r.status === "Late");
+  const halfDayRecords = filteredAttendance.filter((r) => r.status === "Half Day");
+  const absentRecords = filteredAttendance.filter((r) => r.status === "Absent");
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -157,6 +168,28 @@ export default function AttendancePage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* View Toggle */}
+          <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2.5 text-xs gap-1.5"
+              onClick={() => setViewMode("list")}
+            >
+              <LayoutList className="w-3.5 h-3.5" />
+              List
+            </Button>
+            <Button
+              variant={viewMode === "kanban" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2.5 text-xs gap-1.5"
+              onClick={() => setViewMode("kanban")}
+            >
+              <Kanban className="w-3.5 h-3.5" />
+              Kanban
+            </Button>
+          </div>
+
           {isEmployee && (
             <>
               <Button
@@ -219,7 +252,6 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Toolbar */}
       <div className="p-2 rounded-lg border border-border bg-card flex items-center justify-between gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
@@ -235,56 +267,217 @@ export default function AttendancePage() {
         </span>
       </div>
 
-      {/* Table */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[85px]">Ref</TableHead>
-              <TableHead>Employee</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>In</TableHead>
-              <TableHead>Out</TableHead>
-              <TableHead className="text-right">Hours</TableHead>
-              <TableHead className="text-right">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredAttendance.length === 0 ? (
+      {/* Content View */}
+      {viewMode === "list" ? (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
-                  No records.
-                </TableCell>
+                <TableHead className="w-[85px]">Ref</TableHead>
+                <TableHead>Employee</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>In</TableHead>
+                <TableHead>Out</TableHead>
+                <TableHead className="text-right">Hours</TableHead>
+                <TableHead className="text-right">Status</TableHead>
               </TableRow>
-            ) : (
-              filteredAttendance.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell className="font-mono text-[11px] text-muted-foreground">{record.id}</TableCell>
-                  <TableCell className="font-medium text-xs">{record.employee}</TableCell>
-                  <TableCell className="font-mono text-[11px] text-muted-foreground">{record.date}</TableCell>
-                  <TableCell className="font-mono text-[11px]">{record.checkIn}</TableCell>
-                  <TableCell className="font-mono text-[11px]">{record.checkOut}</TableCell>
-                  <TableCell className="font-mono text-right text-xs font-semibold">{record.workedHours}h</TableCell>
-                  <TableCell className="text-right">
-                    <Badge
-                      variant={
-                        record.status === "Present"
-                          ? "success"
-                          : record.status === "Late"
-                          ? "warning"
-                          : "destructive"
-                      }
-                      className="text-[10px] font-mono"
-                    >
-                      {record.status}
-                    </Badge>
+            </TableHeader>
+            <TableBody>
+              {filteredAttendance.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
+                    No records.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ) : (
+                filteredAttendance.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell className="font-mono text-[11px] text-muted-foreground">{record.id}</TableCell>
+                    <TableCell className="font-medium text-xs">{record.employee}</TableCell>
+                    <TableCell className="font-mono text-[11px] text-muted-foreground">{record.date}</TableCell>
+                    <TableCell className="font-mono text-[11px]">{record.checkIn}</TableCell>
+                    <TableCell className="font-mono text-[11px]">{record.checkOut}</TableCell>
+                    <TableCell className="font-mono text-right text-xs font-semibold">{record.workedHours}h</TableCell>
+                    <TableCell className="text-right">
+                      <Badge
+                        variant={
+                          record.status === "Present"
+                            ? "success"
+                            : record.status === "Late"
+                            ? "warning"
+                            : "destructive"
+                        }
+                        className="text-[10px] font-mono"
+                      >
+                        {record.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        /* Kanban View */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Present */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  Present ({presentRecords.length})
+                </h3>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              {presentRecords.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
+                  No present logs.
+                </div>
+              ) : (
+                presentRecords.map((r) => (
+                  <div key={r.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-emerald-500/40 transition-all space-y-2">
+                    <div className="flex items-start justify-between gap-1">
+                      <h4 className="text-xs font-semibold text-foreground">{r.employee}</h4>
+                      <Badge variant="success" className="text-[10px] font-mono shrink-0">
+                        {r.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-1 border-t border-border/40">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-emerald-500" /> {r.checkIn} - {r.checkOut}
+                      </span>
+                      <span className="font-semibold text-foreground">{r.workedHours}h</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> {r.date}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Late */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  Late Arrival ({lateRecords.length})
+                </h3>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              {lateRecords.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
+                  No late logs.
+                </div>
+              ) : (
+                lateRecords.map((r) => (
+                  <div key={r.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-amber-500/40 transition-all space-y-2">
+                    <div className="flex items-start justify-between gap-1">
+                      <h4 className="text-xs font-semibold text-foreground">{r.employee}</h4>
+                      <Badge variant="warning" className="text-[10px] font-mono shrink-0">
+                        {r.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-1 border-t border-border/40">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-amber-500" /> {r.checkIn} - {r.checkOut}
+                      </span>
+                      <span className="font-semibold text-foreground">{r.workedHours}h</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> {r.date}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Half Day */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  Half Day ({halfDayRecords.length})
+                </h3>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              {halfDayRecords.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
+                  No half day logs.
+                </div>
+              ) : (
+                halfDayRecords.map((r) => (
+                  <div key={r.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-blue-500/40 transition-all space-y-2">
+                    <div className="flex items-start justify-between gap-1">
+                      <h4 className="text-xs font-semibold text-foreground">{r.employee}</h4>
+                      <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                        {r.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-1 border-t border-border/40">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-blue-500" /> {r.checkIn} - {r.checkOut}
+                      </span>
+                      <span className="font-semibold text-foreground">{r.workedHours}h</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> {r.date}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Absent */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-rose-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  Absent ({absentRecords.length})
+                </h3>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              {absentRecords.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
+                  No absent logs.
+                </div>
+              ) : (
+                absentRecords.map((r) => (
+                  <div key={r.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-rose-500/40 transition-all space-y-2 opacity-85">
+                    <div className="flex items-start justify-between gap-1">
+                      <h4 className="text-xs font-semibold text-foreground">{r.employee}</h4>
+                      <Badge variant="destructive" className="text-[10px] font-mono shrink-0">
+                        {r.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-1 border-t border-border/40">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-rose-500" /> No Check-in
+                      </span>
+                      <span className="font-semibold text-foreground">0.00h</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> {r.date}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
