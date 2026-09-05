@@ -125,7 +125,7 @@ model Employee {
   dateOfBirth    DateTime?
   gender         String?
   address        String?
-  bankAccountId  String?
+  bankAccountId  String?          @unique
   departmentId   String?
   jobPositionId  String?
   hireDate       DateTime

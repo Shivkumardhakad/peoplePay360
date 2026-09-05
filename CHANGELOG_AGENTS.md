@@ -217,3 +217,22 @@
 
 ### Notes
 - Turborepo telemetry and Prisma package.json deprecation messages are warnings and were not the failure cause.
+
+## 2026-09-05 14:45 IST — Fix bank account relation validation
+
+### Summary
+- Marked the employee bank-account foreign key as unique for the intended one-to-one relationship.
+
+### Files Changed
+- `packages/db/prisma/schema.prisma`: Added `@unique` to `Employee.bankAccountId`.
+- `CHANGELOG_AGENTS.md`: Recorded the CI fix.
+
+### Reason
+- CI failed during Prisma DMMF generation with P1012 because one-to-one defining relation fields must be unique.
+
+### Validation
+- `git diff --check` — pending
+- Prisma generate — not run locally; CI is the available validation environment.
+
+### Notes
+- Turborepo telemetry and output warnings remain non-blocking.
