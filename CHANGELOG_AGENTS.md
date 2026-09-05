@@ -1989,3 +1989,24 @@
 
 ### Notes
 - Existing unrelated `apps/web/middleware.ts` whitespace and Turbo-generated files remain outside this commit.
+## 2026-09-06 09:00 IST — Load contract references from live records
+
+### Summary
+- Removed hardcoded salary structure and working schedule options from contract creation.
+- Added database-backed active salary structure and working schedule loaders.
+- Kept employee selection database-backed and normalized schedule weekly hours for the form.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added `getWorkingSchedulesAction` with active schedules and numeric weekly hours.
+- `apps/web/components/contract-form.tsx`: Loads live employees, salary structures, and schedules for contract fields.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Contract records must reference actual salary structures and working schedules used by payroll and attendance, not presentation-only IDs.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` on changed files — passed.
+
+### Notes
+- If the Payroll API or HR database has no active structure/schedule, the corresponding selector remains empty and the required validation prevents an invalid contract.

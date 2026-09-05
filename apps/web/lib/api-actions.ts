@@ -168,6 +168,11 @@ export async function getContractsAction() {
   }
 }
 
+export async function getWorkingSchedulesAction() {
+  const schedules = await prisma.workingSchedule.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true, code: true, weeklyHours: true } });
+  return schedules.map((schedule) => ({ ...schedule, weeklyHours: Number(schedule.weeklyHours) }));
+}
+
 export async function createContractAction(data: {
   employeeId: string;
   position: string;
