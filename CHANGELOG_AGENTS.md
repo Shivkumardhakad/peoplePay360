@@ -35,6 +35,24 @@
 
 ### Notes
 - CI uses `pnpm install --no-frozen-lockfile` because the repository does not currently contain a `pnpm-lock.yaml`.
+
+## 2026-09-05 12:25 IST — Allow required pnpm build scripts
+
+### Summary
+- Added an explicit pnpm 11 build-script allowlist for CI dependency installation.
+
+### Files Changed
+- `pnpm-workspace.yaml`: Allowed required install scripts for Prisma, NestJS, Tailwind, Sharp, Core JS, and the resolver dependency using pnpm 11's `allowBuilds` setting.
+- `CHANGELOG_AGENTS.md`: Recorded the CI build-script approval fix.
+
+### Reason
+- pnpm 11 rejected the install because dependency build scripts were not approved, preventing CI from completing dependency installation.
+
+### Validation
+- `git diff --check` — passed
+
+### Notes
+- The allowlist is limited to packages reported by the failing CI install and avoids enabling arbitrary dependency scripts. pnpm's current build-script policy is documented at https://pnpm.io/cli/approve-builds.
 ## 2026-09-05 11:20 +05:30 — Codex Project Scaffold
 
 ### Summary

@@ -1,3 +1,15 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# These packages require install-time scripts to generate native binaries or
+# client code used by the workspace build and runtime.
+allowBuilds:
+  "@nestjs/core": true
+  "@prisma/client": true
+  "@prisma/engines": true
+  "@tailwindcss/oxide": true
+  "core-js": true
+  "prisma": true
+  "sharp": true
+  "unrs-resolver": true
