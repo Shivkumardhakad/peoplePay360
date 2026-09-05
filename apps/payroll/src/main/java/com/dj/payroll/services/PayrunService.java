@@ -26,6 +26,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.UUID;
 
 @Service
@@ -79,6 +81,7 @@ public class PayrunService {
         entity.setPeriodStart(request.periodStart());
         entity.setPeriodEnd(request.periodEnd());
         entity.setSalaryStructureId(request.salaryStructureId());
+        entity.setSelectedEmployeeIds(request.selectedEmployeeIds() == null ? null : String.join(",", request.selectedEmployeeIds().stream().distinct().toList()));
         entity.setStatus("DRAFT");
         entity.setCreatedById(createdById);
         entity.setCreatedAt(Instant.now());
@@ -101,8 +104,14 @@ public class PayrunService {
 
         List<HrContractClient.ContractSnapshot> contracts = hrContractClient
             .findActiveContracts(payrun.getPeriodStart(), payrun.getPeriodEnd());
+        List<String> selectedEmployeeIds = selectedEmployeeIds(payrun);
+        if (!selectedEmployeeIds.isEmpty()) {
+            contracts = contracts.stream().filter(contract -> selectedEmployeeIds.contains(contract.employeeId())).toList();
+        }
         if (contracts.isEmpty()) {
-            throw new IllegalArgumentException("No active contracts found for the payrun period");
+            throw new IllegalArgumentException(selectedEmployeeIds.isEmpty()
+                ? "No active contracts found for the payrun period"
+                : "No selected employees have active contracts for the payrun period");
         }
 
         for (HrContractClient.ContractSnapshot contract : contracts) {
@@ -251,8 +260,13 @@ public class PayrunService {
             .map(p -> new PayrunDtos.PayslipSummary(p.getId(), p.getEmployeeId(), p.getGrossAmount(),
                 p.getDeductionAmount(), p.getNetAmount(), p.getStatus())).toList();
         return new PayrunDtos.Response(entity.getId(), entity.getName(), entity.getPeriodStart(), entity.getPeriodEnd(),
-            entity.getSalaryStructureId(), entity.getStatus(), entity.getComputedAt(), entity.getValidatedAt(),
+            entity.getSalaryStructureId(), selectedEmployeeIds(entity), entity.getStatus(), entity.getComputedAt(), entity.getValidatedAt(),
             entity.getPaidAt(), payslips, entity.getCreatedAt(), entity.getUpdatedAt());
+    }
+
+    private List<String> selectedEmployeeIds(Payrun payrun) {
+        if (payrun.getSelectedEmployeeIds() == null || payrun.getSelectedEmployeeIds().isBlank()) return Collections.emptyList();
+        return Arrays.stream(payrun.getSelectedEmployeeIds().split(",")).filter(value -> !value.isBlank()).toList();
     }
 
     private PayslipDtos.Response toPayslipResponse(Payslip entity) {

@@ -15,12 +15,13 @@ public final class PayrunDtos {
         @NotBlank String name,
         @NotNull LocalDateTime periodStart,
         @NotNull LocalDateTime periodEnd,
-        @NotBlank String salaryStructureId
+        @NotBlank String salaryStructureId,
+        List<String> selectedEmployeeIds
     ) {}
 
     public record Response(
         String id, String name, LocalDateTime periodStart, LocalDateTime periodEnd,
-        String salaryStructureId, String status, Instant computedAt,
+        String salaryStructureId, List<String> selectedEmployeeIds, String status, Instant computedAt,
         Instant validatedAt, Instant paidAt, List<PayslipSummary> payslips,
         Instant createdAt, Instant updatedAt
     ) {}

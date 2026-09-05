@@ -1815,3 +1815,29 @@
 
 ### Notes
 - Approval metadata is recorded when the authenticated session user maps to a database user; allocation deduction is enforced for types requiring allocation.
+
+## 2026-09-06 06:00 IST — Enforce selected employees in payrun computation
+
+### Summary
+- Added selected employee IDs to payrun creation and persisted the scope in the Java Payroll payrun record.
+- Filtered active HR contracts during computation so only selected employees receive payslips.
+- Returned the selected employee scope from payrun responses and fixed the wizard's salary-structure selector binding.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/dto/PayrunDtos.java`: Added selected employee scope to create/response DTOs.
+- `apps/payroll/src/main/java/com/dj/payroll/entities/Payrun.java`: Persisted selected employee IDs.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Applied selected-employee filtering during compute.
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Sends selected employees and binds structure selection.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- The payrun wizard previously let users select employees, but Payroll computation ignored that selection and processed every active contract.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+- `apps/payroll/mvnw.cmd test` — not run successfully because the repository Maven wrapper could not start in this Windows environment.
+- `mvn test -q` — not run because Maven is not installed on PATH.
+
+### Notes
+- Payroll uses Hibernate `ddl-auto: update`, so the new payrun scope column is created by the Java service on startup. Existing payruns without a scope continue to process all eligible contracts for backward compatibility.

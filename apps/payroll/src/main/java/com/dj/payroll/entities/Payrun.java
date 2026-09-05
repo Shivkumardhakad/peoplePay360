@@ -3,6 +3,7 @@ package com.dj.payroll.entities;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Column;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -22,6 +23,8 @@ public class Payrun {
     private LocalDateTime periodStart;
     private LocalDateTime periodEnd;
     private String salaryStructureId;
+    @Column(columnDefinition = "TEXT")
+    private String selectedEmployeeIds;
     private String status = "DRAFT";
     private Instant computedAt;
     private Instant validatedAt;
