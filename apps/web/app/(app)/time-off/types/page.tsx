@@ -68,7 +68,6 @@ export default function TimeOffTypesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[95px]">Type Ref</TableHead>
                 <TableHead>Policy Name</TableHead>
                 <TableHead>Unit</TableHead>
                 <TableHead>Approval Workflow</TableHead>
@@ -82,7 +81,6 @@ export default function TimeOffTypesPage() {
 
                 return (
                   <TableRow key={type.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{type.id}</TableCell>
                     <TableCell className="font-medium text-xs">{type.name}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{type.unit}</TableCell>
                     <TableCell>

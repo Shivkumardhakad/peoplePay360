@@ -69,7 +69,6 @@ export default function PayrunsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[100px]">Batch Ref</TableHead>
               <TableHead>Batch Name</TableHead>
               <TableHead>Period</TableHead>
               <TableHead>Salary Structure</TableHead>
@@ -82,7 +81,7 @@ export default function PayrunsPage() {
           <TableBody>
             {filteredPayruns.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-20 text-center text-xs text-muted-foreground">
+                <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
                   No payrun batches found.
                 </TableCell>
               </TableRow>
@@ -92,7 +91,6 @@ export default function PayrunsPage() {
 
                 return (
                   <TableRow key={payrun.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{payrun.id}</TableCell>
                     <TableCell className="font-medium text-xs">
                       <Link href={`/payroll/payruns/${payrun.id}`} className="hover:underline">
                         {payrun.name}

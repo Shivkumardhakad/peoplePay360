@@ -155,7 +155,6 @@ export default function TimeOffAllocationsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[95px]">Ref</TableHead>
               <TableHead>Employee</TableHead>
               <TableHead>Leave Type</TableHead>
               <TableHead className="text-right">Allocated</TableHead>
@@ -167,7 +166,7 @@ export default function TimeOffAllocationsPage() {
           <TableBody>
             {filteredAllocations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
+                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
                   No allocation records found.
                 </TableCell>
               </TableRow>
@@ -176,7 +175,6 @@ export default function TimeOffAllocationsPage() {
                 const remaining = alloc.allocated - alloc.used;
                 return (
                   <TableRow key={alloc.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{alloc.id}</TableCell>
                     <TableCell className="font-medium text-xs">{alloc.employee}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{alloc.type}</TableCell>
                     <TableCell className="font-mono text-right text-xs text-muted-foreground">

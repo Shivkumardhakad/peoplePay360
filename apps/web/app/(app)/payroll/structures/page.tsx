@@ -84,7 +84,6 @@ export default function SalaryStructuresPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">Ref ID</TableHead>
                 <TableHead>Structure Name</TableHead>
                 <TableHead className="text-right">Rules</TableHead>
                 <TableHead className="text-right">Status</TableHead>
@@ -97,7 +96,6 @@ export default function SalaryStructuresPage() {
 
                 return (
                   <TableRow key={structure.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{structure.id}</TableCell>
                     <TableCell className="font-medium text-xs">{structure.name}</TableCell>
                     <TableCell className="font-mono text-right text-xs text-muted-foreground">
                       {structure.ruleCount} rules

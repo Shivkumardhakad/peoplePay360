@@ -249,7 +249,6 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[85px]">Ref</TableHead>
               <TableHead>Employee</TableHead>
               <TableHead className="text-right">Gross Earnings</TableHead>
               <TableHead className="text-right">Deductions</TableHead>
@@ -260,14 +259,13 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
           <TableBody>
             {status === "DRAFT" ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground font-mono text-xs">
+                <TableCell colSpan={5} className="text-center py-10 text-muted-foreground font-mono text-xs">
                   Payrun batch in DRAFT. Click <span className="font-semibold text-foreground">[Compute]</span> to calculate employee payslips.
                 </TableCell>
               </TableRow>
             ) : (
               INITIAL_PAYSLIPS.map((ps) => (
                 <TableRow key={ps.id}>
-                  <TableCell className="font-mono text-[11px] text-muted-foreground">{ps.id}</TableCell>
                   <TableCell className="font-medium text-xs">
                     <Link href={`/payroll/payslips/${ps.id}`} className="hover:underline">
                       {ps.employee}

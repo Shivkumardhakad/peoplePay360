@@ -121,7 +121,6 @@ export default function NewPayrunWizard() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10 text-center"></TableHead>
-                  <TableHead className="w-[85px]">ID</TableHead>
                   <TableHead>Employee</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead className="text-right">Base Wage</TableHead>
@@ -140,7 +139,6 @@ export default function NewPayrunWizard() {
                           className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary cursor-pointer"
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-[11px] text-muted-foreground">{emp.id}</TableCell>
                       <TableCell className="font-medium text-xs">{emp.name}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{emp.department}</TableCell>
                       <TableCell className="text-right font-mono text-xs font-semibold">

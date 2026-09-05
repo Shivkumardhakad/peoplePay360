@@ -132,7 +132,6 @@ export default function ContractsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[90px]">Ref ID</TableHead>
                 <TableHead>Employee</TableHead>
                 <TableHead>Position</TableHead>
                 <TableHead>Department</TableHead>
@@ -144,14 +143,13 @@ export default function ContractsPage() {
             <TableBody>
               {filteredContracts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
+                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
                     No contracts found.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredContracts.map((contract) => (
                   <TableRow key={contract.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{contract.id}</TableCell>
                     <TableCell className="font-medium text-xs">{contract.employee}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{contract.position}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{contract.department}</TableCell>

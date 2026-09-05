@@ -145,7 +145,6 @@ export default function EmployeesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[90px]">ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Role</TableHead>
@@ -156,14 +155,13 @@ export default function EmployeesPage() {
             <TableBody>
               {filteredEmployees.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                  <TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground">
                     No records found.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredEmployees.map((employee) => (
                   <TableRow key={employee.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{employee.id}</TableCell>
                     <TableCell className="font-medium">
                       <Link href={`/employees/${employee.id}`} className="hover:underline">
                         {employee.name}

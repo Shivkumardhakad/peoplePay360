@@ -185,7 +185,6 @@ export default function PayslipsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[95px]">Ref</TableHead>
               <TableHead>Employee</TableHead>
               <TableHead>Batch</TableHead>
               <TableHead>Period</TableHead>
@@ -199,7 +198,7 @@ export default function PayslipsPage() {
           <TableBody>
             {filteredPayslips.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-20 text-center text-xs text-muted-foreground">
+                <TableCell colSpan={8} className="h-20 text-center text-xs text-muted-foreground">
                   No payslips found.
                 </TableCell>
               </TableRow>
@@ -209,7 +208,6 @@ export default function PayslipsPage() {
 
                 return (
                   <TableRow key={payslip.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{payslip.id}</TableCell>
                     <TableCell className="font-medium text-xs">
                       <Link href={`/payroll/payslips/${payslip.id}`} className="hover:underline">
                         {payslip.employeeName}

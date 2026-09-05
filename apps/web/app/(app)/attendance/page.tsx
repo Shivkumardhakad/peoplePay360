@@ -250,7 +250,6 @@ export default function AttendancePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[85px]">Ref</TableHead>
                 <TableHead>Employee</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>In</TableHead>
@@ -262,14 +261,13 @@ export default function AttendancePage() {
             <TableBody>
               {filteredAttendance.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
+                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
                     No records.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredAttendance.map((record) => (
                   <TableRow key={record.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{record.id}</TableCell>
                     <TableCell className="font-medium text-xs">{record.employee}</TableCell>
                     <TableCell className="font-mono text-[11px] text-muted-foreground">{record.date}</TableCell>
                     <TableCell className="font-mono text-[11px]">{record.checkIn}</TableCell>

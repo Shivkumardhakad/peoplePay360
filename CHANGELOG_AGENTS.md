@@ -1674,3 +1674,31 @@
 
 ### Notes
 - Allocation period defaults to the current calendar year and duplicate employee/type/year allocations are updated rather than duplicated.
+## 2026-09-06 03:00 IST — Remove internal reference columns from UI tables
+
+### Summary
+- Removed user-facing Ref/ID columns from HR, time-off, user, and payroll tables.
+- Kept internal IDs in row keys, links, and action handlers so navigation and mutations continue to work.
+
+### Files Changed
+- `apps/web/app/(app)/attendance/page.tsx`: Removed attendance reference column.
+- `apps/web/app/(app)/contracts/page.tsx`: Removed contract reference column.
+- `apps/web/app/(app)/employees/page.tsx`: Removed employee ID column.
+- `apps/web/app/(app)/users/page.tsx`: Removed user ID column.
+- `apps/web/app/(app)/time-off/types/page.tsx`: Removed time-off type reference column.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: Removed allocation reference column.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Removed request reference column.
+- `apps/web/app/(app)/payroll/payruns/page.tsx`: Removed batch reference column.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Removed payslip reference column.
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Removed employee ID column.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Removed payslip reference column.
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Removed structure reference column.
+
+### Reason
+- Internal database references are not useful to day-to-day users and made tables visually noisy.
+
+### Validation
+- Pending after this UI cleanup.
+
+### Notes
+- Internal IDs remain available to the application for routing, lookup, and row actions.

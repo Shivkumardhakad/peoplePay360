@@ -249,7 +249,6 @@ export default function TimeOffRequestsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[85px]">Ref</TableHead>
               <TableHead>Employee</TableHead>
               <TableHead>Policy</TableHead>
               <TableHead>Date Range</TableHead>
@@ -261,7 +260,7 @@ export default function TimeOffRequestsPage() {
           <TableBody>
             {filteredRequests.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
+                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
                   No leave requests found.
                 </TableCell>
               </TableRow>
@@ -275,7 +274,6 @@ export default function TimeOffRequestsPage() {
 
                 return (
                   <TableRow key={req.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{req.id}</TableCell>
                     <TableCell className="font-medium text-xs">
                       {req.employee}
                       {isSelf && (
