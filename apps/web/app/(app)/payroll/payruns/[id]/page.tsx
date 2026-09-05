@@ -115,10 +115,10 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
     setLoadingAction("send");
     try {
       const res = await sendPayrunPayslipsAction(payrunId);
-      await new Promise((r) => setTimeout(r, 500));
+      if (!res.success) throw new Error(res.message);
       toast({
         title: "Payslips Dispatched",
-        description: res.message || "Emailed digital payslips to all batch employees.",
+        description: res.message,
         type: "success",
       });
     } finally {

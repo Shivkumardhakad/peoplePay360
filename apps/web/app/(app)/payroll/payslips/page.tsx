@@ -12,90 +12,6 @@ import { useToast } from "@/components/ui/toast";
 import { generatePayslipPDF } from "@/lib/payslip-pdf";
 import { listPayrollPayslipsAction } from "@/lib/api-actions";
 
-const MOCK_PAYSLIPS = [
-  {
-    id: "PS-1001",
-    employeeName: "Alice Johnson",
-    employeeId: "EMP-001",
-    department: "Engineering",
-    position: "Senior Frontend Engineer",
-    period: "2023-10",
-    payrun: "October 2023 Payroll",
-    contractRef: "CON-1001 (Standard Tech)",
-    gross: 10000,
-    deductions: 2500,
-    net: 7500,
-    status: "PAID" as const,
-    lines: [
-      { rule: "Basic Salary", category: "BASIC", amount: 8000.0, type: "EARNING" as const },
-      { rule: "Housing Allowance (HRA)", category: "ALLOWANCE", amount: 1500.0, type: "EARNING" as const },
-      { rule: "Transport & Remote Allowance", category: "ALLOWANCE", amount: 500.0, type: "EARNING" as const },
-      { rule: "Income Tax Withholding", category: "DEDUCTION", amount: -1800.0, type: "DEDUCTION" as const },
-      { rule: "Retirement / Provident Fund", category: "DEDUCTION", amount: -400.0, type: "DEDUCTION" as const },
-      { rule: "Health & Medical Insurance", category: "DEDUCTION", amount: -300.0, type: "DEDUCTION" as const },
-    ],
-  },
-  {
-    id: "PS-1002",
-    employeeName: "Bob Smith",
-    employeeId: "EMP-002",
-    department: "Human Resources",
-    position: "HR Manager",
-    period: "2023-10",
-    payrun: "October 2023 Payroll",
-    contractRef: "CON-1002 (HR Package)",
-    gross: 7916.67,
-    deductions: 1800,
-    net: 6116.67,
-    status: "PAID" as const,
-    lines: [
-      { rule: "Basic Salary", category: "BASIC", amount: 6500.0, type: "EARNING" as const },
-      { rule: "Housing Allowance", category: "ALLOWANCE", amount: 1416.67, type: "EARNING" as const },
-      { rule: "Income Tax Withholding", category: "DEDUCTION", amount: -1400.0, type: "DEDUCTION" as const },
-      { rule: "Provident Fund", category: "DEDUCTION", amount: -400.0, type: "DEDUCTION" as const },
-    ],
-  },
-  {
-    id: "PS-1101",
-    employeeName: "Alice Johnson",
-    employeeId: "EMP-001",
-    department: "Engineering",
-    position: "Senior Frontend Engineer",
-    period: "2023-11",
-    payrun: "November 2023 Payroll",
-    contractRef: "CON-1001 (Standard Tech)",
-    gross: 10000,
-    deductions: 2500,
-    net: 7500,
-    status: "DRAFT" as const,
-    lines: [
-      { rule: "Basic Salary", category: "BASIC", amount: 8000.0, type: "EARNING" as const },
-      { rule: "Allowances", category: "ALLOWANCE", amount: 2000.0, type: "EARNING" as const },
-      { rule: "Deductions", category: "DEDUCTION", amount: -2500.0, type: "DEDUCTION" as const },
-    ],
-  },
-  {
-    id: "PS-1004",
-    employeeName: "Emily Watson",
-    employeeId: "EMP-004",
-    department: "Product & Design",
-    position: "Lead UX Designer",
-    period: "2023-10",
-    payrun: "October 2023 Payroll",
-    contractRef: "CON-1004 (Design Lead)",
-    gross: 8500,
-    deductions: 1700,
-    net: 6800,
-    status: "PAID" as const,
-    lines: [
-      { rule: "Basic Salary", category: "BASIC", amount: 7000.0, type: "EARNING" as const },
-      { rule: "Creative Allowance", category: "ALLOWANCE", amount: 1500.0, type: "EARNING" as const },
-      { rule: "Income Tax", category: "DEDUCTION", amount: -1300.0, type: "DEDUCTION" as const },
-      { rule: "Provident Fund", category: "DEDUCTION", amount: -400.0, type: "DEDUCTION" as const },
-    ],
-  },
-];
-
 function money(value: number) {
   return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 }
@@ -111,8 +27,8 @@ export default function PayslipsPage() {
 
   const role = session?.user?.role || "ADMIN";
   const isEmployee = role === "EMPLOYEE";
-  const currentUserName = session?.user?.name || "Emily Watson";
-  const currentEmpId = session?.user?.employeeId || "EMP-004";
+  const currentUserName = session?.user?.name || "";
+  const currentEmpId = session?.user?.employeeId || "";
 
   // RBAC Scoping: Employees see ONLY their own payslips. Managers see all company payslips.
   const scopedPayslips = isEmployee
@@ -133,8 +49,6 @@ export default function PayslipsPage() {
 
   const handleDownload = async (slip: any) => {
     setDownloadingId(slip.id);
-    await new Promise((r) => setTimeout(r, 500));
-
     try {
       generatePayslipPDF(slip);
       toast({
