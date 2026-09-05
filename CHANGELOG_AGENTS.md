@@ -298,3 +298,22 @@
 
 ### Notes
 - This is a compile-time typing fix only; displayed dashboard data remains static fixture data.
+
+## 2026-09-05 16:25 IST — Fix employee directory color typing
+
+### Summary
+- Made the employee fixture a readonly tuple so its avatar color key remains a valid indexed literal under strict TypeScript checks.
+
+### Files Changed
+- `apps/web/app/(dashboard)/employees/page.tsx`: Added literal tuple typing for employee fixture rows and a typed avatar color map.
+- `CHANGELOG_AGENTS.md`: Recorded the build fix.
+
+### Reason
+- CI `web:build` failed because array destructuring widened the avatar color value to possibly undefined.
+
+### Validation
+- `git diff --check` — pending
+- `pnpm build` — not run locally; dependencies are unavailable.
+
+### Notes
+- Dashboard data remains static fixture data.
