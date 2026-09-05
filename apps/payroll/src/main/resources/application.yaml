@@ -26,3 +26,4 @@ spring:
 
 peoplepay:
   hr-api-url: ${HR_API_URL:http://localhost:3001/api/hr}
+  hr-api-jwt-secret: ${HR_API_JWT_SECRET:${JWT_SECRET:PeoplePay360-dev-jwt-secret-change-in-production-2026}}

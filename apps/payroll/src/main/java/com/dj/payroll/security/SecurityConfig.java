@@ -3,6 +3,7 @@ package com.dj.payroll.security;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -35,8 +36,34 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/error").permitAll()
-                .requestMatchers("/api/payroll/**")
+                .requestMatchers(HttpMethod.GET,
+                    "/api/payroll/payruns",
+                    "/api/payroll/payruns/*",
+                    "/api/payroll/payruns/*/payslips",
+                    "/api/payroll/payruns/*/audit",
+                    "/api/payroll/payruns/*/payment-status",
+                    "/api/payroll/payslips/*",
+                    "/api/payroll/payslips/*/pdf",
+                    "/api/payroll/payslips/*/payment-status",
+                    "/api/payroll/reports/**",
+                    "/api/payroll/salary-rules",
+                    "/api/payroll/salary-rules/*",
+                    "/api/payroll/salary-structures",
+                    "/api/payroll/salary-structures/*",
+                    "/api/payroll/salary-rule-categories",
+                    "/api/payroll/salary-rule-categories/*")
                     .hasAnyRole("ADMIN", "PAYROLL_MANAGER", "HR_MANAGER")
+                .requestMatchers(
+                    "/api/payroll/payruns",
+                    "/api/payroll/payruns/*/compute",
+                    "/api/payroll/payruns/*/validate",
+                    "/api/payroll/payruns/*/pay",
+                    "/api/payroll/payruns/*/cancel",
+                    "/api/payroll/salary-rules/**",
+                    "/api/payroll/salary-structures/**",
+                    "/api/payroll/salary-rule-categories/**")
+                    .hasAnyRole("ADMIN", "PAYROLL_MANAGER")
+                .requestMatchers("/api/payroll/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));

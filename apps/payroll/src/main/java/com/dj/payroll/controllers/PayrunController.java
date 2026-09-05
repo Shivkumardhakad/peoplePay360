@@ -3,8 +3,13 @@ package com.dj.payroll.controllers;
 import com.dj.payroll.dto.PayrunDtos;
 import com.dj.payroll.dto.PayslipDtos;
 import com.dj.payroll.services.PayrunService;
+import com.dj.payroll.services.PayslipPdfService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,8 +25,12 @@ import java.util.List;
 @RequestMapping("/api/payroll")
 public class PayrunController {
     private final PayrunService service;
+    private final PayslipPdfService payslipPdfService;
 
-    public PayrunController(PayrunService service) { this.service = service; }
+    public PayrunController(PayrunService service, PayslipPdfService payslipPdfService) {
+        this.service = service;
+        this.payslipPdfService = payslipPdfService;
+    }
 
     @GetMapping("/payruns")
     public List<PayrunDtos.Response> listPayruns() { return service.list(); }
@@ -55,4 +64,14 @@ public class PayrunController {
 
     @GetMapping("/payslips/{id}")
     public PayslipDtos.Response getPayslip(@PathVariable String id) { return service.getPayslip(id); }
+
+    @GetMapping(value = "/payslips/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> downloadPayslipPdf(@PathVariable String id) {
+        byte[] pdf = payslipPdfService.generate(service.getPayslip(id));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.inline().filename("payslip-" + id + ".pdf").build());
+        headers.setContentLength(pdf.length);
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
 }

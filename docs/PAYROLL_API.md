@@ -37,6 +37,8 @@ Content-Type: application/json
 
 Unauthenticated requests return `401`; a token without an allowed role returns `403`.
 
+Permissions are endpoint-specific: `HR_MANAGER` has read access to reports, payslips, audits, payment status, and salary configuration; `PAYROLL_MANAGER` can also create/update payroll data and execute payrun actions; `ADMIN` has full access. Unknown future Payroll routes are restricted to `ADMIN` by default.
+
 ## Salary rule categories
 
 | Method | Path | Body | Success |
@@ -123,6 +125,41 @@ Update additionally requires a non-blank `status`; `rules` must contain at least
 | POST | `/api/payroll/payruns/{id}/cancel` | — | `200` |
 | GET | `/api/payroll/payruns/{payrunId}/payslips` | — | `200` |
 | GET | `/api/payroll/payslips/{id}` | — | `200` |
+| GET | `/api/payroll/payslips/{id}/pdf` | — | `200` PDF |
+
+The PDF endpoint returns an inline `application/pdf` response. It requires the same Bearer JWT as the other Payroll endpoints and includes the payslip header, period, totals, and salary-rule lines.
+
+## Reports
+
+Reports use persisted payruns and payslips and require `from` and `to` ISO date-time query parameters. `to` must be after `from`.
+
+| Method | Path | Query | Success |
+|---|---|---|---|
+| GET | `/api/payroll/reports/summary` | `from`, `to` | `200` |
+| GET | `/api/payroll/reports/payslips` | `from`, `to`, optional `status` | `200` |
+
+Example: `/api/payroll/reports/summary?from=2026-09-01T00:00:00&to=2026-10-01T00:00:00`
+
+## Payroll auditor
+
+`GET /api/payroll/payruns/{id}/audit` checks the real payrun and payslip records for missing payslips, duplicate employees, missing totals, negative amounts, deductions above gross, net-total mismatches, and missing salary-rule lines. It returns a risk score, pass/fail result, auditor version, and structured findings.
+
+## Payment status
+
+| Method | Path | Success |
+|---|---|---|
+| GET | `/api/payroll/payruns/{id}/payment-status` | `200` |
+| GET | `/api/payroll/payslips/{id}/payment-status` | `200` |
+
+The payrun response exposes the persisted payrun status, `paidAt`, total payslips, paid payslips, and total net amount. The payslip response exposes its status, paid timestamp, employee, payrun, and net amount. Status changes remain controlled by the existing payrun lifecycle endpoint.
+
+## Formula salary rules
+
+`FORMULA` salary rules now execute during payrun computation. The restricted engine supports `+`, `-`, `*`, `/`, parentheses, unary signs, numeric values, `base_salary`, `gross`, `deductions`, `net`, and earlier rule codes. Unsafe expressions, unknown variables, malformed formulas, and division by zero return a validation error.
+
+During compute, Payroll reads period-applicable contracts from `HR_API_URL`, filters for active employees and the selected salary structure, and rejects overlapping contracts, invalid base salaries, or contracts outside the payrun period.
+
+Before `VALIDATED` status, the API re-checks persisted payslips against the payrun period and HR contract employee scope, then validates contract IDs, non-negative totals, `net = gross - deductions`, salary-rule line presence, and line-total consistency.
 
 Create payrun request:
 

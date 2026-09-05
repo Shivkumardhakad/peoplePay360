@@ -667,6 +667,227 @@
 ### Notes
 - This was a documentation/context update only; no application code was changed.
 
+## 2026-09-05  â€” Implement payslip PDF download
+
+### Summary
+- Added protected PDF generation and download for individual payslips.
+
+### Files Changed
+- `pom.xml`: Added the OpenPDF dependency.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayslipPdfService.java`: Generates a PDF containing payslip metadata, totals, and salary-rule lines.
+- `apps/payroll/src/main/java/com/dj/payroll/controllers/PayrunController.java`: Added `GET /api/payroll/payslips/{id}/pdf` with an inline PDF response.
+- `apps/payroll/src/test/java/com/dj/payroll/services/PayslipPdfServiceTest.java`: Added PDF signature and generation coverage.
+- `AGENTS.md`: Added the PDF endpoint to the Payroll API map.
+- `docs/PAYROLL_API.md`: Documented the PDF response and authentication requirement.
+
+### Reason
+- Payslips need a printable/downloadable document for employee delivery and payroll review.
+
+### Validation
+- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 â€” passed; 5 tests passed.
+- `GET http://localhost:8080/api/payroll/payslips/test-id/pdf` without a JWT â€” returned expected `401` protection response.
+- `git diff --check` â€” passed.
+
+### Notes
+- An authenticated request with an existing payslip ID is required to verify the full live PDF body; the unit test verifies valid PDF bytes and embedded line generation.
+
+## 2026-09-05  â€” Add payroll reports APIs
+
+### Summary
+- Added period-based payroll summary and payslip detail reports backed by persisted Payroll data.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/controllers/ReportController.java`: Added summary and payslip report endpoints.
+- `apps/payroll/src/main/java/com/dj/payroll/services/ReportService.java`: Added period validation, aggregation, status filtering, and report mapping.
+- `apps/payroll/src/main/java/com/dj/payroll/dto/ReportDtos.java`: Added report response contracts.
+- `apps/payroll/src/main/java/com/dj/payroll/repositories/ReportRepository.java`: Added period-based payslip query.
+- `apps/payroll/src/main/java/com/dj/payroll/repositories/PayrunRepository.java`: Added period payrun count query.
+- `apps/payroll/src/test/java/com/dj/payroll/services/ReportServiceTest.java`: Added aggregation test coverage.
+- `AGENTS.md`: Documented the report endpoints.
+- `docs/PAYROLL_API.md`: Added report usage and query requirements.
+
+### Reason
+- Payroll reporting was listed as required functionality but had no Payroll API implementation.
+
+### Validation
+- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 â€” passed; 6 tests passed.
+- Payroll application restarted with the new report controllers â€” passed on port `8080`.
+- Both report endpoints without a JWT â€” returned expected `401` protection responses.
+- `git diff --check` â€” passed.
+
+### Notes
+- Reports require an authenticated request and return empty totals when the selected period has no payslips.
+
+## 2026-09-05  â€” Add payroll auditor API
+
+### Summary
+- Added a deterministic payroll auditor endpoint over persisted payrun, payslip, and payslip-line data.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/controllers/PayrollAuditController.java`: Added `GET /api/payroll/payruns/{id}/audit`.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrollAuditorService.java`: Added structured payroll integrity findings and risk scoring.
+- `apps/payroll/src/main/java/com/dj/payroll/dto/PayrollAuditDtos.java`: Added audit response contracts.
+- `apps/payroll/src/test/java/com/dj/payroll/services/PayrollAuditorServiceTest.java`: Added mismatch and missing-line coverage.
+- `AGENTS.md`: Documented the auditor endpoint.
+- `docs/PAYROLL_API.md`: Documented audit checks and response behavior.
+
+### Reason
+- Payroll needs a review step that surfaces calculation and data-integrity risks before finalization. The current implementation is deterministic and does not claim to be an external LLM.
+
+### Validation
+- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 7 tests passed.
+- Payroll application restarted with the auditor controller — passed on port `8080`.
+- Auditor endpoint without a JWT — returned expected `401` protection response.
+- `git diff --check` — passed.
+
+### Notes
+- Auditor version is `rules-v1`; an external AI provider can be added later without changing the structured API contract.
+
+## 2026-09-05  â€” Add payment status APIs
+
+### Summary
+- Added read-only payment status endpoints for payruns and individual payslips.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/controllers/PaymentStatusController.java`: Added payrun and payslip payment status routes.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PaymentStatusService.java`: Aggregates persisted payment state and net totals.
+- `apps/payroll/src/main/java/com/dj/payroll/dto/PaymentStatusDtos.java`: Added payment status response contracts.
+- `apps/payroll/src/test/java/com/dj/payroll/services/PaymentStatusServiceTest.java`: Added aggregation coverage.
+- `AGENTS.md`: Documented payment status endpoints.
+- `docs/PAYROLL_API.md`: Added payment status API documentation.
+
+### Reason
+- Payment status existed only as part of the payrun action response; dedicated read APIs are needed for payment tracking and dashboard/report consumers.
+
+### Validation
+- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 8 tests passed.
+- Payroll application restarted with the payment status controller — passed on port `8080`.
+- Both payment status endpoints without a JWT — returned expected `401` protection responses.
+- `git diff --check` — passed.
+
+### Notes
+- These APIs are read-only. Payment transitions continue through the validated payrun lifecycle.
+
+## 2026-09-05  â€” Implement formula salary-rule engine
+
+### Summary
+- Replaced the unsupported `FORMULA` payrun failure with a restricted deterministic arithmetic engine.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/services/FormulaSalaryRuleEngine.java`: Added safe arithmetic parsing and payroll variable resolution.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Integrated formula evaluation into ordered payslip calculation with prior-rule context.
+- `apps/payroll/src/test/java/com/dj/payroll/services/FormulaSalaryRuleEngineTest.java`: Added arithmetic, variable, unknown-variable, and divide-by-zero coverage.
+- `apps/payroll/src/test/java/com/dj/payroll/services/PayrunServiceTest.java`: Updated service construction for the formula engine.
+- `AGENTS.md`: Documented supported formula variables and operators.
+- `docs/PAYROLL_API.md`: Documented formula behavior and validation failures.
+
+### Reason
+- Formula salary rules were accepted by the API but always failed during payrun computation.
+
+### Validation
+- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 10 tests passed.
+- Spring application context startup — passed; formula engine component loads successfully.
+- `git diff --check` — passed.
+
+### Notes
+- This is intentionally not a general-purpose scripting engine; no Java reflection, method calls, or arbitrary code execution is allowed.
+
+## 2026-09-05  â€” Strengthen employee and contract payroll integration
+
+### Summary
+- Payroll compute now consumes employee status and contract salary-structure data from the HR API and validates the complete employee/contract scope before generating payslips.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/integration/HrContractClient.java`: Added employee status and salary-structure data to contract snapshots and filtering.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Added overlap, employee-status, base-salary, and selected-structure validation.
+- `apps/payroll/src/test/java/com/dj/payroll/services/PayrunServiceTest.java`: Added overlapping-contract rejection coverage and updated HR client expectations.
+- `AGENTS.md`: Documented integration rules.
+- `docs/PAYROLL_API.md`: Documented HR contract selection and validation.
+
+### Reason
+- Payroll previously imported only contract ID, employee ID, and salary, allowing terminated employees, mismatched structures, invalid salaries, and overlapping active contracts into compute.
+
+### Validation
+- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 11 tests passed.
+- `GET http://localhost:3001/api/hr/contracts` — returned `200`; HR contract endpoint is reachable.
+- Payroll compute endpoint without a JWT — returned expected `401` protection response.
+- `git diff --check` — passed.
+
+### Notes
+- HR API must be reachable at `HR_API_URL`; no real employee or payroll data was modified by this change. An authenticated seeded payrun was not available for a full end-to-end compute execution.
+
+## 2026-09-05  â€” Add full real-data payrun validation
+
+### Summary
+- Strengthened payrun validation before `VALIDATED` status using persisted payslips, salary-rule lines, and a fresh HR contract scope lookup.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Added period, contract, employee, total, arithmetic, line-presence, line-total, and HR-scope validation.
+- `apps/payroll/src/test/java/com/dj/payroll/services/PayrunServiceTest.java`: Added real-data validation failure coverage.
+- `AGENTS.md`: Documented validation requirements.
+- `docs/PAYROLL_API.md`: Documented validation checks.
+
+### Reason
+- Payrun validation previously checked only empty payslips and negative net values, allowing inconsistent or stale payroll data to be finalized.
+
+### Validation
+- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 12 tests passed.
+- `GET http://localhost:3001/api/hr/contracts` — returned `200`; HR contract source is reachable.
+- Payroll compute endpoint without a JWT — returned expected `401` protection response.
+- `git diff --check` — passed.
+
+### Notes
+- Validation performs a fresh HR API lookup; HR availability is required when validating a non-empty payrun.
+
+## 2026-09-05  â€” Fix Departments API validation and access
+
+### Summary
+- Hardened Departments API with pagination, detail retrieval, request validation, consistent missing/conflict errors, and JWT role protection.
+
+### Files Changed
+- `apps/hr-api/src/modules/departments/departments.controller.ts`: Added guarded detail route, pagination validation, and Zod create/update validation.
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Added paginated queries, department detail lookup, and Prisma error mapping.
+- `apps/hr-api/src/modules/shared/department-access.guard.ts`: Added HS256 JWT validation for `ADMIN` and `HR_MANAGER` department access.
+- `AGENTS.md`: Updated the Departments API map and runtime requirements.
+
+### Reason
+- Departments returned `500` for invalid records, accepted unvalidated Prisma input, loaded unbounded position data, lacked pagination, and had no endpoint authentication.
+
+### Validation
+- Direct TypeScript compiler `tsc -p apps/hr-api/tsconfig.json --noEmit` — passed.
+- Unauthenticated department list — `401`.
+- Authenticated `HR_MANAGER` list — `200`.
+- Invalid page — `400`.
+- Missing detail/delete — `404`.
+- Empty create — `400`.
+- No real department data was created or deleted.
+
+### Notes
+- The JWT guard uses `JWT_SECRET` and the repository development fallback; production must set a strong secret explicitly.
+
+## 2026-09-05  â€” Add endpoint-level Payroll RBAC
+
+### Summary
+- Replaced the single broad Payroll role rule with endpoint-specific authorization rules.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/security/SecurityConfig.java`: Added separate read, report, audit, payment-status, configuration, compute, and mutation role matchers.
+- `AGENTS.md`: Documented endpoint-level role scope.
+- `docs/PAYROLL_API.md`: Documented the role matrix and default-deny behavior for future routes.
+
+### Reason
+- Every Payroll endpoint previously accepted all three Payroll roles, allowing HR managers to perform payroll mutations.
+
+### Validation
+- `mvn -Dmaven.repo.local=D:\oddo1\peoplePay360\.m2-local test` with Java 21 — passed; 11 tests passed.
+- Spring security context startup — passed.
+- Unauthenticated Payroll read/mutation routes — returned expected `401` responses.
+- Local `HR_MANAGER` JWT: reports read — `200`; payrun compute mutation — expected `403`.
+- `git diff --check` — passed.
+
+### Notes
+- JWT role claims remain the authorization source. A token must contain a role claim; no frontend-only permission checks are trusted.
+
 ## 2026-09-05 17:38 +05:30 — Expand hackathon scope details
 
 ### Summary
@@ -771,3 +992,22 @@
 - HR requires `DATABASE_URL` pointing to `oddo_hr` when started.
 - Local `oddo_hr` database creation is an environment setup action; no existing Payroll data was reset or deleted.
 - This was a documentation/context update only; no application code was changed.
+## 2026-09-06  — Git staging cleanup
+
+### Summary
+- Removed generated Maven dependency-cache files from the staged changes.
+- Added `.m2-local/` to `.gitignore`.
+
+### Files Changed
+- `.gitignore`: Ignore the local Maven repository cache.
+- `CHANGELOG_AGENTS.md`: Recorded the staging cleanup.
+
+### Reason
+- Prevent generated `.m2-local` dependencies from being committed or pushed with the application source.
+
+### Validation
+- `git diff --cached --name-only` — passed; no `.m2-local` files remain staged.
+- `git status --short --untracked-files=no` — passed; 35 relevant files remain staged.
+
+### Notes
+- The local `.m2-local` directory was not deleted; it remains available for local builds and is now ignored by Git.

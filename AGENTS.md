@@ -21,7 +21,11 @@ The repository contains two backend APIs. Keep this endpoint map synchronized wi
 | Method | Endpoint | Purpose |
 |---|---|---|
 | GET | `/api/hr/employees` | List employees |
-| GET | `/api/hr/departments` | List departments |
+| GET | `/api/hr/departments?page=1&limit=50` | Paginated department list |
+| GET | `/api/hr/departments/{id}` | Get department with positions and employee count |
+| POST | `/api/hr/departments` | Create validated department |
+| PATCH | `/api/hr/departments/{id}` | Update validated department |
+| DELETE | `/api/hr/departments/{id}` | Delete department |
 | GET | `/api/hr/job-positions` | List job positions |
 | GET | `/api/hr/contracts` | List contracts |
 | GET | `/api/hr/attendance` | List attendance records |
@@ -29,7 +33,7 @@ The repository contains two backend APIs. Keep this endpoint map synchronized wi
 | GET | `/api/hr/users` | List users |
 | GET | `/api/hr/dashboard` | Get HR dashboard data |
 
-The HR API uses a dedicated PostgreSQL database through Prisma and requires `DATABASE_URL` (local development: `postgresql://postgres:root@localhost:5432/oddo_hr`). Do not point HR at the Payroll `oddo` database because their schemas are different. Apply the HR schema with `pnpm --filter @peoplepay360/db exec prisma migrate deploy` after setting `DATABASE_URL`. CORS defaults to `http://localhost:3000`; the port defaults to `3001` and can be changed with `PORT`. The HR API currently has no real automated test suite; its package `test` script is a placeholder.
+The HR API uses a dedicated PostgreSQL database through Prisma and requires `DATABASE_URL` (local development: `postgresql://postgres:root@localhost:5432/oddo_hr`). Do not point HR at the Payroll `oddo` database because their schemas are different. Apply the HR schema with `pnpm --filter @peoplepay360/db exec prisma migrate deploy` after setting `DATABASE_URL`. CORS defaults to `http://localhost:3000`; the port defaults to `3001` and can be changed with `PORT`. Department routes require an `ADMIN` or `HR_MANAGER` JWT; they validate request bodies and return paginated results. The HR API still needs a broader automated test suite.
 
 ### Payroll API — Java/Spring Boot
 
@@ -38,7 +42,7 @@ The HR API uses a dedicated PostgreSQL database through Prisma and requires `DAT
 - Start: `pnpm dev:payroll`
 - Test/build: `pnpm build:payroll`
 - Detailed examples: [`docs/PAYROLL_API.md`](docs/PAYROLL_API.md)
-- All `/api/payroll/**` endpoints require a Bearer JWT with `role` equal to `ADMIN`, `PAYROLL_MANAGER`, or `HR_MANAGER`.
+- All `/api/payroll/**` endpoints require a Bearer JWT. Read-only reports, payslips, audits, payment status, and salary configuration reads allow `ADMIN`, `PAYROLL_MANAGER`, or `HR_MANAGER`; payroll mutations and compute actions allow only `ADMIN` or `PAYROLL_MANAGER`; unspecified future Payroll routes fall back to `ADMIN` until explicitly assigned.
 
 #### Salary rule categories
 
@@ -77,6 +81,35 @@ The HR API uses a dedicated PostgreSQL database through Prisma and requires `DAT
 | POST | `/api/payroll/payruns/{id}/cancel` | Cancel payrun |
 | GET | `/api/payroll/payruns/{payrunId}/payslips` | List payrun payslips |
 | GET | `/api/payroll/payslips/{id}` | Get payslip with lines |
+| GET | `/api/payroll/payslips/{id}/pdf` | Download or display payslip PDF |
+
+#### Reports
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/payroll/reports/summary?from={ISO_DATETIME}&to={ISO_DATETIME}` | Aggregate payrun/payslip totals and status counts |
+| GET | `/api/payroll/reports/payslips?from={ISO_DATETIME}&to={ISO_DATETIME}&status={STATUS}` | Detailed payslip report for a period |
+
+#### Payroll auditor
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/payroll/payruns/{id}/audit` | Audit persisted payrun/payslip data and return risk findings |
+
+#### Payment status
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/payroll/payruns/{id}/payment-status` | Payrun payment status, paid payslip count, and total net amount |
+| GET | `/api/payroll/payslips/{id}/payment-status` | Individual payslip payment status and paid timestamp |
+
+#### Formula salary rules
+
+Formula rules are evaluated during payrun computation using a restricted arithmetic engine. Supported operators are `+`, `-`, `*`, `/`, unary signs, parentheses, numeric literals, `base_salary`, `gross`, `deductions`, `net`, and earlier salary-rule codes. Unknown variables and division by zero are rejected.
+
+Payroll compute loads contracts and employee status from the HR API for the selected period and salary structure. It rejects terminated employees, invalid or negative base salaries, and overlapping active contracts for the same employee.
+
+Payrun validation must re-check real persisted payslips against the payrun period, HR active-contract employee scope, contract IDs, totals, net arithmetic, and salary-rule line totals before allowing `VALIDATED` status.
 
 Payroll requires PostgreSQL (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) and Java 21. Payrun computation also requires the HR API at `HR_API_URL` and currently cannot execute `FORMULA` salary rules because no formula engine is configured. The Java test suite currently contains 4 passing tests when run with Java 21.
 This hackathon implementation may also be presented as "HR & Payroll" by PeoplePay360. The core product story is a connected operational platform where employee master data, contracts, schedules, attendance, leave, salary rules, payruns, payslips, PDF delivery, and dashboard reporting work from live system records rather than static mocks.
