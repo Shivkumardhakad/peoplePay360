@@ -32,6 +32,7 @@ public class ApiErrorResponse {
 		return new ApiErrorResponse(LocalDateTime.now(), status, error, message, path, null);
 	}
 
+
 	public static ApiErrorResponse withValidationErrors(
 			int status,
 			String error,

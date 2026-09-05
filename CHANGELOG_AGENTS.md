@@ -622,3 +622,89 @@
 
 ### Notes
 - Prisma package.json configuration deprecation warning remains non-blocking.
+
+## 2026-09-05  — Fix Payroll API root scripts
+
+### Summary
+- Corrected root Payroll API commands to use the actual Maven project directory.
+
+### Files Changed
+- `package.json`: Updated `dev:payroll` and `build:payroll` from `apps/payroll-api` to `apps/payroll`.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- The configured `apps/payroll-api` path does not contain the Maven project; the source and `pom.xml` are under `apps/payroll`.
+
+### Validation
+- `mvn -q test` from `apps/payroll` — could not complete initially because Maven attempted to write to inaccessible `C:\.m2\repository`.
+- `mvn "-Dmaven.repo.local=D:\\oddo1\\peoplePay360\\.m2-local" test -q` with Java 21 — passed; 4 tests succeeded.
+- `git diff --check` — passed.
+
+### Notes
+- Existing Surefire reports showed 4 Payroll tests passing before this change.
+- The machine defaulted to Java 8; Maven test execution requires the installed Java 21 runtime specified by the project.
+- HR package validation was not completed because pnpm could not verify the locked pnpm 11.19.0 registry signature in the local environment.
+- `apps/payroll/src/main/java/com/dj/payroll/exception/ApiErrorResponse.java` had a pre-existing whitespace-only modification and was not changed.
+
+## 2026-09-05  — Document Payroll API endpoints
+
+### Summary
+- Added a complete local-use and endpoint reference for the Java Payroll API.
+
+### Files Changed
+- `docs/PAYROLL_API.md`: Documented authentication, configuration, salary rules, salary structures, payruns, payslips, examples, lifecycle, and known limitations.
+- `CHANGELOG_AGENTS.md`: Recorded this documentation change.
+
+### Reason
+- The Java API needed a single reference that can be used to manually verify every available endpoint and its request format.
+
+### Validation
+- Controller and DTO source inspection — passed; all currently mapped Java endpoints are included.
+- `git diff --check` — passed.
+
+### Notes
+- Swagger/OpenAPI is not currently configured, so the Markdown document is the source-level endpoint reference.
+
+## 2026-09-05  — Add API reference to AGENTS instructions
+
+### Summary
+- Added the HR and Payroll API endpoint maps and runtime requirements to the agent instructions.
+
+### Files Changed
+- `AGENTS.md`: Documented both backend base URLs, start/test commands, authentication, endpoints, dependencies, and known limitations.
+- `CHANGELOG_AGENTS.md`: Recorded this documentation change.
+
+### Reason
+- Agents need the complete API contract in the repository instructions when implementing or validating backend changes.
+
+### Validation
+- Controller source inspection — passed; HR and Payroll endpoint mappings were checked against source controllers.
+- `git diff --check` — passed.
+
+### Notes
+- Request-body examples remain in `docs/PAYROLL_API.md`.
+
+## 2026-09-05  — Verify APIs with separate HR database
+
+### Summary
+- Created the local `oddo_hr` database, applied the committed HR Prisma migration, and completed live checks for both APIs.
+
+### Files Changed
+- `AGENTS.md`: Documented the required dedicated HR database and migration command.
+- `docs/PAYROLL_API.md`: Added the local HR database setup note.
+- `CHANGELOG_AGENTS.md`: Recorded the verification and configuration note.
+
+### Reason
+- The HR API returned `500` because its Prisma tables were missing and the Payroll database contained incompatible schema/data. A separate HR database preserves the Payroll schema and allows HR migrations to apply cleanly.
+
+### Validation
+- `pnpm --filter @peoplepay360/db exec prisma generate` — passed.
+- `pnpm --filter @peoplepay360/db exec prisma migrate deploy` against `oddo_hr` — passed.
+- HR TypeScript check — passed.
+- HR live endpoints — all 8 returned `200`; dashboard returned zero-count data.
+- Payroll live startup with Java 21 — passed on port `8080`; protected payrun endpoint returned expected `401` without a JWT.
+- `git diff --check` — passed.
+
+### Notes
+- HR requires `DATABASE_URL` pointing to `oddo_hr` when started.
+- Local `oddo_hr` database creation is an environment setup action; no existing Payroll data was reset or deleted.

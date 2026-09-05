@@ -6,6 +6,80 @@ PeoplePay360 is an integrated HR and Payroll platform that manages employee reco
 
 The system must prioritize accurate business logic, reliable data relationships, historical tracking, role-based access, and an end-to-end employee-to-payslip workflow over superficial UI implementation.
 
+## API Reference
+
+The repository contains two backend APIs. Keep this endpoint map synchronized with controller changes.
+
+### HR API — NestJS
+
+- Base URL: `http://localhost:3001/api/hr`
+- Source: `apps/hr-api`
+- Start: `pnpm dev:hr`
+- Build: `pnpm --filter @peoplepay360/hr-api build`
+- Current controllers are read-only list/dashboard endpoints:
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/hr/employees` | List employees |
+| GET | `/api/hr/departments` | List departments |
+| GET | `/api/hr/job-positions` | List job positions |
+| GET | `/api/hr/contracts` | List contracts |
+| GET | `/api/hr/attendance` | List attendance records |
+| GET | `/api/hr/time-off/requests` | List time-off requests |
+| GET | `/api/hr/users` | List users |
+| GET | `/api/hr/dashboard` | Get HR dashboard data |
+
+The HR API uses a dedicated PostgreSQL database through Prisma and requires `DATABASE_URL` (local development: `postgresql://postgres:root@localhost:5432/oddo_hr`). Do not point HR at the Payroll `oddo` database because their schemas are different. Apply the HR schema with `pnpm --filter @peoplepay360/db exec prisma migrate deploy` after setting `DATABASE_URL`. CORS defaults to `http://localhost:3000`; the port defaults to `3001` and can be changed with `PORT`. The HR API currently has no real automated test suite; its package `test` script is a placeholder.
+
+### Payroll API — Java/Spring Boot
+
+- Base URL: `http://localhost:8080`
+- Source: `apps/payroll`
+- Start: `pnpm dev:payroll`
+- Test/build: `pnpm build:payroll`
+- Detailed examples: [`docs/PAYROLL_API.md`](docs/PAYROLL_API.md)
+- All `/api/payroll/**` endpoints require a Bearer JWT with `role` equal to `ADMIN`, `PAYROLL_MANAGER`, or `HR_MANAGER`.
+
+#### Salary rule categories
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/payroll/salary-rule-categories` | List categories |
+| GET | `/api/payroll/salary-rule-categories/{id}` | Get category |
+| POST | `/api/payroll/salary-rule-categories` | Create category |
+| PUT | `/api/payroll/salary-rule-categories/{id}` | Update category |
+| DELETE | `/api/payroll/salary-rule-categories/{id}` | Delete category |
+
+#### Salary rules and structures
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/payroll/salary-rules` | List rules; optional `categoryId` query parameter |
+| GET | `/api/payroll/salary-rules/{id}` | Get rule |
+| POST | `/api/payroll/salary-rules` | Create rule |
+| PUT | `/api/payroll/salary-rules/{id}` | Update rule |
+| DELETE | `/api/payroll/salary-rules/{id}` | Deactivate rule |
+| GET | `/api/payroll/salary-structures` | List structures |
+| GET | `/api/payroll/salary-structures/{id}` | Get structure |
+| POST | `/api/payroll/salary-structures` | Create structure with rule assignments |
+| PUT | `/api/payroll/salary-structures/{id}` | Update structure |
+
+#### Payruns and payslips
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/payroll/payruns` | List payruns |
+| GET | `/api/payroll/payruns/{id}` | Get payrun |
+| POST | `/api/payroll/payruns` | Create payrun |
+| POST | `/api/payroll/payruns/{id}/compute` | Compute payslips |
+| POST | `/api/payroll/payruns/{id}/validate` | Validate payrun and return warnings |
+| POST | `/api/payroll/payruns/{id}/pay` | Mark payrun paid |
+| POST | `/api/payroll/payruns/{id}/cancel` | Cancel payrun |
+| GET | `/api/payroll/payruns/{payrunId}/payslips` | List payrun payslips |
+| GET | `/api/payroll/payslips/{id}` | Get payslip with lines |
+
+Payroll requires PostgreSQL (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) and Java 21. Payrun computation also requires the HR API at `HR_API_URL` and currently cannot execute `FORMULA` salary rules because no formula engine is configured. The Java test suite currently contains 4 passing tests when run with Java 21.
+
 ## Purpose of This File
 
 This document defines the engineering standards, workflow, and operating rules for all AI agents and automated contributors working in this repository.
