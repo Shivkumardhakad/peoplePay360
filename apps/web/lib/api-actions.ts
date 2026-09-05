@@ -603,9 +603,53 @@ export async function getHrDashboardAction() {
 }
 
 export async function validatePayrunAction(payrunId: string) {
-  const result = await payrollApiFetch(`/api/payroll/payruns/${payrunId}/validate`, { method: "POST" });
-  revalidatePath(`/payroll/payruns/${payrunId}`);
-  return { success: true, result };
+  try {
+    const payrun = await payrollApiFetch<any>(`/api/payroll/payruns/${payrunId}`);
+    const periodStart = new Date(payrun.periodStart);
+    const periodEnd = new Date(payrun.periodEnd);
+    const warnings: Array<{ code: string; message: string; blocking: boolean; employeeId?: string }> = [];
+    const payslips = Array.isArray(payrun.payslips) ? payrun.payslips : [];
+
+    if (!payslips.length) warnings.push({ code: "NO_PAYSLIPS", message: "Compute the payrun before validation.", blocking: true });
+    const employeeIds: string[] = payslips.map((payslip: any) => String(payslip.employeeId ?? "")).filter(Boolean);
+    const uniqueEmployeeIds = [...new Set(employeeIds)];
+    const duplicateEmployeeIds = employeeIds.filter((employeeId: string, index: number) => employeeIds.indexOf(employeeId) !== index);
+    [...new Set(duplicateEmployeeIds)].forEach((employeeId) => warnings.push({ code: "DUPLICATE_PAYSLIP", message: `Duplicate payslip detected for employee ${employeeId}.`, blocking: true, employeeId }));
+
+    const structure = await payrollApiFetch<any>(`/api/payroll/salary-structures/${payrun.salaryStructureId}`);
+    if (!structure?.rules?.length) warnings.push({ code: "NO_SALARY_RULES", message: "Salary structure has no assigned salary rules.", blocking: true });
+
+    const [employees, contracts] = await Promise.all([
+      prisma.employee.findMany({ where: { id: { in: uniqueEmployeeIds } }, select: { id: true, firstName: true, lastName: true, bankAccountId: true } }),
+      prisma.contract.findMany({ where: { employeeId: { in: uniqueEmployeeIds } }, select: { employeeId: true, status: true, startDate: true, endDate: true } }),
+    ]);
+    const employeeMap = new Map(employees.map((employee) => [employee.id, employee]));
+    const contractsByEmployee = new Map<string, typeof contracts>();
+    contracts.forEach((contract) => contractsByEmployee.set(contract.employeeId, [...(contractsByEmployee.get(contract.employeeId) ?? []), contract]));
+    for (const employeeId of uniqueEmployeeIds) {
+      const employee = employeeMap.get(employeeId);
+      if (!employee) {
+        warnings.push({ code: "MISSING_EMPLOYEE", message: `Employee record ${employeeId} no longer exists in HR.`, blocking: true, employeeId });
+        continue;
+      }
+      if (!employee.bankAccountId) warnings.push({ code: "MISSING_BANK_ACCOUNT", message: `${employee.firstName} ${employee.lastName} has no bank account.`, blocking: true, employeeId });
+      const applicableContract = (contractsByEmployee.get(employeeId) ?? []).some((contract) => contract.status === "ACTIVE" && contract.startDate <= periodEnd && (!contract.endDate || contract.endDate >= periodStart));
+      if (!applicableContract) warnings.push({ code: "INVALID_CONTRACT_PERIOD", message: `${employee.firstName} ${employee.lastName} has no applicable active contract for this period.`, blocking: true, employeeId });
+    }
+
+    const attendanceExceptions = await prisma.attendance.count({ where: { employeeId: { in: uniqueEmployeeIds }, date: { gte: periodStart, lte: periodEnd }, status: "EXCEPTION" } });
+    if (attendanceExceptions > 0) warnings.push({ code: "ATTENDANCE_EXCEPTIONS", message: `${attendanceExceptions} attendance exceptions need review.`, blocking: false });
+    const pendingLeave = await prisma.timeOffRequest.count({ where: { employeeId: { in: uniqueEmployeeIds }, status: "SUBMITTED", startDate: { lte: periodEnd }, endDate: { gte: periodStart } } });
+    if (pendingLeave > 0) warnings.push({ code: "PENDING_LEAVE", message: `${pendingLeave} leave requests are still pending in this pay period.`, blocking: false });
+    payslips.filter((payslip: any) => Number(payslip.netAmount) < 0).forEach((payslip: any) => warnings.push({ code: "NEGATIVE_NET", message: `Negative net amount for employee ${payslip.employeeId}.`, blocking: true, employeeId: payslip.employeeId }));
+
+    if (warnings.some((warning) => warning.blocking)) return { success: false, warnings, error: "Payroll validation blocked by data warnings." };
+    const result = await payrollApiFetch(`/api/payroll/payruns/${payrunId}/validate`, { method: "POST" });
+    revalidatePath(`/payroll/payruns/${payrunId}`);
+    return { success: true, result, warnings };
+  } catch (error) {
+    return { success: false, warnings: [], error: error instanceof Error ? error.message : "Payroll validation failed." };
+  }
 }
 
 export async function markPayrunPaidAction(payrunId: string) {

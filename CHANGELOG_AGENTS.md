@@ -1841,3 +1841,26 @@
 
 ### Notes
 - Payroll uses Hibernate `ddl-auto: update`, so the new payrun scope column is created by the Java service on startup. Existing payruns without a scope continue to process all eligible contracts for backward compatibility.
+
+## 2026-09-06 06:30 IST — Add live payroll validation warnings
+
+### Summary
+- Added server-side validation checks against Java Payroll and live HR Prisma records.
+- Added blocking warnings for missing payslips, salary rules, employees, bank accounts, applicable contracts, duplicate payslips, and negative net amounts.
+- Added review warnings for attendance exceptions and pending leave during the payroll period.
+- Rendered returned warnings in the payrun processing page and blocked final validation when blocking issues exist.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Cross-check payrun, payroll structure, employee, contract, attendance, and leave data before Java validation.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Display validation warnings and handle blocked validation responses.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payroll validation must surface operational risks before a payrun becomes validated or paid.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Java Maven tests remain unavailable in this environment because Maven is not installed and the wrapper cannot start; web validation checks are type-checked.

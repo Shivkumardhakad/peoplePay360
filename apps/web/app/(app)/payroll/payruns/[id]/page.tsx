@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 type PayrunStatus = "DRAFT" | "COMPUTED" | "VALIDATED" | "PAID";
+type ValidationWarning = { code: string; message: string; blocking: boolean; employeeId?: string };
 
 interface Slip {
   id: string;
@@ -44,6 +45,7 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [payrun, setPayrun] = useState<any>(null);
   const [payslips, setPayslips] = useState<any[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>([]);
 
   const reload = async () => {
     const [loadedPayrun, loadedPayslips] = await Promise.all([getPayrunAction(payrunId), listPayrunPayslipsAction(payrunId)]);
@@ -78,13 +80,17 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
   const handleValidate = async () => {
     setLoadingAction("validate");
     try {
-      await validatePayrunAction(payrunId);
+      const result = await validatePayrunAction(payrunId);
+      setValidationWarnings(result.warnings ?? []);
+      if (!result.success) throw new Error(result.error);
       await reload();
       toast({
         title: "Payrun Validated",
-        description: "Checked contracts, banking details, and tax thresholds.",
+        description: result.warnings?.length ? `${result.warnings.length} non-blocking warning(s) recorded.` : "Payroll validation completed without warnings.",
         type: "info",
       });
+    } catch (error) {
+      toast({ title: "Validation blocked", description: error instanceof Error ? error.message : "Payroll validation failed.", type: "error" });
     } finally {
       setLoadingAction(null);
     }
@@ -244,6 +250,22 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
               Payroll API returned computed payslips. Review warnings before validation.
             </p>
           </div>
+        </div>
+      )}
+
+      {validationWarnings.length > 0 && (
+        <div className="space-y-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+            <p className="text-xs font-semibold">Validation Warnings ({validationWarnings.length})</p>
+          </div>
+          <ul className="space-y-1 pl-6 list-disc">
+            {validationWarnings.map((warning, index) => (
+              <li key={`${warning.code}-${warning.employeeId ?? "all"}-${index}`} className="text-[11px]">
+                <span className="font-semibold">{warning.blocking ? "Blocking" : "Review"}:</span> {warning.message}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
