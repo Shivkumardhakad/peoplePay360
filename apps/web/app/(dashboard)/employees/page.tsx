@@ -1,13 +1,17 @@
+import { Download, Filter, MoreHorizontal, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+const employees = [
+  ["AS", "Aarav Sharma", "EMP-1024", "Engineering", "Software Engineer", "Active", "teal"],
+  ["PM", "Priya Mehta", "EMP-1023", "Design", "Product Designer", "Active", "violet"],
+  ["RK", "Rohan Kapoor", "EMP-1022", "Finance", "Finance Manager", "On leave", "amber"],
+  ["NS", "Neha Singh", "EMP-1021", "People", "HR Executive", "Active", "rose"],
+  ["VK", "Vikram Khanna", "EMP-1020", "Engineering", "Senior Engineer", "Active", "blue"]
+];
+const avatarColors: Record<string, string> = { teal: "bg-teal-100 text-teal-700", violet: "bg-violet-100 text-violet-700", amber: "bg-amber-100 text-amber-700", rose: "bg-rose-100 text-rose-700", blue: "bg-blue-100 text-blue-700" };
+
 export default function EmployeesPage() {
-  return <PageShell title="Employees" description="Employee records, employment status, and core HR data." />;
+  return <div className="grid gap-6"><header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.14em] text-teal-700">People operations</p><h2 className="mt-2 text-[30px] font-semibold tracking-tight text-slate-950">Employees</h2><p className="mt-1 text-sm text-slate-500">Manage your people, roles, and employment information.</p></div><Button className="rounded-lg bg-slate-900"><Plus className="mr-2 size-4" /> Add employee</Button></header><div className="grid gap-4 sm:grid-cols-3"><Mini label="All employees" value="248" note="Current headcount" /><Mini label="Active" value="239" note="96.4% of workforce" /><Mini label="On leave" value="09" note="Across 4 departments" /></div><section className="overflow-hidden rounded-2xl border bg-white"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-4"><div className="relative"><Search className="absolute left-3 top-2.5 size-4 text-slate-400" /><input placeholder="Search employees..." className="h-9 w-64 rounded-lg border bg-slate-50 pl-9 pr-3 text-xs outline-none focus:border-teal-500" /></div><div className="flex gap-2"><button className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium text-slate-600"><Filter className="size-3.5" /> Filters</button><button className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium text-slate-600"><Download className="size-3.5" /> Export</button><button className="grid size-8 place-items-center rounded-lg border text-slate-500"><SlidersHorizontal className="size-4" /></button></div></div><table className="w-full text-left"><thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-[.12em] text-slate-400"><tr><th className="px-5 py-3">Employee</th><th className="px-5 py-3">Department</th><th className="px-5 py-3">Position</th><th className="px-5 py-3">Status</th><th className="px-5 py-3"></th></tr></thead><tbody className="divide-y divide-slate-100">{employees.map(([initials, name, code, dept, position, status, color]) => <tr className="hover:bg-slate-50" key={code}><td className="px-5 py-4"><div className="flex items-center gap-3"><span className={`grid size-9 place-items-center rounded-full ${avatarColors[color]} text-[10px] font-bold`}>{initials}</span><span><strong className="block text-xs font-semibold text-slate-800">{name}</strong><small className="text-[11px] text-slate-400">{code}</small></span></div></td><td className="px-5 py-4 text-xs text-slate-600">{dept}</td><td className="px-5 py-4 text-xs text-slate-600">{position}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${status === "Active" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{status}</span></td><td className="px-5 py-4 text-right"><MoreHorizontal className="ml-auto size-4 text-slate-400" /></td></tr>)}</tbody></table><div className="flex items-center justify-between border-t p-4 text-xs text-slate-400"><span>Showing 5 of 248 employees</span><span className="font-medium text-slate-600">1 &nbsp; 2 &nbsp; 3 &nbsp; ... &nbsp; 50</span></div></section></div>;
 }
 
-function PageShell({ title, description }: { title: string; description: string }) {
-  return (
-    <div>
-      <p className="text-sm font-medium text-cyan-800">People operations</p>
-      <h2 className="mt-2 text-3xl font-semibold text-slate-950">{title}</h2>
-      <p className="mt-3 max-w-2xl text-slate-600">{description}</p>
-    </div>
-  );
-}
+function Mini({ label, value, note }: { label: string; value: string; note: string }) { return <div className="rounded-2xl border bg-white p-5"><p className="text-xs text-slate-500">{label}</p><strong className="mt-1 block text-2xl text-slate-900">{value}</strong><small className="mt-1 block text-[11px] text-slate-400">{note}</small></div>; }

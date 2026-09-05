@@ -135,3 +135,43 @@
 
 ### Notes
 - Payroll and HR database ownership are separated at the code level. Cross-service links use stable identifiers such as `employeeId`, `contractId`, and `payrollProfileCode` rather than ORM relations across services.
+## 2026-09-05 12:35 IST — PeoplePay360 Next.js workspace UI
+
+### Summary
+- Implemented a polished PeoplePay360 dashboard shell and populated the dashboard and employee directory with representative HR/payroll workflow data.
+
+### Files Changed
+- `apps/web/app/(dashboard)/layout.tsx`: Added responsive navigation, workspace header, user profile area, and product branding.
+- `apps/web/app/(dashboard)/dashboard/page.tsx`: Added payroll overview, KPI cards, pending actions, and recent payroll activity sections.
+- `apps/web/app/(dashboard)/employees/page.tsx`: Added employee metrics, search/filter toolbar, directory table, statuses, and pagination.
+- `apps/web/app/globals.css`: Added shared border styling for the refreshed UI.
+
+### Reason
+- Turned the Next.js route shell into an actionable frontend representation of the normalized employee, attendance, leave, contract, and payroll architecture described in `temp/one`.
+
+### Validation
+- `pnpm --filter web build` — not completed; pnpm terminated with an environment `EPERM` while accessing `C:\Users\DELL`.
+
+### Notes
+- The displayed records are static UI fixtures until API wiring is added.
+- Existing placeholder routes remain available and were not changed; contracts and payruns now have representative workflow screens.
+
+## 2026-09-05 13:40 IST — Complete normalized schema
+
+### Summary
+- Added the complete relational model set described in `temp/one` to the Prisma schema.
+
+### Files Changed
+- `packages/db/prisma/schema.prisma`: Added bank accounts, normalized schedule days, contract ownership fields, leave metadata, salary structures/categories/rules, structure-rule joins, payruns, payslips, payslip lines, roles, permissions, and RBAC join tables.
+- `CHANGELOG_AGENTS.md`: Recorded the schema change.
+
+### Reason
+- The previous schema covered only a subset of HR entities and did not represent the complete employee-to-payslip and role-permission relationships.
+
+### Validation
+- `git diff --check` — passed
+- Prisma validation — not run; local dependencies are not installed and pnpm is blocked by the environment’s `C:\Users\DELL` access restriction.
+
+### Notes
+- Existing legacy HR fields (`baseSalary`, `payrollProfileCode`, `days`, and single `User.role`) remain for backward compatibility.
+- Payroll API currently owns its separate Spring database; these Prisma payroll models provide the normalized shared application model requested in `temp/one` and should be reconciled before production migrations.
