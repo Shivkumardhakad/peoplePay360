@@ -1768,3 +1768,25 @@
 
 ### Notes
 - The Java Payroll API currently accepts formula rules, but payrun computation still requires a configured formula engine for executing them.
+
+## 2026-09-06 05:00 IST — Replace employee detail mock data with live records
+
+### Summary
+- Added a server-side employee detail lookup backed by Prisma.
+- Replaced hardcoded employee identity, department, status, joining date, and related counts with database values.
+- Preserved employee self-service ownership checks and return-not-found behavior for invalid records.
+
+### Files Changed
+- `apps/web/app/(app)/employees/[id]/page.tsx`: Render the requested employee's live record and related counts.
+- `apps/web/lib/api-actions.ts`: Added `getEmployeeAction` with department, position, and relation counts.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Employee detail was still displaying static presentation data despite the employee list being DB-backed.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Related navigation still opens the existing operational list pages; those pages remain responsible for their own filtering.

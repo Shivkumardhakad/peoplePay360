@@ -102,6 +102,33 @@ export async function updateEmployeeAction(employeeId: string, data: {
   }
 }
 
+export async function getEmployeeAction(employeeId: string) {
+  const employee = await prisma.employee.findFirst({
+    where: { OR: [{ id: employeeId }, { employeeNumber: employeeId }] },
+    include: {
+      department: true,
+      jobPosition: true,
+      _count: { select: { contracts: true, attendance: true, timeOffRequests: true, allocations: true } },
+    },
+  });
+
+  if (!employee) return null;
+
+  return {
+    id: employee.id,
+    employeeNumber: employee.employeeNumber,
+    firstName: employee.firstName,
+    lastName: employee.lastName,
+    email: employee.email,
+    phone: employee.phone ?? "",
+    department: employee.department?.name ?? "Unassigned",
+    position: employee.jobPosition?.title ?? "Unassigned",
+    status: employee.status,
+    dateOfJoining: employee.hireDate.toISOString().slice(0, 10),
+    counts: employee._count,
+  };
+}
+
 export async function getPayrollEligibleEmployeesAction() {
   const employees = await prisma.employee.findMany({ where: { status: "ACTIVE" }, orderBy: { lastName: "asc" }, include: { department: true, contracts: { where: { status: "ACTIVE" }, orderBy: { startDate: "desc" }, take: 1 } } });
   return employees.map((employee) => ({ id: employee.id, employeeNumber: employee.employeeNumber, name: `${employee.firstName} ${employee.lastName}`, department: employee.department?.name ?? "-", wage: Number(employee.contracts[0]?.baseSalary ?? 0) }));

@@ -1,39 +1,30 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Clock, CalendarDays, ArrowLeft, ReceiptText } from "lucide-react";
 import { EmployeeForm } from "@/components/employee-form";
+import { getEmployeeAction } from "@/lib/api-actions";
 
 export default async function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: employeeId } = await params;
   const session = await getServerSession(authOptions);
   const userRole = session?.user?.role || "ADMIN";
   const isEmployee = userRole === "EMPLOYEE";
-  const userEmpId = session?.user?.employeeId || "EMP-004";
+  const userEmpId = session?.user?.employeeId;
 
   // If Employee, strictly enforce viewing ONLY their own profile
-  if (isEmployee && employeeId !== userEmpId) {
+  if (isEmployee && (!userEmpId || employeeId !== userEmpId)) {
+    if (!userEmpId) redirect("/dashboard");
     redirect(`/employees/${userEmpId}`);
   }
 
-  const employeeName = isEmployee ? (session?.user?.name || "Emily Watson") : "Alice Johnson";
-  const nameParts = employeeName.split(" ");
-  const firstName = nameParts[0] || "Alice";
-  const lastName = nameParts.slice(1).join(" ") || "Johnson";
-
-  const mockEmployee = {
-    id: isEmployee ? userEmpId : employeeId,
-    firstName: firstName,
-    lastName: lastName,
-    email: isEmployee ? (session?.user?.email || "emily.watson@company.com") : "alice.johnson@company.com",
-    department: isEmployee ? "Product & Design" : "Engineering",
-    status: "ACTIVE" as const,
-    dateOfJoining: isEmployee ? "2023-03-01" : "2023-01-15",
-  };
+  const employee = await getEmployeeAction(employeeId);
+  if (!employee) notFound();
+  const statusLabel = employee.status === "ACTIVE" ? "Active" : employee.status === "ON_LEAVE" ? "On Leave" : "Inactive";
 
   return (
     <div className="space-y-3 max-w-4xl mx-auto">
@@ -49,17 +40,17 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-base font-semibold tracking-tight text-foreground">
-              {mockEmployee.firstName} {mockEmployee.lastName}
+              {employee.firstName} {employee.lastName}
             </h1>
             <span className="font-mono text-[11px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded border border-border">
-              {mockEmployee.id}
+              {employee.employeeNumber}
             </span>
-            <Badge variant="success" className="text-[10px] font-mono">
-              Active
+            <Badge variant={employee.status === "ACTIVE" ? "success" : "outline"} className="text-[10px] font-mono">
+              {statusLabel}
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground font-mono">
-            {mockEmployee.department} • Joined {mockEmployee.dateOfJoining}
+            {employee.department} • Joined {employee.dateOfJoining}
           </p>
         </div>
       </div>
@@ -96,7 +87,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
                     <p className="text-[11px] text-muted-foreground">Compensation Terms</p>
                   </div>
                 </div>
-                <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded border border-border">2</span>
+                <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded border border-border">{employee.counts.contracts}</span>
               </div>
             </Card>
           </Link>
@@ -114,7 +105,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
                   <p className="text-[11px] text-muted-foreground">Timesheet Logs</p>
                 </div>
               </div>
-              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded border border-border">98%</span>
+              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded border border-border">{employee.counts.attendance}</span>
             </div>
           </Card>
         </Link>
@@ -131,7 +122,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
                   <p className="text-[11px] text-muted-foreground">Leave Requests</p>
                 </div>
               </div>
-              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded border border-border">15d</span>
+              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded border border-border">{employee.counts.timeOffRequests}</span>
             </div>
           </Card>
         </Link>
@@ -145,7 +136,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-3">
-          <EmployeeForm employeeId={mockEmployee.id} defaultValues={mockEmployee} readOnly={isEmployee} />
+          <EmployeeForm employeeId={employee.id} defaultValues={{ firstName: employee.firstName, lastName: employee.lastName, email: employee.email, phone: employee.phone, department: employee.department, dateOfJoining: employee.dateOfJoining, status: employee.status === "TERMINATED" ? "TERMINATED" : employee.status }} readOnly={isEmployee} />
         </CardContent>
       </Card>
     </div>
