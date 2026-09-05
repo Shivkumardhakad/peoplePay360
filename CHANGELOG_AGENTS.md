@@ -317,3 +317,24 @@
 
 ### Notes
 - Dashboard data remains static fixture data.
+
+## 2026-09-05 17:05 IST — Fix database seed execution
+
+### Summary
+- Fixed the seed script’s misspelled Prisma delegate and added missing bcryptjs TypeScript declarations.
+
+### Files Changed
+- `packages/db/prisma/seed.ts`: Changed `workingScwhedule` to the valid `workingSchedule` delegate.
+- `packages/db/package.json`: Added `@types/bcryptjs` for seed compilation.
+- `CHANGELOG_AGENTS.md`: Recorded the seed fix.
+
+### Reason
+- `pnpm db:seed` failed before execution due to a TypeScript declaration error and an invalid Prisma client property.
+
+### Validation
+- `pnpm install --filter @peoplepay360/db` — passed
+- `pnpm --filter @peoplepay360/db exec prisma generate` — passed
+- `pnpm db:seed` — passed
+
+### Notes
+- Prisma package.json configuration deprecation warning remains non-blocking.

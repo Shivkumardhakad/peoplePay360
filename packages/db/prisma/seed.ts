@@ -8,7 +8,7 @@ const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 async function main() {
   const passwordHash = await bcrypt.hash("Admin123!", 10);
 
-  const schedule = await prisma.workingScwhedule.upsert({
+  const schedule = await prisma.workingSchedule.upsert({
     where: { name: "Standard 40 Hour Week" },
     update: {},
     create: {
