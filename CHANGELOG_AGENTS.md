@@ -382,3 +382,21 @@
 
 ### Notes
 - This was a documentation/context update only; no application code was changed.
+
+## 2026-09-05 17:38 +05:30 — Expand hackathon scope details
+
+### Summary
+- Expanded the agent instructions with the full HR & Payroll module breakdown, end-to-end flow requirements, dashboard expectations, and technical delivery guidelines.
+
+### Files Changed
+- `AGENTS.md`: Added detailed requirements for employee management, contracts, working schedules, attendance, time off, salary structures/rules, payruns, payslips, payroll dashboard, PDF/email delivery, demo flows, and technical priorities.
+- `CHANGELOG_AGENTS.md`: Recorded this documentation update.
+
+### Reason
+- The earlier context update summarized the product statement but did not preserve enough detail for future implementation decisions.
+
+### Validation
+- `git diff --check -- AGENTS.md CHANGELOG_AGENTS.md` — passed
+
+### Notes
+- This was a documentation/context update only; no application code was changed.

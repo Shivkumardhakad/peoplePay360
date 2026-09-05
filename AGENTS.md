@@ -29,6 +29,98 @@ This hackathon implementation may also be presented as "HR & Payroll" by PeopleP
 - HR Payroll Manager: has HR Payroll User permissions plus full CRUD access to payruns, payslips, salary structures, and salary rules.
 - Admin: has full access to all modules, user management, role assignment, permission updates, and system administration.
 
+## Required Functional Scope
+
+### Employee Master Management
+
+- Support employee list, kanban, and form experiences where practical.
+- Employee records must capture identity, department, manager, schedule, job position, status, salary context, and employment history.
+- Employee detail pages or APIs should act as the operational hub and expose related contracts, attendance, time off requests, allocations, and payslips.
+- Employees must be searchable/filterable by department, status, employee type, and other useful operational fields.
+
+### Contract Management
+
+- Contracts must preserve historical employment terms, including duration, department, position, wage/base salary, salary structure, schedule, and status.
+- Contract lists must clearly identify active contracts.
+- Payroll must select the contract applicable to the payrun period, not simply the latest record.
+- The system should prevent or warn on overlapping active contracts for the same employee unless an explicit business rule allows them.
+
+### Working Schedules
+
+- Working schedules must define weekly patterns by day, start time, end time, break duration, and working-day flag.
+- Weekly hours should be calculated from schedule-day definitions instead of manually trusted where possible.
+- Schedules may be assigned through employees or contracts and must feed attendance and payroll context.
+
+### Attendance
+
+- Attendance must support check-in, check-out, worked minutes/hours, status, exceptions, and manual corrections.
+- Attendance exceptions such as late, absent, missing checkout, half day, remote, overtime, and manual edits should be reviewable.
+- Manual corrections must be authorization-protected and auditable where practical.
+- Attendance data must remain available for dashboard/reporting and payroll warning checks.
+
+### Time Off
+
+- Time Off must include request, allocation, and type setup flows.
+- Time-off types must define units, allocation requirements, paid/unpaid behavior, approval requirements, payroll behavior, and status.
+- Allocations must track allocated, consumed, remaining, validity period, and status.
+- Approved requests must deduct balances from the matching allocation exactly once, and refused/cancelled requests must not consume balances.
+- Requests must show employee, type, dates, duration, status, reason, approver, and approval timestamp.
+
+### Salary Structures and Salary Rules
+
+- Salary structures are reusable containers for ordered salary rules.
+- Salary structure lists/forms should expose rule count, linked employee/contract count, and active status.
+- Salary rules must include category, code, sequence, computation method, value/formula, and status.
+- Rule categories must distinguish earnings, allowances/contributions, deductions, gross totals, and net totals as needed by payslip output.
+- Rule execution must be deterministic and respect sequence/dependencies.
+- Fixed, percentage, and formula computation methods are expected; formula support must be explicit rather than silently hardcoded.
+
+### Payruns and Payslips
+
+- Payrun creation must behave like a wizard: define salary structure and period, then select eligible employees, then create the batch.
+- Payruns must expose status, period, salary structure, selected employees, generated payslips, totals, warnings, and actions.
+- Payrun actions should include compute, validate, mark paid/finalize, generate PDF, and send payslips.
+- Compute must generate payslips from selected employees, period-specific contracts, attendance/time-off context, and salary rules.
+- Validation must block or warn on missing bank details, missing applicable contracts, duplicate payslips, attendance exceptions, leave-balance problems, and incomplete salary configuration.
+- Paid/finalized payruns and payslips must remain immutable enough for historical reporting.
+- Payslips must show employee, payrun, period, status, worked days/hours, gross, deductions, net, and line-level salary breakdowns.
+
+### Payroll Dashboard and Reporting
+
+- Dashboard metrics must come from live system records, not static charts.
+- Dashboard filters should include period, department, and employee type where practical.
+- KPI cards should cover total net salary paid, payslips generated, average salary, approved time off, and attendance health.
+- Reports/charts should cover salary cost by department, monthly net salary trends, attendance overview, time-off overview, payroll warnings, and department headcount plus salary expenditure.
+- Operational alerts should surface pending approvals, missing payroll information, duplicate payslips, contract attention items, attendance exceptions, and payment statuses.
+
+### Payslip PDF and Delivery
+
+- Individual payslips should support printable PDF generation.
+- Payruns should support bulk payslip email delivery.
+- PDF/email operations must be tied to validated/finalized payroll records and must not expose another employee's salary information.
+
+## End-to-End Flow Requirements
+
+- Employee records connect to contracts, schedules, attendance, time off, allocations, payruns, and payslips.
+- Attendance records capture daily presence and exceptions, and authorized users can correct entries.
+- Leave flows begin with time-off types and allocations, continue through requests and approvals, and update balances consistently.
+- Payroll configuration begins with salary structures, rule categories, and ordered rules.
+- Payroll officers create a payrun by selecting structure/period, then selecting eligible employees.
+- The system computes payslips using applicable contracts and configured salary rules for the selected period.
+- Payroll users review warnings and payslip breakdowns before validation and payment.
+- Finalized payruns remain available for history, PDF generation, and employee delivery.
+- Demo data should support a five-minute walkthrough of employee-to-payslip and leave allocation-to-request scenarios.
+
+## Technical Delivery Guidelines
+
+- The team may use any stack, but this repository currently uses Next.js, NestJS, Prisma, PostgreSQL, and workspace packages; follow existing boundaries unless explicitly changed.
+- Business rules such as contract selection, schedule hour calculation, leave balance consumption, salary sequencing, and payroll validation must live in application/domain logic, not hardcoded UI fixtures.
+- Configuration screens, APIs, and computation must be integrated; do not create salary-rule or leave-policy screens that are disconnected from actual payroll results.
+- Static mock data is acceptable only as temporary presentation scaffolding and must be called out as such.
+- Access control must reflect the role scope in this file.
+- Representative seed data should cover employees, departments, contracts, schedules, attendance, time off, salary structures, salary rules, payruns, payslips, and warning scenarios.
+- Future roadmap notes should prioritize formula engine depth, compliance rules, approval audit trails, richer reporting, notification templates, and payroll integrations.
+
 ## Purpose of This File
 
 This document defines the engineering standards, workflow, and operating rules for all AI agents and automated contributors working in this repository.
