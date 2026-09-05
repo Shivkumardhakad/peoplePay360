@@ -2300,6 +2300,24 @@
 - TypeScript check — pending.
 - `git diff --check` — pending.
 
+## 2026-09-06 15:50 IST — Allow employee-owned payslip payment status
+
+### Summary
+- Payslip payment-status reads now allow Employee users when the payslip belongs to their authenticated employee context.
+- Other employees' payment statuses remain forbidden.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/controllers/PaymentStatusController.java`: Added employee ownership enforcement.
+- `apps/payroll/src/main/java/com/dj/payroll/security/SecurityConfig.java`: Allowed scoped payment-status reads for Employee role.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payslip detail loaded the payment-status endpoint after loading the payslip, and Employee users received `403` from the admin-only matcher.
+
+### Validation
+- Java package build and runtime smoke test — pending.
+- `git diff --check` — pending.
+
 ### Notes
 - Existing unassigned employees need their department updated once from the employee edit form; new records will be correctly assigned.
 

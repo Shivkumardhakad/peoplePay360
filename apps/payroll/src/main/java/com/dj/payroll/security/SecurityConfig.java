@@ -41,13 +41,14 @@ public class SecurityConfig {
                     "/api/payroll/payslips/*",
                     "/api/payroll/payslips/*/pdf")
                     .hasAnyRole("EMPLOYEE", "ADMIN", "PAYROLL_MANAGER", "HR_PAYROLL_MANAGER", "HR_PAYROLL_USER")
+                .requestMatchers(HttpMethod.GET, "/api/payroll/payslips/*/payment-status")
+                    .hasAnyRole("EMPLOYEE", "ADMIN", "PAYROLL_MANAGER", "HR_PAYROLL_MANAGER", "HR_PAYROLL_USER")
                 .requestMatchers(HttpMethod.GET,
                     "/api/payroll/payruns",
                     "/api/payroll/payruns/*",
                     "/api/payroll/payruns/*/payslips",
                     "/api/payroll/payruns/*/audit",
                     "/api/payroll/payruns/*/payment-status",
-                    "/api/payroll/payslips/*/payment-status",
                     "/api/payroll/reports/**",
                     "/api/payroll/salary-rules",
                     "/api/payroll/salary-rules/*",
