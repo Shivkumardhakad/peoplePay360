@@ -15,6 +15,7 @@ import {
   getPayrunAction,
   listPayrunPayslipsAction,
   getPayrollAuditAction,
+  getPayrunPaymentStatusAction,
 } from "@/lib/api-actions";
 import {
   Calculator,
@@ -48,6 +49,7 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
   const [payslips, setPayslips] = useState<any[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>([]);
   const [audit, setAudit] = useState<any>(null);
+  const [paymentStatus, setPaymentStatus] = useState<any>(null);
 
   const reload = async () => {
     const [loadedPayrun, loadedPayslips] = await Promise.all([getPayrunAction(payrunId), listPayrunPayslipsAction(payrunId)]);
@@ -57,6 +59,9 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
     if ((loadedPayrun as any).status !== "DRAFT") {
       try { setAudit(await getPayrollAuditAction(payrunId)); } catch { setAudit(null); }
     } else setAudit(null);
+    if (["VALIDATED", "PAID"].includes((loadedPayrun as any).status)) {
+      try { setPaymentStatus(await getPayrunPaymentStatusAction(payrunId)); } catch { setPaymentStatus(null); }
+    } else setPaymentStatus(null);
   };
 
   useEffect(() => { reload().catch((error) => toast({ title: "Unable to load payrun", description: error.message, type: "error" })); }, [payrunId]);
@@ -285,6 +290,14 @@ export default function PayrunProcessingPage({ params }: { params: Promise<{ id:
               {audit.findings.map((finding: any, index: number) => <li key={`${finding.code}-${index}`} className="text-[11px]">{finding.message}</li>)}
             </ul>
           ) : <p className="text-[11px] text-muted-foreground">No audit findings for this payrun.</p>}
+        </div>
+      )}
+
+      {paymentStatus && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase font-mono text-muted-foreground">Payment Status</p><p className="mt-1 text-sm font-semibold">{paymentStatus.status}</p></div>
+          <div className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase font-mono text-muted-foreground">Paid Payslips</p><p className="mt-1 text-sm font-semibold">{paymentStatus.paidPayslipCount} / {paymentStatus.payslipCount}</p></div>
+          <div className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase font-mono text-muted-foreground">Total Net</p><p className="mt-1 text-sm font-semibold">${Number(paymentStatus.totalNetAmount ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p></div>
         </div>
       )}
 

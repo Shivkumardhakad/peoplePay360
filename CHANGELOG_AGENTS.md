@@ -2031,3 +2031,25 @@
 
 ### Notes
 - Audit loading is skipped for draft payruns and refreshed after compute/validation actions.
+## 2026-09-06 10:00 IST — Surface payment status in payroll UI
+
+### Summary
+- Added authenticated web actions for payrun and payslip payment-status endpoints.
+- Added payment status, paid payslip count, and total net metrics to payrun review.
+- Added live payment state and paid timestamp to payslip detail.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added payrun/payslip payment-status actions.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Renders live payment summary metrics.
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: Renders live payment state and timestamp.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- The Java Payroll API exposed payment-status records, but the UI only showed a hardcoded paid badge and did not expose batch payment totals.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` on changed files — passed.
+
+### Notes
+- Payment status loading is non-blocking for payslip detail; the payslip remains viewable if the status endpoint is temporarily unavailable.
