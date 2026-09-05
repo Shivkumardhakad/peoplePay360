@@ -2190,3 +2190,25 @@
 
 ### Notes
 - Plain-text passwords are never persisted; administrators must communicate the entered initial password securely to the employee.
+## 2026-09-06 14:00 IST — Automate Payroll local environment wiring
+
+### Summary
+- Added a cross-platform Node launcher that reads the existing web local environment at runtime and maps database/JWT/HR API settings into Spring Payroll.
+- Updated `pnpm dev:payroll` to use the launcher, avoiding secret duplication in the repository.
+
+### Files Changed
+- `scripts/dev-payroll.mjs`: Runtime environment mapping and Maven wrapper launch.
+- `package.json`: Uses the new Payroll development launcher.
+- `CHANGELOG_AGENTS.md`: Recorded the setup change.
+
+### Reason
+- Keep the Java Payroll service aligned with the working Node environment while preventing local secrets from being copied into tracked files.
+
+### Validation
+- `& .\\mvnw.cmd test` — 13 tests passed; Spring context test failed against the local fallback database credentials before runtime env mapping.
+- Runtime Payroll start with mapped web env — passed on port 8080.
+- `3000/3001/8080` port smoke check — passed.
+- Protected Payroll and HR endpoints without auth — both returned `401` as expected.
+
+### Notes
+- The launcher expects `apps/web/.env.local` to contain `DATABASE_URL` and `NEXTAUTH_SECRET`; it does not print or persist those values.
