@@ -4,7 +4,7 @@ import { prisma } from "@peoplepay360/db";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 
-const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:3001/api/hr";
+const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:4000/api/hr";
 
 // -------------------------------------------------------------
 // EMPLOYEES
@@ -66,9 +66,58 @@ export async function createEmployeeAction(data: {
   }
 }
 
+export async function getEmployeesAction() {
+  try {
+    const employees = await prisma.employee.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        department: true,
+        jobPosition: true,
+      },
+    });
+    return employees.map((e) => ({
+      id: e.id,
+      employeeNumber: e.employeeNumber,
+      name: `${e.firstName} ${e.lastName}`,
+      department: e.department?.name || "Engineering",
+      position: e.jobPosition?.title || "Staff",
+      status: e.status,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // -------------------------------------------------------------
 // CONTRACTS
 // -------------------------------------------------------------
+
+export async function getContractsAction() {
+  try {
+    const contracts = await prisma.contract.findMany({
+      orderBy: { startDate: "desc" },
+      include: {
+        employee: true,
+        department: true,
+        position: true,
+      },
+    });
+    return contracts.map((c) => ({
+      id: c.id.length > 8 ? `CON-${c.id.slice(-4).toUpperCase()}` : c.id,
+      rawId: c.id,
+      employee: c.employee ? `${c.employee.firstName} ${c.employee.lastName}` : "Unknown Employee",
+      employeeId: c.employeeId,
+      position: c.title || c.position?.title || "Staff",
+      department: c.department?.name || "Engineering",
+      startDate: c.startDate.toISOString().split("T")[0] || "",
+      endDate: c.endDate ? c.endDate.toISOString().split("T")[0] || "-" : "-",
+      wage: Number(c.wage ?? c.baseSalary ?? 0),
+      status: (c.status === "ACTIVE" ? "Active" : "Ended") as "Active" | "Ended",
+    }));
+  } catch {
+    return [];
+  }
+}
 
 export async function createContractAction(data: {
   employeeId: string;
@@ -82,43 +131,85 @@ export async function createContractAction(data: {
   workingScheduleId?: string;
 }) {
   try {
-    const res = await fetch(`${HR_API_URL}/contracts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        employeeId: data.employeeId,
-        startDate: new Date(data.startDate),
-        endDate: data.endDate ? new Date(data.endDate) : null,
-        wage: data.wage,
-        status: "ACTIVE",
-      }),
-      cache: "no-store",
+    // 1. Resolve employee: find by ID or employeeNumber (e.g. "EMP-001" or cuid)
+    let employee = await prisma.employee.findFirst({
+      where: {
+        OR: [
+          { id: data.employeeId },
+          { employeeNumber: data.employeeId },
+        ],
+      },
     });
 
-    if (res.ok) {
-      revalidatePath("/contracts");
-      return { success: true, contract: await res.json() };
+    if (!employee) {
+      employee = await prisma.employee.findFirst({ where: { status: "ACTIVE" } });
     }
-  } catch {
-    // Fallback
-  }
 
-  try {
+    if (!employee) {
+      return { success: false, error: "No employee found. Please create an employee first." };
+    }
+
+    const realEmployeeId = employee.id;
+    const contractStartDate = new Date(data.startDate);
+    const contractEndDate = data.endDate ? new Date(data.endDate) : null;
+
+    // 2. Handle active contract overlaps per AGENTS.md:
+    // If the employee already has an active contract that overlaps, close or expire the old one
+    const existingActive = await prisma.contract.findFirst({
+      where: {
+        employeeId: realEmployeeId,
+        status: "ACTIVE",
+      },
+    });
+
+    if (existingActive) {
+      // Set end date of previous contract to the day before the new contract start date
+      const previousEnd = new Date(contractStartDate.getTime() - 24 * 60 * 60 * 1000);
+      await prisma.contract.update({
+        where: { id: existingActive.id },
+        data: {
+          status: "EXPIRED",
+          endDate: previousEnd > existingActive.startDate ? previousEnd : existingActive.startDate,
+        },
+      });
+    }
+
+    // 3. Resolve department and position relations if available
+    const dept = await prisma.department.findFirst({
+      where: { name: { contains: data.department, mode: "insensitive" } },
+    });
+    const structure = await prisma.salaryStructure.findFirst();
+    const schedule = await prisma.workingSchedule.findFirst();
+
+    // 4. Create the contract in PostgreSQL
     const contract = await prisma.contract.create({
       data: {
-        employeeId: data.employeeId,
+        employeeId: realEmployeeId,
         title: data.position,
         baseSalary: data.wage,
         wage: data.wage,
         weeklyHours: 40,
         payrollProfileCode: "STANDARD",
-        startDate: new Date(data.startDate),
-        endDate: data.endDate ? new Date(data.endDate) : null,
+        startDate: contractStartDate,
+        endDate: contractEndDate,
         status: "ACTIVE",
+        departmentId: dept?.id,
+        salaryStructureId: structure?.id,
+        workingScheduleId: schedule?.id,
+      },
+      include: {
+        employee: true,
       },
     });
+
     revalidatePath("/contracts");
-    return { success: true, contract };
+    return {
+      success: true,
+      contract: {
+        ...contract,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+      },
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to create contract";
     return { success: false, error: msg };

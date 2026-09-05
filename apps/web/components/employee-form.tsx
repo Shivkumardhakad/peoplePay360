@@ -27,10 +27,12 @@ export function EmployeeForm({
   defaultValues,
   onSuccess,
   onCancel,
+  readOnly = false,
 }: {
   defaultValues?: Partial<EmployeeFormValues>;
   onSuccess?: (emp: EmployeeFormValues) => void;
   onCancel?: () => void;
+  readOnly?: boolean;
 }) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
@@ -81,12 +83,12 @@ export function EmployeeForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="firstName" className="text-xs font-medium">First Name</Label>
-          <Input id="firstName" placeholder="Jane" {...register("firstName")} />
+          <Input id="firstName" placeholder="Jane" disabled={readOnly} {...register("firstName")} />
           {errors.firstName && <p className="text-[11px] text-destructive">{errors.firstName.message}</p>}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="lastName" className="text-xs font-medium">Last Name</Label>
-          <Input id="lastName" placeholder="Doe" {...register("lastName")} />
+          <Input id="lastName" placeholder="Doe" disabled={readOnly} {...register("lastName")} />
           {errors.lastName && <p className="text-[11px] text-destructive">{errors.lastName.message}</p>}
         </div>
       </div>
@@ -94,27 +96,28 @@ export function EmployeeForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="email" className="text-xs font-medium">Work Email</Label>
-          <Input id="email" type="email" placeholder="jane.doe@company.com" className="font-mono text-xs" {...register("email")} />
+          <Input id="email" type="email" placeholder="jane.doe@company.com" disabled={readOnly} className="font-mono text-xs" {...register("email")} />
           {errors.email && <p className="text-[11px] text-destructive">{errors.email.message}</p>}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="phone" className="text-xs font-medium">Phone</Label>
-          <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" className="font-mono text-xs" {...register("phone")} />
+          <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" disabled={readOnly} className="font-mono text-xs" {...register("phone")} />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="dateOfJoining" className="text-xs font-medium">Date of Joining</Label>
-          <Input id="dateOfJoining" type="date" className="font-mono text-xs" {...register("dateOfJoining")} />
+          <Input id="dateOfJoining" type="date" disabled={readOnly} className="font-mono text-xs" {...register("dateOfJoining")} />
           {errors.dateOfJoining && <p className="text-[11px] text-destructive">{errors.dateOfJoining.message}</p>}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="department" className="text-xs font-medium">Department</Label>
           <select
             id="department"
+            disabled={readOnly}
             {...register("department")}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-75 disabled:cursor-not-allowed"
           >
             <option value="">Select Department</option>
             <option value="Engineering">Engineering</option>
@@ -131,8 +134,9 @@ export function EmployeeForm({
         <Label htmlFor="status" className="text-xs font-medium">Employment Status</Label>
         <select
           id="status"
+          disabled={readOnly}
           {...register("status")}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-75 disabled:cursor-not-allowed"
         >
           <option value="ACTIVE">Active</option>
           <option value="INACTIVE">Inactive</option>
@@ -140,17 +144,24 @@ export function EmployeeForm({
         </select>
       </div>
 
-      <div className="flex justify-end gap-2 pt-3 border-t border-border">
-        {onCancel && (
-          <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={submitting}>
-            Cancel
+      {!readOnly ? (
+        <div className="flex justify-end gap-2 pt-3 border-t border-border">
+          {onCancel && (
+            <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={submitting}>
+              Cancel
+            </Button>
+          )}
+          <Button type="submit" size="sm" disabled={submitting} className="gap-1.5 h-8">
+            {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            <span>{submitting ? "Saving..." : "Save Employee"}</span>
           </Button>
-        )}
-        <Button type="submit" size="sm" disabled={submitting} className="gap-1.5 h-8">
-          {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          <span>{submitting ? "Saving..." : "Save Employee"}</span>
-        </Button>
-      </div>
+        </div>
+      ) : (
+        <div className="pt-2 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
+          <span>Official employee record managed by HR Department.</span>
+          <span className="font-mono text-[10px] bg-muted px-2 py-0.5 rounded border border-border">Locked</span>
+        </div>
+      )}
     </form>
   );
 }

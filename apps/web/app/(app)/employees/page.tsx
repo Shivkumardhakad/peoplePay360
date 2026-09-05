@@ -40,7 +40,12 @@ export default function EmployeesPage() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
   const role = session?.user?.role || "ADMIN";
-  const canAddEmployee = role === "ADMIN" || role === "HR_MANAGER";
+  const canAddEmployee =
+    role === "ADMIN" ||
+    role === "HR_MANAGER" ||
+    role === "HR_PAYROLL_MANAGER" ||
+    role === "PAYROLL_MANAGER" ||
+    role === "HR_PAYROLL_USER";
 
   const filteredEmployees = employees.filter(
     (e) =>

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { SalaryStructureForm, type SalaryStructureFormValues } from "@/components/salary-structure-form";
-import { Layers, CheckCircle2, Archive, Loader2 } from "lucide-react";
+import { Layers, CheckCircle2, Archive, Loader2, Lock } from "lucide-react";
 
 interface StructureItem {
   id: string;
@@ -23,9 +24,16 @@ const INITIAL_STRUCTURES: StructureItem[] = [
 ];
 
 export default function SalaryStructuresPage() {
+  const { data: session } = useSession();
   const { toast } = useToast();
   const [structures, setStructures] = useState<StructureItem[]>(INITIAL_STRUCTURES);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const role = session?.user?.role || "ADMIN";
+  const canEdit =
+    role === "ADMIN" ||
+    role === "HR_PAYROLL_MANAGER" ||
+    role === "PAYROLL_MANAGER";
 
   const handleCreated = (data: SalaryStructureFormValues) => {
     const newStruct: StructureItem = {
@@ -65,11 +73,17 @@ export default function SalaryStructuresPage() {
             Reusable containers for ordered salary rules linked to employment contracts.
           </p>
         </div>
+        {!canEdit && (
+          <Badge variant="outline" className="text-[10px] font-mono gap-1 text-muted-foreground">
+            <Lock className="w-3 h-3" />
+            Read-Only (Requires HR Payroll Manager)
+          </Badge>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
+      <div className={`grid grid-cols-1 ${canEdit ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"} gap-3 items-start`}>
         {/* Table */}
-        <div className="lg:col-span-2 rounded-lg border border-border bg-card overflow-hidden">
+        <div className={`${canEdit ? "lg:col-span-2" : "col-span-1"} rounded-lg border border-border bg-card overflow-hidden`}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -77,7 +91,7 @@ export default function SalaryStructuresPage() {
                 <TableHead>Structure Name</TableHead>
                 <TableHead className="text-right">Rules</TableHead>
                 <TableHead className="text-right">Status</TableHead>
-                <TableHead className="w-[80px] text-right">Action</TableHead>
+                {canEdit && <TableHead className="w-[80px] text-right">Action</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -105,24 +119,26 @@ export default function SalaryStructuresPage() {
                         {structure.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right p-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleToggleStatus(structure.id)}
-                        disabled={isToggling}
-                        className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1"
-                      >
-                        {isToggling ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : structure.status === "Active" ? (
-                          <Archive className="w-3 h-3" />
-                        ) : (
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        )}
-                        <span>{isToggling ? "Updating..." : structure.status === "Active" ? "Archive" : "Activate"}</span>
-                      </Button>
-                    </TableCell>
+                    {canEdit && (
+                      <TableCell className="text-right p-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleStatus(structure.id)}
+                          disabled={isToggling}
+                          className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1"
+                        >
+                          {isToggling ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : structure.status === "Active" ? (
+                            <Archive className="w-3 h-3" />
+                          ) : (
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          )}
+                          <span>{isToggling ? "Updating..." : structure.status === "Active" ? "Archive" : "Activate"}</span>
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
@@ -130,19 +146,21 @@ export default function SalaryStructuresPage() {
           </Table>
         </div>
 
-        {/* Form */}
-        <div>
-          <Card>
-            <CardHeader className="border-b border-border pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider font-mono text-muted-foreground">
-                New Salary Structure
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-3">
-              <SalaryStructureForm onSuccess={handleCreated} />
-            </CardContent>
-          </Card>
-        </div>
+        {/* Form - Only visible to HR_PAYROLL_MANAGER and ADMIN */}
+        {canEdit && (
+          <div>
+            <Card>
+              <CardHeader className="border-b border-border pb-3">
+                <CardTitle className="text-xs font-semibold uppercase tracking-wider font-mono text-muted-foreground">
+                  New Salary Structure
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-3">
+                <SalaryStructureForm onSuccess={handleCreated} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

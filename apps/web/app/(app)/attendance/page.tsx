@@ -40,9 +40,32 @@ export default function AttendancePage() {
 
   const role = session?.user?.role || "ADMIN";
   const isEmployee = role === "EMPLOYEE";
-  const canAddManual = role === "ADMIN" || role === "HR_MANAGER";
+  const canAddManual =
+    role === "ADMIN" ||
+    role === "HR_MANAGER" ||
+    role === "HR_PAYROLL_MANAGER" ||
+    role === "PAYROLL_MANAGER" ||
+    role === "HR_PAYROLL_USER";
+  const currentUserName = session?.user?.name || "Emily Watson";
 
-  const filteredAttendance = attendance.filter(
+  // RBAC Scoping: Employees see ONLY their own records. Managers see company-wide records.
+  const scopedAttendance = isEmployee
+    ? (attendance.some((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
+        ? attendance.filter((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
+        : [
+            {
+              id: "ATT-MINE",
+              employee: currentUserName,
+              date: new Date().toISOString().split("T")[0] || "2023-10-01",
+              checkIn: "09:00",
+              checkOut: "-",
+              workedHours: "In Progress",
+              status: "Present" as const,
+            },
+          ])
+    : attendance;
+
+  const filteredAttendance = scopedAttendance.filter(
     (r) =>
       r.employee.toLowerCase().includes(search.toLowerCase()) ||
       r.date.includes(search) ||
@@ -123,8 +146,14 @@ export default function AttendancePage() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold tracking-tight text-foreground">Attendance</h1>
-          <p className="text-xs text-muted-foreground">Timesheets, worked duration, and presence logs.</p>
+          <h1 className="text-base font-semibold tracking-tight text-foreground">
+            {isEmployee ? "My Attendance" : "Attendance"}
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            {isEmployee
+              ? "Your personal worked duration, check-in history, and presence logs."
+              : "Company timesheets, worked duration, and presence logs."}
+          </p>
         </div>
 
         <div className="flex items-center gap-2">

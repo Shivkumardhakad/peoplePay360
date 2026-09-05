@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast";
-import { createContractAction } from "@/lib/api-actions";
+import { createContractAction, getEmployeesAction } from "@/lib/api-actions";
 import { Loader2 } from "lucide-react";
 
 const contractSchema = z.object({
@@ -39,6 +39,20 @@ export function ContractForm({
 }) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [employees, setEmployees] = useState<Array<{ id: string; employeeNumber: string; name: string }>>([
+    { id: "EMP-001", employeeNumber: "EMP-001", name: "Alice Johnson" },
+    { id: "EMP-002", employeeNumber: "EMP-002", name: "Bob Smith" },
+    { id: "EMP-003", employeeNumber: "EMP-003", name: "Charlie Davis" },
+    { id: "EMP-004", employeeNumber: "EMP-004", name: "Emily Watson" },
+  ]);
+
+  useEffect(() => {
+    getEmployeesAction().then((res) => {
+      if (res && res.length > 0) {
+        setEmployees(res);
+      }
+    });
+  }, []);
 
   const {
     register,
@@ -95,10 +109,11 @@ export function ContractForm({
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="">Select Employee</option>
-            <option value="EMP-001">Alice Johnson (EMP-001)</option>
-            <option value="EMP-002">Bob Smith (EMP-002)</option>
-            <option value="EMP-003">Charlie Davis (EMP-003)</option>
-            <option value="EMP-004">Emily Watson (EMP-004)</option>
+            {employees.map((emp) => (
+              <option key={emp.id} value={emp.id}>
+                {emp.name} ({emp.employeeNumber || emp.id.slice(0, 8)})
+              </option>
+            ))}
           </select>
           {errors.employeeId && <p className="text-[11px] text-destructive">{errors.employeeId.message}</p>}
         </div>
