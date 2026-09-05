@@ -279,3 +279,22 @@
 
 ### Notes
 - The Node16 pair keeps Node-aware resolution while preserving CommonJS behavior for this NestJS package because it does not declare ESM in its package metadata.
+
+## 2026-09-05 15:45 IST — Fix dashboard icon typing
+
+### Summary
+- Added an explicit Lucide icon type to the dashboard pending-actions fixture.
+
+### Files Changed
+- `apps/web/app/(dashboard)/dashboard/page.tsx`: Typed pending action icon components as `LucideIcon` so Next.js TypeScript checks accept JSX rendering.
+- `CHANGELOG_AGENTS.md`: Recorded the build fix.
+
+### Reason
+- CI `web:build` failed because an untyped mixed tuple inferred `Icon` without a callable JSX component signature.
+
+### Validation
+- `git diff --check` — pending
+- `pnpm build` — not run locally; dependencies are unavailable.
+
+### Notes
+- This is a compile-time typing fix only; displayed dashboard data remains static fixture data.
