@@ -577,7 +577,7 @@
 ### Notes
 - Service methods use Spring's default `REQUIRED` transaction propagation; runtime business exceptions roll back the complete payrun operation.
 
-## 2026-09-05 16:08 IST — Verify and harden payroll APIs
+## 2026-09-05 16:08 IST ï¿½ Verify and harden payroll APIs
 
 ### Summary
 - Added explicit RestClient builder configuration for the HR contract client.
@@ -593,11 +593,32 @@
 - The application context could not start without a RestClient builder, and structure updates could conflict with the unique structure-rule constraint.
 
 ### Validation
-- `mvn -f pom.xml -pl apps/payroll -am test` — passed; 4 tests succeeded.
-- Runtime smoke checks on port 8081 — authentication, CRUD, validation, not-found handling, payrun reads, payslip listing, and structure update passed.
+- `mvn -f pom.xml -pl apps/payroll -am test` ï¿½ passed; 4 tests succeeded.
+- Runtime smoke checks on port 8081 ï¿½ authentication, CRUD, validation, not-found handling, payrun reads, payslip listing, and structure update passed.
 - Payrun compute returned controlled HTTP 503 because the configured HR API was unavailable.
-- `git diff --check` — passed.
+- `git diff --check` ï¿½ passed.
 
 ### Notes
 - Full payrun compute, validate, and paid lifecycle requires the HR API `/contracts` endpoint to be running and returning period-valid active contracts.
 - Local smoke records were created in the development database for verification.
+
+## 2026-09-05 17:05 IST â€” Fix database seed execution
+
+### Summary
+- Fixed the seed scriptâ€™s misspelled Prisma delegate and added missing bcryptjs TypeScript declarations.
+
+### Files Changed
+- `packages/db/prisma/seed.ts`: Changed `workingScwhedule` to the valid `workingSchedule` delegate.
+- `packages/db/package.json`: Added `@types/bcryptjs` for seed compilation.
+- `CHANGELOG_AGENTS.md`: Recorded the seed fix.
+
+### Reason
+- `pnpm db:seed` failed before execution due to a TypeScript declaration error and an invalid Prisma client property.
+
+### Validation
+- `pnpm install --filter @peoplepay360/db` â€” passed
+- `pnpm --filter @peoplepay360/db exec prisma generate` â€” passed
+- `pnpm db:seed` â€” passed
+
+### Notes
+- Prisma package.json configuration deprecation warning remains non-blocking.
