@@ -52,7 +52,7 @@ public class SecurityConfig {
                     "/api/payroll/salary-structures/*",
                     "/api/payroll/salary-rule-categories",
                     "/api/payroll/salary-rule-categories/*")
-                    .hasAnyRole("ADMIN", "PAYROLL_MANAGER", "HR_MANAGER")
+                    .hasAnyRole("ADMIN", "PAYROLL_MANAGER", "HR_PAYROLL_MANAGER", "HR_PAYROLL_USER")
                 .requestMatchers(
                     "/api/payroll/payruns",
                     "/api/payroll/payruns/*/compute",
@@ -62,7 +62,7 @@ public class SecurityConfig {
                     "/api/payroll/salary-rules/**",
                     "/api/payroll/salary-structures/**",
                     "/api/payroll/salary-rule-categories/**")
-                    .hasAnyRole("ADMIN", "PAYROLL_MANAGER")
+                    .hasAnyRole("ADMIN", "PAYROLL_MANAGER", "HR_PAYROLL_MANAGER")
                 .requestMatchers("/api/payroll/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .oauth2ResourceServer(oauth2 -> oauth2

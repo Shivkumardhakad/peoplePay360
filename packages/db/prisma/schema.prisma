@@ -12,6 +12,7 @@ enum UserRole {
   ADMIN
   HR_MANAGER
   PAYROLL_MANAGER
+  HR_PAYROLL_USER
   EMPLOYEE
 }
 
@@ -143,6 +144,7 @@ model Employee {
   timeOffRequests TimeOffRequest[]
   bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
   payslips Payslip[]
+  payrunSelections PayrunEmployee[]
 }
 
 model BankAccount {
@@ -392,6 +394,18 @@ model Payrun {
   salaryStructure    SalaryStructure @relation(fields: [salaryStructureId], references: [id])
   createdBy          User?          @relation(fields: [createdById], references: [id])
   payslips           Payslip[]
+  selectedEmployees  PayrunEmployee[]
+}
+
+model PayrunEmployee {
+  id         String   @id @default(cuid())
+  payrunId   String
+  employeeId String
+  createdAt  DateTime @default(now())
+  payrun     Payrun   @relation(fields: [payrunId], references: [id], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  @@unique([payrunId, employeeId])
+  @@index([employeeId])
 }
 
 model Payslip {

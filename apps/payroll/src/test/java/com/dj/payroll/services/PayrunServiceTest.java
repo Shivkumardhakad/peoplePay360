@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -124,13 +125,16 @@ class PayrunServiceTest {
     }
 
     @Test
-    void validateRejectsPayrunWithoutPayslips() {
+    void validateReturnsWarningsForPayrunWithoutPayslips() {
         Payrun payrun = draftPayrun();
         payrun.setStatus("COMPUTED");
         when(payrunRepository.findByIdForUpdate("payrun-1")).thenReturn(Optional.of(payrun));
         when(payslipRepository.findAllByPayrunIdOrderByEmployeeIdAsc("payrun-1")).thenReturn(List.of());
 
-        assertThrows(IllegalArgumentException.class, () -> service.validate("payrun-1"));
+        var result = service.validate("payrun-1");
+
+        assertEquals("COMPUTED", result.status());
+        assertEquals(true, result.warnings().contains("Payrun has no payslips"));
     }
 
     @Test
@@ -152,9 +156,10 @@ class PayrunServiceTest {
         when(hrContractClient.findActiveContracts(payrun.getPeriodStart(), payrun.getPeriodEnd(), "structure-1"))
             .thenReturn(List.of(new HrContractClient.ContractSnapshot("contract-1", "employee-1", new BigDecimal("100"))));
 
-        var exception = assertThrows(IllegalArgumentException.class, () -> service.validate("payrun-1"));
+        var result = service.validate("payrun-1");
 
-        assertEquals(true, exception.getMessage().contains("Net amount does not equal gross minus deductions"));
+        assertEquals("COMPUTED", result.status());
+        assertEquals(true, result.warnings().stream().anyMatch(item -> item.contains("Net amount does not equal gross minus deductions")));
     }
 
     private Payrun draftPayrun() {
@@ -164,6 +169,7 @@ class PayrunServiceTest {
         payrun.setPeriodStart(LocalDateTime.of(2026, 9, 1, 0, 0));
         payrun.setPeriodEnd(LocalDateTime.of(2026, 9, 30, 23, 59));
         payrun.setStatus("DRAFT");
+        payrun.setSelectedEmployeeIds(new java.util.LinkedHashSet<>(Set.of("employee-1")));
         return payrun;
     }
 }

@@ -1,20 +1,36 @@
-import Link from "next/link";
-import { 
-  Users, 
-  FileText, 
-  Clock, 
-  LayoutDashboard,
-} from "lucide-react";
+"use client";
 
-// Mock session type for UI building
-export type Session = {
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Users,
+  FileText,
+  Clock,
+  LayoutDashboard,
+  CalendarDays,
+  CalendarClock,
+  CalendarRange,
+  CreditCard,
+  Shield,
+  Layers,
+  Sparkles,
+  Settings2,
+  Wallet,
+  Receipt,
+  ListChecks,
+  SlidersHorizontal,
+  type LucideIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export interface Session {
   user: {
     id: string;
     name: string;
-    role: "ADMIN" | "HR_MANAGER" | "HR_PAYROLL_USER" | "HR_PAYROLL_MANAGER" | "EMPLOYEE";
+    role: "ADMIN" | "HR_MANAGER" | "PAYROLL_MANAGER" | "HR_PAYROLL_MANAGER" | "HR_PAYROLL_USER" | "EMPLOYEE";
     employeeId: string | null;
-  }
-};
+  };
+}
 
 export const MOCK_SESSION: Session = {
   user: {
@@ -22,100 +38,122 @@ export const MOCK_SESSION: Session = {
     name: "Admin User",
     role: "ADMIN",
     employeeId: null,
-  }
+  },
 };
+
+function NavLink({
+  href,
+  icon: Icon,
+  children,
+  accent,
+  nested,
+}: {
+  href: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+  accent?: boolean;
+  nested?: boolean;
+}) {
+  const pathname = usePathname();
+  const isActive = pathname === href || pathname.startsWith(href + "/");
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+        nested && "ml-2",
+        isActive
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        accent && isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+      )}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      {children}
+    </Link>
+  );
+}
 
 export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
   const role = session.user.role;
   const isEmployee = role === "EMPLOYEE";
+  const isHRManagerOnly = role === "HR_MANAGER";
+  const isAdmin = role === "ADMIN";
   const employeeProfileHref = session.user.employeeId ? `/employees/${session.user.employeeId}` : "/employees";
 
   return (
-    <div className="w-64 bg-primary text-primary-foreground min-h-screen flex flex-col border-r border-border">
-      <div className="p-6">
-        <h1 className="text-xl font-bold tracking-tight">PeoplePay360</h1>
+    <aside className="w-56 shrink-0 min-h-screen flex flex-col border-r border-border bg-sidebar bg-muted/20 select-none">
+      {/* Brand Header */}
+      <div className="h-12 border-b border-border flex items-center px-4 gap-2.5">
+        <div className="w-5 h-5 rounded bg-primary text-primary-foreground flex items-center justify-center font-bold text-[11px] font-mono shadow-xs">
+          P
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-xs font-bold tracking-tight text-foreground">PeoplePay360</span>
+          <span className="text-[10px] text-muted-foreground font-mono">HR</span>
+        </div>
       </div>
-      <nav className="flex-1 px-4 space-y-2">
+
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
         {!isEmployee && (
-          <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors">
-            <LayoutDashboard className="w-5 h-5" />
-            <span>Dashboard</span>
-          </Link>
+          <NavLink href="/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
         )}
-        
+
+        {/* Admin-only: user & role management */}
+        {isAdmin && (
+          <NavLink href="/users" icon={Shield} accent>Team &amp; Roles</NavLink>
+        )}
+
         {isEmployee ? (
-          <Link href={employeeProfileHref} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors">
-            <Users className="w-5 h-5" />
-            <span>My Profile</span>
-          </Link>
+          <NavLink href={employeeProfileHref} icon={Users}>My Profile</NavLink>
         ) : (
           <>
-            <Link href="/employees" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors">
-              <Users className="w-5 h-5" />
-              <span>Employees</span>
-            </Link>
-            <Link href="/contracts" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors">
-              <FileText className="w-5 h-5" />
-              <span>Contracts</span>
-            </Link>
+            <NavLink href="/employees" icon={Users}>Employees</NavLink>
+            <NavLink href="/contracts" icon={FileText}>Contracts</NavLink>
           </>
         )}
 
-        <Link href="/attendance" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors">
-          <Clock className="w-5 h-5" />
-          <span>Attendance</span>
-        </Link>
+        <NavLink href="/attendance" icon={Clock}>Attendance</NavLink>
 
-        {/* Time Off */}
-        <div className="pt-4 pb-1">
-          <p className="px-3 text-xs font-semibold text-primary-foreground/60">Time Off</p>
+        <div className="px-1 pt-4 pb-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Time Off</p>
         </div>
         {!isEmployee ? (
           <>
-            <Link href="/time-off/requests" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors pl-8">
-              <span>Requests</span>
-            </Link>
-            <Link href="/time-off/allocations" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors pl-8">
-              <span>Allocations</span>
-            </Link>
-            <Link href="/time-off/types" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors pl-8">
-              <span>Types</span>
-            </Link>
+            <NavLink href="/time-off/requests" icon={CalendarClock} nested>Requests</NavLink>
+            <NavLink href="/time-off/allocations" icon={CalendarRange} nested>Allocations</NavLink>
+            <NavLink href="/time-off/types" icon={Settings2} nested>Types</NavLink>
           </>
         ) : (
-          <Link href="/time-off/requests" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors pl-8">
-            <span>My Requests</span>
-          </Link>
+          <NavLink href="/time-off/requests" icon={CalendarClock} nested>My Requests</NavLink>
         )}
 
-        {/* Payroll */}
-        <div className="pt-4 pb-1">
-          <p className="px-3 text-xs font-semibold text-primary-foreground/60">Payroll</p>
-        </div>
-        {!isEmployee ? (
+        {/* Payroll section - hidden entirely for HR Manager, per role permissions */}
+        {!isHRManagerOnly && (
           <>
-            <Link href="/payroll/payruns" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors pl-8">
-              <span>Payruns</span>
-            </Link>
-            <Link href="/payroll/payslips" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors pl-8">
-              <span>Payslips</span>
-            </Link>
-            <Link href="/payroll/structures" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors pl-8">
-              <span>Structures</span>
-            </Link>
-            <Link href="/payroll/rules" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors pl-8">
-              <span>Rules</span>
-            </Link>
+            <div className="px-1 pt-4 pb-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Payroll</p>
+            </div>
+            {!isEmployee ? (
+              <>
+                <NavLink href="/payroll/payruns" icon={Wallet} nested>Payruns</NavLink>
+                <NavLink href="/payroll/payslips" icon={Receipt} nested>Payslips</NavLink>
+                <NavLink href="/payroll/structures" icon={ListChecks} nested>Structures</NavLink>
+                <NavLink href="/payroll/rules" icon={SlidersHorizontal} nested>Rules</NavLink>
+              </>
+            ) : (
+              <NavLink href="/payroll/payslips" icon={Receipt} nested>My Payslips</NavLink>
+            )}
           </>
-        ) : (
-          <Link href="/payroll/payslips" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-primary-foreground/10 transition-colors pl-8">
-            <span>My Payslips</span>
-          </Link>
         )}
       </nav>
-      <div className="p-4 border-t border-primary-foreground/10 text-xs text-primary-foreground/60">
-        Payroll ledger workspace
+
+      {/* Footer */}
+      <div className="p-3 border-t border-border flex items-center justify-between text-[11px] font-mono text-muted-foreground">
+        <span>v1.0-prod</span>
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" title="Online" />
       </div>
-    </div>
+    </aside>
   );
 }

@@ -13,7 +13,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -47,8 +51,7 @@ public class HrContractClient {
             return contracts.stream()
                 .filter(contract -> "ACTIVE".equals(contract.status()))
                 .filter(contract -> contract.employee() == null || "ACTIVE".equals(contract.employee().status()))
-                .filter(contract -> salaryStructureId == null || contract.salaryStructureId() == null
-                    || salaryStructureId.equals(contract.salaryStructureId()))
+                .filter(contract -> salaryStructureId == null || salaryStructureId.equals(contract.salaryStructureId()))
                 .filter(contract -> !contract.startDate().isAfter(end))
                 .filter(contract -> contract.endDate() == null || !contract.endDate().isBefore(start))
                 .map(contract -> new ContractSnapshot(contract.id(), contract.employeeId(), contract.baseSalary(),
@@ -72,6 +75,74 @@ public class HrContractClient {
             this(id, employeeId, baseSalary, null, "ACTIVE");
         }
     }
+
+    public record PayrollContext(int workedMinutes, BigDecimal unpaidLeaveDays,
+                                 int attendanceExceptions, boolean hasBankAccount) {}
+
+    public Map<String, PayrollContext> findPayrollContext(LocalDateTime periodStart, LocalDateTime periodEnd,
+                                                          Set<String> employeeIds) {
+        if (employeeIds == null || employeeIds.isEmpty()) return Map.of();
+        try {
+            List<Map<String, Object>> bankAccounts = list("/bank-accounts");
+            List<Map<String, Object>> attendance = list("/attendance");
+            List<Map<String, Object>> timeOff = list("/time-off/requests");
+            Map<String, Integer> workedMinutes = new HashMap<>();
+            Map<String, Integer> exceptions = new HashMap<>();
+            Map<String, BigDecimal> unpaidLeave = new HashMap<>();
+            Set<String> bankedEmployees = new HashSet<>();
+
+            for (Map<String, Object> account : bankAccounts) {
+                String employeeId = nestedId(account.get("employee"));
+                if (employeeIds.contains(employeeId)) bankedEmployees.add(employeeId);
+            }
+            for (Map<String, Object> entry : attendance) {
+                String employeeId = string(entry.get("employeeId"));
+                if (!employeeIds.contains(employeeId) || !inPeriod(entry.get("date"), periodStart, periodEnd)) continue;
+                workedMinutes.merge(employeeId, integer(entry.get("workedMinutes")), Integer::sum);
+                String status = string(entry.get("status"));
+                if (Set.of("ABSENT", "LATE", "HALF_DAY", "EXCEPTION").contains(status)) {
+                    exceptions.merge(employeeId, 1, Integer::sum);
+                }
+            }
+            for (Map<String, Object> request : timeOff) {
+                String employeeId = string(request.get("employeeId"));
+                if (!employeeIds.contains(employeeId) || !"APPROVED".equals(string(request.get("status")))) continue;
+                if (!inPeriod(request.get("startDate"), periodStart, periodEnd)) continue;
+                Object type = request.get("timeOffType");
+                boolean paid = type instanceof Map<?, ?> map && Boolean.TRUE.equals(map.get("paid"));
+                if (!paid) unpaidLeave.merge(employeeId, decimal(request.get("quantity")), BigDecimal::add);
+            }
+            Map<String, PayrollContext> result = new HashMap<>();
+            for (String employeeId : employeeIds) {
+                result.put(employeeId, new PayrollContext(workedMinutes.getOrDefault(employeeId, 0),
+                    unpaidLeave.getOrDefault(employeeId, BigDecimal.ZERO), exceptions.getOrDefault(employeeId, 0),
+                    bankedEmployees.contains(employeeId)));
+            }
+            return result;
+        } catch (RuntimeException exception) {
+            throw new ExternalServiceException("HR payroll context service is unavailable", exception);
+        }
+    }
+
+    private List<Map<String, Object>> list(String path) {
+        List<Map<String, Object>> response = client.get().uri(path)
+            .headers(headers -> headers.setBearerAuth(serviceToken()))
+            .retrieve().body(new ParameterizedTypeReference<>() {});
+        return response == null ? List.of() : response;
+    }
+
+    private boolean inPeriod(Object value, LocalDateTime start, LocalDateTime end) {
+        if (value == null) return false;
+        try {
+            Instant instant = Instant.parse(value.toString());
+            return !instant.isBefore(start.toInstant(ZoneOffset.UTC)) && !instant.isAfter(end.toInstant(ZoneOffset.UTC));
+        } catch (RuntimeException ignored) { return false; }
+    }
+
+    private String nestedId(Object value) { return value instanceof Map<?, ?> map ? string(map.get("id")) : null; }
+    private String string(Object value) { return value == null ? "" : value.toString(); }
+    private int integer(Object value) { return value instanceof Number number ? number.intValue() : Integer.parseInt(string(value)); }
+    private BigDecimal decimal(Object value) { return value instanceof Number number ? new BigDecimal(number.toString()) : new BigDecimal(string(value)); }
 
     private String serviceToken() {
         try {

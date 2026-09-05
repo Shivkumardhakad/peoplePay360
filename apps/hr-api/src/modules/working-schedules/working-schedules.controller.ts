@@ -1,7 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Prisma, UserRole } from "@prisma/client";
+import { Roles } from "../auth/roles.decorator";
 import { HrService } from "../shared/hr.service";
 
+@Roles(UserRole.ADMIN, UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.PAYROLL_MANAGER)
 @Controller("working-schedules")
 export class WorkingSchedulesController {
   constructor(private readonly hr: HrService) {}

@@ -1,11 +1,15 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
+import { createContractAction, getEmployeesAction } from "@/lib/api-actions";
+import { Loader2 } from "lucide-react";
 
 const contractSchema = z.object({
   employeeId: z.string().min(1, "Employee is required"),
@@ -22,138 +26,203 @@ const contractSchema = z.object({
 export type ContractFormInput = z.input<typeof contractSchema>;
 export type ContractFormValues = z.output<typeof contractSchema>;
 
-export function ContractForm({ 
-  defaultValues, 
-  isEditing = false 
-}: { 
+export function ContractForm({
+  defaultValues,
+  isEditing = false,
+  onSuccess,
+  onCancel,
+}: {
   defaultValues?: Partial<ContractFormInput>;
   isEditing?: boolean;
+  onSuccess?: (contract: ContractFormValues) => void;
+  onCancel?: () => void;
 }) {
-  const { register, handleSubmit, formState: { errors } } = useForm<ContractFormInput, unknown, ContractFormValues>({
+  const { toast } = useToast();
+  const [submitting, setSubmitting] = useState(false);
+  const [employees, setEmployees] = useState<Array<{ id: string; employeeNumber: string; name: string }>>([
+    { id: "EMP-001", employeeNumber: "EMP-001", name: "Alice Johnson" },
+    { id: "EMP-002", employeeNumber: "EMP-002", name: "Bob Smith" },
+    { id: "EMP-003", employeeNumber: "EMP-003", name: "Charlie Davis" },
+    { id: "EMP-004", employeeNumber: "EMP-004", name: "Emily Watson" },
+  ]);
+
+  useEffect(() => {
+    getEmployeesAction().then((res) => {
+      if (res && res.length > 0) {
+        setEmployees(res);
+      }
+    });
+  }, []);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ContractFormInput, unknown, ContractFormValues>({
     resolver: zodResolver(contractSchema),
     defaultValues: defaultValues || {
       employmentType: "FULL_TIME",
+      salaryStructureId: "STR-001",
+      workingScheduleId: "SCH-001",
+      startDate: new Date().toISOString().split("T")[0] || "2023-10-01",
     },
   });
 
-  const onSubmit = (data: ContractFormValues) => {
-    console.log("Submit contract form:", data);
-    // TODO: Wire server action / API call here
+  const onSubmit = async (data: ContractFormValues) => {
+    setSubmitting(true);
+    try {
+      const res = await createContractAction(data);
+      if (res.success) {
+        toast({
+          title: "Contract Saved",
+          description: `Employment terms recorded for employee.`,
+          type: "success",
+        });
+        onSuccess?.(data);
+      } else {
+        toast({
+          title: "Error saving contract",
+          description: res.error || "Please check provided fields.",
+          type: "error",
+        });
+      }
+    } catch {
+      toast({
+        title: "Error",
+        description: "Network error occurred",
+        type: "error",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="employeeId">Employee</Label>
-          <select 
-            id="employeeId" 
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="employeeId" className="text-xs font-medium">Employee</Label>
+          <select
+            id="employeeId"
             {...register("employeeId")}
             disabled={isEditing}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="">Select Employee</option>
-            <option value="EMP-001">Alice Johnson</option>
-            <option value="EMP-002">Bob Smith</option>
+            {employees.map((emp) => (
+              <option key={emp.id} value={emp.id}>
+                {emp.name} ({emp.employeeNumber || emp.id.slice(0, 8)})
+              </option>
+            ))}
           </select>
-          {errors.employeeId && <p className="text-sm text-destructive">{errors.employeeId.message}</p>}
+          {errors.employeeId && <p className="text-[11px] text-destructive">{errors.employeeId.message}</p>}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="employmentType">Employment Type</Label>
-          <select 
-            id="employmentType" 
+
+        <div className="space-y-1.5">
+          <Label htmlFor="employmentType" className="text-xs font-medium">Employment Type</Label>
+          <select
+            id="employmentType"
             {...register("employmentType")}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            <option value="FULL_TIME">Full-time</option>
+            <option value="FULL_TIME">Full-time Regular</option>
             <option value="PART_TIME">Part-time</option>
-            <option value="CONTRACTOR">Contractor</option>
+            <option value="CONTRACTOR">Contractor / Fixed Term</option>
           </select>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="position">Position</Label>
-          <Input id="position" {...register("position")} />
-          {errors.position && <p className="text-sm text-destructive">{errors.position.message}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="position" className="text-xs font-medium">Position Title</Label>
+          <Input id="position" placeholder="e.g. Senior Frontend Engineer" {...register("position")} />
+          {errors.position && <p className="text-[11px] text-destructive">{errors.position.message}</p>}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="department">Department</Label>
-          <select 
-            id="department" 
+
+        <div className="space-y-1.5">
+          <Label htmlFor="department" className="text-xs font-medium">Department</Label>
+          <select
+            id="department"
             {...register("department")}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            <option value="">Select a department</option>
+            <option value="">Select Department</option>
             <option value="Engineering">Engineering</option>
-            <option value="HR">HR</option>
-            <option value="Finance">Finance</option>
+            <option value="Human Resources">Human Resources</option>
+            <option value="Finance & Accounting">Finance & Accounting</option>
+            <option value="Product & Design">Product & Design</option>
           </select>
-          {errors.department && <p className="text-sm text-destructive">{errors.department.message}</p>}
+          {errors.department && <p className="text-[11px] text-destructive">{errors.department.message}</p>}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="startDate">Start Date</Label>
-          <Input id="startDate" type="date" className="font-mono" {...register("startDate")} />
-          {errors.startDate && <p className="text-sm text-destructive">{errors.startDate.message}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="startDate" className="text-xs font-medium">Start Date</Label>
+          <Input id="startDate" type="date" className="font-mono text-xs" {...register("startDate")} />
+          {errors.startDate && <p className="text-[11px] text-destructive">{errors.startDate.message}</p>}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="endDate">End Date</Label>
-          <Input id="endDate" type="date" className="font-mono" {...register("endDate")} />
-          <p className="text-xs text-muted-foreground">Leave blank if ongoing</p>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="endDate" className="text-xs font-medium">End Date (Optional)</Label>
+          <Input id="endDate" type="date" className="font-mono text-xs" {...register("endDate")} />
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="wage">Wage (Annual/Hourly)</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="wage" className="text-xs font-medium">Annual Base Salary (USD)</Label>
         <div className="relative">
-          <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-          <Input 
-            id="wage" 
-            type="number" 
-            step="0.01" 
-            className="font-mono pl-7" 
-            {...register("wage")} 
+          <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-mono">$</span>
+          <Input
+            id="wage"
+            type="number"
+            step="1000"
+            placeholder="95000"
+            className="font-mono text-xs pl-7"
+            {...register("wage")}
           />
         </div>
-        {errors.wage && <p className="text-sm text-destructive">{errors.wage.message}</p>}
+        {errors.wage && <p className="text-[11px] text-destructive">{errors.wage.message}</p>}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="salaryStructureId">Salary Structure</Label>
-          <select 
-            id="salaryStructureId" 
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="salaryStructureId" className="text-xs font-medium">Salary Structure</Label>
+          <select
+            id="salaryStructureId"
             {...register("salaryStructureId")}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            <option value="">Select structure</option>
-            <option value="STR-001">Standard Tech Package</option>
-            <option value="STR-002">Executive Package</option>
+            <option value="STR-001">Standard Tech Package (STR-001)</option>
+            <option value="STR-002">Executive Package (STR-002)</option>
+            <option value="STR-003">Operations Base (STR-003)</option>
           </select>
-          {errors.salaryStructureId && <p className="text-sm text-destructive">{errors.salaryStructureId.message}</p>}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="workingScheduleId">Working Schedule</Label>
-          <select 
-            id="workingScheduleId" 
+
+        <div className="space-y-1.5">
+          <Label htmlFor="workingScheduleId" className="text-xs font-medium">Working Schedule</Label>
+          <select
+            id="workingScheduleId"
             {...register("workingScheduleId")}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            <option value="">Select schedule</option>
-            <option value="SCH-001">Standard 40h Mon-Fri</option>
+            <option value="SCH-001">Standard 40h (Mon-Fri 9-5)</option>
             <option value="SCH-002">Part Time 20h</option>
+            <option value="SCH-003">Flexible Remote 37.5h</option>
           </select>
-          {errors.workingScheduleId && <p className="text-sm text-destructive">{errors.workingScheduleId.message}</p>}
         </div>
       </div>
 
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline">Cancel</Button>
-        <Button type="submit">Save Contract</Button>
+      <div className="flex justify-end gap-2 pt-3 border-t border-border">
+        {onCancel && (
+          <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={submitting}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" size="sm" disabled={submitting} className="gap-1.5 h-8">
+          {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          <span>{submitting ? "Saving..." : "Save Contract"}</span>
+        </Button>
       </div>
     </form>
   );

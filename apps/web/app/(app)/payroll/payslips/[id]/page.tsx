@@ -1,82 +1,233 @@
+"use client";
+
+import { use, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Printer } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
+import { generatePayslipPDF } from "@/lib/payslip-pdf";
+import { ArrowLeft, Printer, Download, CheckCircle, FileText, Loader2 } from "lucide-react";
 
-const MOCK_PAYSLIP = {
+interface SlipLine {
+  rule: string;
+  category: string;
+  amount: number;
+  type: "EARNING" | "DEDUCTION";
+}
+
+const MOCK_PAYSLIP_DATA = {
   id: "PS-1001",
-  employee: "Alice Johnson",
+  employeeName: "Alice Johnson",
+  employeeId: "EMP-001",
+  department: "Engineering",
+  position: "Senior Frontend Engineer",
   period: "October 2023",
-  contract: "CON-1001 (Senior Frontend Engineer)",
+  contractRef: "CON-1001 (Standard Tech)",
+  gross: 10000.0,
+  deductions: 2500.0,
+  net: 7500.0,
   lines: [
-    { rule: "Basic Salary", category: "BASIC", amount: 10000.00, type: "EARNING" },
-    { rule: "Health Insurance", category: "DEDUCTION", amount: -300.00, type: "DEDUCTION" },
-    { rule: "Income Tax", category: "DEDUCTION", amount: -2200.00, type: "DEDUCTION" },
-  ],
-  net: 7500.00,
+    { rule: "Basic Salary", category: "BASIC", amount: 8000.0, type: "EARNING" },
+    { rule: "Housing Allowance (HRA)", category: "ALLOWANCE", amount: 1500.0, type: "EARNING" },
+    { rule: "Transport & Remote Allowance", category: "ALLOWANCE", amount: 500.0, type: "EARNING" },
+    { rule: "Health & Medical Insurance", category: "DEDUCTION", amount: -300.0, type: "DEDUCTION" },
+    { rule: "Income Tax Withholding", category: "DEDUCTION", amount: -1800.0, type: "DEDUCTION" },
+    { rule: "Retirement / Provident Fund", category: "DEDUCTION", amount: -400.0, type: "DEDUCTION" },
+  ] as SlipLine[],
 };
 
-export default async function PayslipDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id: payslipId } = await params;
+export default function PayslipDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: payslipId } = use(params);
+  const { data: session } = useSession();
+  const { toast } = useToast();
+  const [downloading, setDownloading] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  const isEmployee = session?.user?.role === "EMPLOYEE";
+  const currentUserName = session?.user?.name || "Employee";
+  const currentEmpId = session?.user?.employeeId || "EMP-004";
+
+  const payslip = {
+    ...MOCK_PAYSLIP_DATA,
+    id: payslipId,
+    ...(isEmployee
+      ? {
+          employeeName: currentUserName,
+          employeeId: currentEmpId,
+          department: "Product & Design",
+          position: "Staff Member",
+          gross: 8500.0,
+          deductions: 1700.0,
+          net: 6800.0,
+        }
+      : {}),
+  };
+
+  const handleDownloadPDF = async () => {
+    setDownloading(true);
+    await new Promise((r) => setTimeout(r, 600)); // Perceptible loading feedback
+
+    try {
+      generatePayslipPDF(payslip);
+      toast({
+        title: "Payslip Downloaded",
+        description: `Exported PDF for ${payslip.employeeName} (${payslipId}).`,
+        type: "success",
+      });
+    } catch {
+      toast({
+        title: "Print Failed",
+        description: "Unable to generate PDF document.",
+        type: "error",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    setPrinting(true);
+    await new Promise((r) => setTimeout(r, 300));
+    window.print();
+    setPrinting(false);
+  };
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-4 max-w-3xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/payroll/payruns/1">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="w-4 h-4" />
+        <div className="flex items-center gap-2.5">
+          <Link href="/payroll/payslips">
+            <Button variant="ghost" size="icon" className="h-7 w-7">
+              <ArrowLeft className="w-3.5 h-3.5" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Payslip {payslipId}</h1>
-            <p className="text-sm text-muted-foreground">{MOCK_PAYSLIP.employee} • {MOCK_PAYSLIP.period}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-semibold tracking-tight text-foreground">Payslip {payslipId}</h1>
+              <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                {payslip.period}
+              </span>
+              <Badge variant="success" className="text-[10px] font-mono">
+                <CheckCircle className="w-3 h-3 mr-1" /> Paid
+              </Badge>
+            </div>
+            <p className="text-[11px] text-muted-foreground font-mono">
+              {payslip.employeeName} • {payslip.department} • {payslip.contractRef}
+            </p>
           </div>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Printer className="w-4 h-4" />
-          Print Payslip
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrint}
+            disabled={printing}
+            className="gap-1.5 h-8 text-xs"
+          >
+            {printing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+            <span>Print</span>
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={handleDownloadPDF}
+            disabled={downloading}
+            className="gap-1.5 h-8 text-xs"
+          >
+            {downloading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Generating PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PDF</span>
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="border-b bg-muted/20 pb-4">
+      {/* Payslip Document Card */}
+      <Card className="overflow-hidden shadow-xs">
+        <CardHeader className="border-b border-border bg-muted/20 p-4">
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="text-lg">Salary Statement</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">Contract: {MOCK_PAYSLIP.contract}</p>
+              <div className="flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-primary" />
+                <CardTitle className="text-sm font-bold">Salary Ledger Statement</CardTitle>
+              </div>
+              <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                Contract: {payslip.contractRef}
+              </p>
+              <p className="text-[11px] text-muted-foreground font-mono">
+                Employee Ref: {payslip.employeeId}
+              </p>
             </div>
+
             <div className="text-right">
-              <p className="text-sm font-semibold">PeoplePay360 Inc.</p>
-              <p className="text-xs text-muted-foreground">123 Business Rd, Tech City</p>
+              <p className="text-xs font-bold text-foreground">PeoplePay360 Inc.</p>
+              <p className="text-[11px] text-muted-foreground font-mono">Enterprise Payroll</p>
             </div>
           </div>
         </CardHeader>
+
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/10 border-b">
-                <TableHead className="py-3 px-6">Description</TableHead>
-                <TableHead className="py-3 px-6 text-center">Category</TableHead>
-                <TableHead className="py-3 px-6 text-right">Amount</TableHead>
+              <TableRow>
+                <TableHead className="py-2 px-4 text-[11px]">Salary Component / Rule</TableHead>
+                <TableHead className="py-2 px-4 text-center text-[11px]">Category</TableHead>
+                <TableHead className="py-2 px-4 text-right text-[11px]">Line Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {MOCK_PAYSLIP.lines.map((line, idx) => (
-                <TableRow key={idx} className="border-b border-border/50 hover:bg-transparent">
-                  <TableCell className="py-3 px-6 font-medium">{line.rule}</TableCell>
-                  <TableCell className="py-3 px-6 text-center text-xs text-muted-foreground">{line.category}</TableCell>
-                  <TableCell className={`py-3 px-6 text-right font-mono ${line.type === 'DEDUCTION' ? 'text-destructive' : ''}`}>
-                    {line.amount > 0 ? '' : '-'}${Math.abs(line.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              {payslip.lines.map((line, idx) => (
+                <TableRow key={idx} className="hover:bg-transparent">
+                  <TableCell className="py-2 px-4 text-xs font-medium">{line.rule}</TableCell>
+                  <TableCell className="py-2 px-4 text-center font-mono text-[11px] text-muted-foreground">
+                    {line.category}
+                  </TableCell>
+                  <TableCell
+                    className={`py-2 px-4 text-right font-mono text-xs ${
+                      line.type === "DEDUCTION" ? "text-rose-600 font-medium" : "text-foreground"
+                    }`}
+                  >
+                    {line.amount > 0 ? "" : "-"}${Math.abs(line.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </TableCell>
                 </TableRow>
               ))}
-              <TableRow className="border-t-2 hover:bg-transparent bg-muted/5">
-                <TableCell colSpan={2} className="py-4 px-6 text-right font-bold text-sm">
-                  Net Salary
+
+              <TableRow className="bg-muted/10 border-t border-border hover:bg-transparent">
+                <TableCell colSpan={2} className="py-2 px-4 text-right font-mono text-[11px] text-muted-foreground">
+                  GROSS SALARY EARNINGS
                 </TableCell>
-                <TableCell className="py-4 px-6 text-right font-mono text-xl font-bold text-accent">
-                  ${MOCK_PAYSLIP.net.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                <TableCell className="py-2 px-4 text-right font-mono text-xs font-semibold">
+                  ${payslip.gross.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </TableCell>
+              </TableRow>
+
+              <TableRow className="bg-muted/10 border-b border-border hover:bg-transparent">
+                <TableCell colSpan={2} className="py-2 px-4 text-right font-mono text-[11px] text-muted-foreground">
+                  TOTAL STATUTORY & BENEFIT DEDUCTIONS
+                </TableCell>
+                <TableCell className="py-2 px-4 text-right font-mono text-xs font-semibold text-rose-600">
+                  -${payslip.deductions.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </TableCell>
+              </TableRow>
+
+              <TableRow className="border-t border-border bg-muted/40 hover:bg-muted/40">
+                <TableCell colSpan={2} className="py-3 px-4 text-right font-bold text-xs tracking-wide">
+                  NET SALARY PAYABLE (CREDITED)
+                </TableCell>
+                <TableCell className="py-3 px-4 text-right font-mono text-base font-bold text-foreground">
+                  ${payslip.net.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </TableCell>
               </TableRow>
             </TableBody>

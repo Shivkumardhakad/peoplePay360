@@ -1,8 +1,11 @@
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { contractSchema } from "@peoplepay360/validation";
+import { Prisma, UserRole } from "@prisma/client";
+import { Roles } from "../auth/roles.decorator";
 import { HrService } from "../shared/hr.service";
 import { DepartmentAccessGuard } from "../shared/department-access.guard";
 
+@Roles(UserRole.ADMIN, UserRole.HR_MANAGER, UserRole.HR_PAYROLL_USER, UserRole.PAYROLL_MANAGER)
 @Controller("contracts")
 @UseGuards(DepartmentAccessGuard)
 export class ContractsController {

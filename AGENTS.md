@@ -16,7 +16,7 @@ The repository contains two backend APIs. Keep this endpoint map synchronized wi
 - Source: `apps/hr-api`
 - Start: `pnpm dev:hr`
 - Build: `pnpm --filter @peoplepay360/hr-api build`
-- Current controllers are read-only list/dashboard endpoints:
+- HR admin endpoints require a Bearer JWT. Employee-role users must use the scoped `/api/hr/me/**` self-service endpoints instead of admin endpoints.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
@@ -33,7 +33,22 @@ The repository contains two backend APIs. Keep this endpoint map synchronized wi
 | GET | `/api/hr/users` | List users |
 | GET | `/api/hr/dashboard` | Get HR dashboard data |
 
-The HR API uses a dedicated PostgreSQL database through Prisma and requires `DATABASE_URL` (local development: `postgresql://postgres:root@localhost:5432/oddo_hr`). Do not point HR at the Payroll `oddo` database because their schemas are different. Apply the HR schema with `pnpm --filter @peoplepay360/db exec prisma migrate deploy` after setting `DATABASE_URL`. CORS defaults to `http://localhost:3000`; the port defaults to `3001` and can be changed with `PORT`. Department routes require an `ADMIN` or `HR_MANAGER` JWT; they validate request bodies and return paginated results. The HR API still needs a broader automated test suite.
+#### HR employee self-service endpoints
+
+All self-service endpoints resolve the employee from the authenticated JWT `employeeId` claim and reject requests without an authenticated employee context.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/hr/me/dashboard` | Get the logged-in employee's leave, attendance, and pending-request summary |
+| GET | `/api/hr/me/profile` | Get the logged-in employee's own profile |
+| GET | `/api/hr/me/attendance` | List the logged-in employee's attendance records |
+| POST | `/api/hr/me/attendance` | Create an attendance entry for the logged-in employee |
+| GET | `/api/hr/me/time-off` | List the logged-in employee's time-off requests |
+| GET | `/api/hr/me/time-off/allocations` | List the logged-in employee's leave allocations and balances |
+| GET | `/api/hr/me/time-off/types` | List active time-off types available for employee requests |
+| POST | `/api/hr/me/time-off/requests` | Create a time-off request for the logged-in employee |
+
+The HR API uses a dedicated PostgreSQL database through Prisma and requires `DATABASE_URL` (local development: `postgresql://postgres:root@localhost:5432/oddo_hr`). Do not point HR at the Payroll `oddo` database because their schemas are different. Apply the HR schema with `pnpm --filter @peoplepay360/db exec prisma migrate deploy` after setting `DATABASE_URL`. CORS defaults to `http://localhost:3000`; the port defaults to `3001` and can be changed with `PORT`. Department routes require an `ADMIN` or `HR_MANAGER` JWT; all authenticated HR API calls require `HR_API_JWT_SECRET` or `NEXTAUTH_SECRET` for Bearer JWT verification. The HR API currently has no real automated test suite; its package `test` script is a placeholder.
 
 ### Payroll API — Java/Spring Boot
 
@@ -74,7 +89,7 @@ The HR API uses a dedicated PostgreSQL database through Prisma and requires `DAT
 |---|---|---|
 | GET | `/api/payroll/payruns` | List payruns |
 | GET | `/api/payroll/payruns/{id}` | Get payrun |
-| POST | `/api/payroll/payruns` | Create payrun |
+| POST | `/api/payroll/payruns` | Create payrun with selected employee IDs |
 | POST | `/api/payroll/payruns/{id}/compute` | Compute payslips |
 | POST | `/api/payroll/payruns/{id}/validate` | Validate payrun and return warnings |
 | POST | `/api/payroll/payruns/{id}/pay` | Mark payrun paid |
@@ -105,13 +120,13 @@ The HR API uses a dedicated PostgreSQL database through Prisma and requires `DAT
 
 #### Formula salary rules
 
-Formula rules are evaluated during payrun computation using a restricted arithmetic engine. Supported operators are `+`, `-`, `*`, `/`, unary signs, parentheses, numeric literals, `base_salary`, `gross`, `deductions`, `net`, and earlier salary-rule codes. Unknown variables and division by zero are rejected.
+Formula rules are evaluated during payrun computation using a restricted arithmetic engine. Supported operators are `+`, `-`, `*`, `/`, unary signs, parentheses, numeric literals, `base_salary`, `gross`, `deductions`, `net`, `worked_minutes`, `unpaid_leave_days`, `attendance_exceptions`, and earlier salary-rule codes. Unknown variables and division by zero are rejected.
 
 Payroll compute loads contracts and employee status from the HR API for the selected period and salary structure. It rejects terminated employees, invalid or negative base salaries, and overlapping active contracts for the same employee.
 
 Payrun validation must re-check real persisted payslips against the payrun period, HR active-contract employee scope, contract IDs, totals, net arithmetic, and salary-rule line totals before allowing `VALIDATED` status.
 
-Payroll requires PostgreSQL (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) and Java 21. Payrun computation also requires the HR API at `HR_API_URL` and currently cannot execute `FORMULA` salary rules because no formula engine is configured. The Java test suite currently contains 4 passing tests when run with Java 21.
+Payroll requires PostgreSQL (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) and Java 21. Payrun computation also requires the HR API at `HR_API_URL`; it loads bank-account, attendance, and approved unpaid-leave context for selected employees and exposes that context to formula rules and validation warnings. The Java test suite currently contains 12 passing tests when run with Java 21.
 This hackathon implementation may also be presented as "HR & Payroll" by PeoplePay360. The core product story is a connected operational platform where employee master data, contracts, schedules, attendance, leave, salary rules, payruns, payslips, PDF delivery, and dashboard reporting work from live system records rather than static mocks.
 
 ## Hackathon Context and Delivery Priorities
