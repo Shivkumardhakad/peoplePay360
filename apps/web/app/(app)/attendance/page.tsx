@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
-import { quickCheckInAction } from "@/lib/api-actions";
+import { quickCheckInAction, getAttendanceAction } from "@/lib/api-actions";
 import { AttendanceForm, type AttendanceFormValues } from "@/components/attendance-form";
 import { Plus, Search, LogIn, LogOut, Loader2 } from "lucide-react";
 
@@ -37,6 +37,14 @@ export default function AttendancePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
+
+  useEffect(() => {
+    getAttendanceAction().then((live) => {
+      if (live && live.length > 0) {
+        setAttendance(live);
+      }
+    });
+  }, []);
 
   const role = session?.user?.role || "ADMIN";
   const isEmployee = role === "EMPLOYEE";
@@ -77,40 +85,28 @@ export default function AttendancePage() {
     if (type === "IN") setCheckingIn(true);
     else setCheckingOut(true);
 
-    const empId = session?.user?.employeeId || "EMP-001";
-    const empName = session?.user?.name || "Current User";
+    const empId = session?.user?.employeeId || session?.user?.id || "EMP-001";
     const timeParts = new Date().toTimeString().split(" ");
     const timeNow = (timeParts[0] || "09:00").slice(0, 5);
-    const todayParts = new Date().toISOString().split("T");
-    const today = todayParts[0] || "2023-10-01";
 
     try {
-      await quickCheckInAction(empId, type);
-      await new Promise((r) => setTimeout(r, 450)); // perceptible smooth loading feedback
-
-      toast({
-        title: type === "IN" ? "Checked In" : "Checked Out",
-        description: `Logged at ${timeNow} today.`,
-        type: "success",
-      });
-
-      if (type === "IN") {
-        setAttendance([
-          {
-            id: `ATT-${String(attendance.length + 1).padStart(3, "0")}`,
-            employee: empName,
-            date: today,
-            checkIn: timeNow,
-            checkOut: "-",
-            workedHours: "Active",
-            status: "Present",
-          },
-          ...attendance,
-        ]);
+      const res = await quickCheckInAction(empId, type);
+      if (res.success) {
+        toast({
+          title: type === "IN" ? "Checked In" : "Checked Out",
+          description: `Logged at ${timeNow} today.`,
+          type: "success",
+        });
+        const live = await getAttendanceAction();
+        if (live && live.length > 0) {
+          setAttendance(live);
+        }
       } else {
-        setAttendance((prev) =>
-          prev.map((r, i) => (i === 0 ? { ...r, checkOut: timeNow, workedHours: "8.00" } : r))
-        );
+        toast({
+          title: "Attendance error",
+          description: res.error || "Could not log attendance",
+          type: "error",
+        });
       }
     } finally {
       if (type === "IN") setCheckingIn(false);
@@ -118,25 +114,11 @@ export default function AttendancePage() {
     }
   };
 
-  const handleManualCreated = (data: AttendanceFormValues) => {
-    const employeeNames: Record<string, string> = {
-      "EMP-001": "Alice Johnson",
-      "EMP-002": "Bob Smith",
-      "EMP-003": "Charlie Davis",
-      "EMP-004": "Emily Watson",
-    };
-
-    const newRecord: AttendanceRecord = {
-      id: `ATT-${String(attendance.length + 1).padStart(3, "0")}`,
-      employee: employeeNames[data.employeeId] || data.employeeId,
-      date: data.date,
-      checkIn: data.checkIn || "-",
-      checkOut: data.checkOut || "-",
-      workedHours: data.checkIn && data.checkOut ? "8.00" : "0.00",
-      status: data.status === "PRESENT" ? "Present" : data.status === "LATE" ? "Late" : data.status === "HALF_DAY" ? "Half Day" : "Absent",
-    };
-
-    setAttendance([newRecord, ...attendance]);
+  const handleManualCreated = async () => {
+    const live = await getAttendanceAction();
+    if (live && live.length > 0) {
+      setAttendance(live);
+    }
     setDialogOpen(false);
   };
 
