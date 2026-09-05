@@ -3,10 +3,15 @@ package com.dj.payroll.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
@@ -32,6 +37,23 @@ public class GlobalExceptionHandler {
 				.body(ApiErrorResponse.of(status.value(), status.getReasonPhrase(), exception.getMessage(), request.getRequestURI()));
 	}
 
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
+			DataIntegrityViolationException exception, HttpServletRequest request) {
+		HttpStatus status = HttpStatus.CONFLICT;
+		return ResponseEntity.status(status).body(ApiErrorResponse.of(
+				status.value(), status.getReasonPhrase(), "The requested change conflicts with existing data.",
+				request.getRequestURI()));
+	}
+
+	@ExceptionHandler(ExternalServiceException.class)
+	public ResponseEntity<ApiErrorResponse> handleExternalService(
+			ExternalServiceException exception, HttpServletRequest request) {
+		HttpStatus status = HttpStatus.SERVICE_UNAVAILABLE;
+		return ResponseEntity.status(status).body(ApiErrorResponse.of(
+				status.value(), status.getReasonPhrase(), exception.getMessage(), request.getRequestURI()));
+	}
+
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	public ResponseEntity<ApiErrorResponse> handleMethodArgumentNotValidException(
 			MethodArgumentNotValidException exception,
@@ -55,6 +77,29 @@ public class GlobalExceptionHandler {
 						request.getRequestURI(),
 						validationErrors
 				));
+	}
+
+	@ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+	public ResponseEntity<ApiErrorResponse> handleMalformedRequest(Exception exception, HttpServletRequest request) {
+		HttpStatus status = HttpStatus.BAD_REQUEST;
+		return ResponseEntity.status(status).body(ApiErrorResponse.of(
+				status.value(), status.getReasonPhrase(), "Request body or parameter format is invalid.",
+				request.getRequestURI()));
+	}
+
+	@ExceptionHandler(AccessDeniedException.class)
+	public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException exception, HttpServletRequest request) {
+		HttpStatus status = HttpStatus.FORBIDDEN;
+		return ResponseEntity.status(status).body(ApiErrorResponse.of(
+				status.value(), status.getReasonPhrase(), "You do not have permission to perform this action.",
+				request.getRequestURI()));
+	}
+
+	@ExceptionHandler(AuthenticationException.class)
+	public ResponseEntity<ApiErrorResponse> handleAuthentication(AuthenticationException exception, HttpServletRequest request) {
+		HttpStatus status = HttpStatus.UNAUTHORIZED;
+		return ResponseEntity.status(status).body(ApiErrorResponse.of(
+				status.value(), status.getReasonPhrase(), "Authentication is required.", request.getRequestURI()));
 	}
 
 	@ExceptionHandler(Exception.class)
