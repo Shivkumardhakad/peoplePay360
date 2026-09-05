@@ -28,6 +28,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -189,10 +191,16 @@ public class PayrunService {
         BigDecimal gross = BigDecimal.ZERO;
         BigDecimal deductions = BigDecimal.ZERO;
         List<PayslipLine> lines = new ArrayList<>();
+        Map<String, BigDecimal> ruleValues = new HashMap<>();
+        ruleValues.put("BASE", baseSalary);
+        ruleValues.put("BASIC", baseSalary);
         for (SalaryRule rule : rules) {
             var category = categoryRepository.findById(rule.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Salary rule category not found: " + rule.getCategoryId()));
-            BigDecimal amount = calculate(rule, baseSalary).setScale(MONEY_SCALE, ROUNDING);
+            ruleValues.put("GROSS", gross);
+            ruleValues.put("DEDUCTIONS", deductions);
+            BigDecimal amount = calculate(rule, baseSalary, ruleValues).setScale(MONEY_SCALE, ROUNDING);
+            ruleValues.put(rule.getCode().toUpperCase(), amount);
             if ("EARNING".equals(category.getType())) gross = gross.add(amount);
             if ("DEDUCTION".equals(category.getType())) deductions = deductions.add(amount);
             PayslipLine line = new PayslipLine();
@@ -226,11 +234,11 @@ public class PayrunService {
         payslipLineRepository.saveAll(lines);
     }
 
-    private BigDecimal calculate(SalaryRule rule, BigDecimal baseSalary) {
+    private BigDecimal calculate(SalaryRule rule, BigDecimal baseSalary, Map<String, BigDecimal> ruleValues) {
         return switch (rule.getCalculationType()) {
             case "FIXED" -> requireValue(rule);
             case "PERCENTAGE" -> baseSalary.multiply(requireValue(rule)).divide(BigDecimal.valueOf(100), 8, ROUNDING);
-            case "FORMULA" -> throw new IllegalArgumentException("FORMULA salary rules require a configured formula engine: " + rule.getCode());
+            case "FORMULA" -> FormulaEvaluator.evaluate(rule.getFormula(), ruleValues);
             default -> throw new IllegalArgumentException("Unsupported salary rule type: " + rule.getCalculationType());
         };
     }

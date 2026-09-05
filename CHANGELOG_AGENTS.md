@@ -1864,3 +1864,28 @@
 
 ### Notes
 - Java Maven tests remain unavailable in this environment because Maven is not installed and the wrapper cannot start; web validation checks are type-checked.
+
+## 2026-09-06 07:00 IST — Add safe formula salary-rule evaluation
+
+### Summary
+- Added a restricted arithmetic formula evaluator for salary rules.
+- Added support for rule-code references, numeric constants, operator precedence, parentheses, unary signs, and deterministic decimal math.
+- Connected `FORMULA` rules to payslip computation and added invalid-reference/division-by-zero protection.
+- Added unit tests for formula evaluation and invalid expressions.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/services/FormulaEvaluator.java`: Added the safe expression parser.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Supplies prior rule values and executes formula rules during payslip generation.
+- `apps/payroll/src/test/java/com/dj/payroll/services/FormulaEvaluatorTest.java`: Covers precedence, references, unknown codes, and division by zero.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Formula salary rules were accepted by configuration but previously caused payrun computation to fail.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+- Java tests — added but not executed because Maven is unavailable in this environment.
+
+### Notes
+- Supported formula syntax is arithmetic only: `+`, `-`, `*`, `/`, parentheses, numbers, and salary rule codes. No Java, SQL, reflection, or arbitrary function execution is allowed.
