@@ -2302,3 +2302,21 @@
 
 ### Notes
 - Existing unassigned employees need their department updated once from the employee edit form; new records will be correctly assigned.
+
+## 2026-09-06 15:35 IST — Include contract department in payrun eligibility
+
+### Summary
+- Department-scoped payrun eligibility now matches either the employee department or an active contract department.
+- Employee display department also falls back to the active contract department.
+- Server-side payrun validation uses the same rule.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added active-contract department fallback for eligibility and creation validation.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Existing employees may have a missing/stale master department while their newly created active contract has the correct department.
+
+### Validation
+- TypeScript check — pending.
+- `git diff --check` — pending.

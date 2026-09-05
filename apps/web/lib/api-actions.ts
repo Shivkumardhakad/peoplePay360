@@ -158,8 +158,11 @@ export async function listPayrollDepartmentsAction() {
 }
 
 export async function getPayrollEligibleEmployeesAction(departmentId?: string) {
-  const employees = await prisma.employee.findMany({ where: { status: "ACTIVE", ...(departmentId ? { departmentId } : {}) }, orderBy: { lastName: "asc" }, include: { department: true, contracts: { where: { status: "ACTIVE" }, orderBy: { startDate: "desc" }, take: 1 } } });
-  return employees.map((employee) => ({ id: employee.id, employeeNumber: employee.employeeNumber, name: `${employee.firstName} ${employee.lastName}`, departmentId: employee.departmentId, department: employee.department?.name ?? "-", wage: Number(employee.contracts[0]?.baseSalary ?? 0) }));
+  const employees = await prisma.employee.findMany({ where: { status: "ACTIVE", ...(departmentId ? { OR: [{ departmentId }, { contracts: { some: { status: "ACTIVE", departmentId } } }] } : {}) }, orderBy: { lastName: "asc" }, include: { department: true, contracts: { where: { status: "ACTIVE" }, orderBy: { startDate: "desc" }, take: 1, include: { department: true } } } });
+  return employees.map((employee) => {
+    const contract = employee.contracts[0];
+    return { id: employee.id, employeeNumber: employee.employeeNumber, name: `${employee.firstName} ${employee.lastName}`, departmentId: employee.departmentId ?? contract?.departmentId ?? null, department: employee.department?.name ?? contract?.department?.name ?? "-", wage: Number(contract?.baseSalary ?? 0) };
+  });
 }
 
 // -------------------------------------------------------------
@@ -936,7 +939,7 @@ export async function createPayrunAction(body: unknown) {
   const request = body as { departmentId?: string; selectedEmployeeIds?: string[] };
   if (request.departmentId) {
     const selectedEmployeeIds = request.selectedEmployeeIds ?? [];
-    const matchingEmployees = await prisma.employee.count({ where: { id: { in: selectedEmployeeIds }, departmentId: request.departmentId, status: "ACTIVE" } });
+    const matchingEmployees = await prisma.employee.count({ where: { id: { in: selectedEmployeeIds }, status: "ACTIVE", OR: [{ departmentId: request.departmentId }, { contracts: { some: { status: "ACTIVE", departmentId: request.departmentId } } }] } });
     if (matchingEmployees !== selectedEmployeeIds.length) throw new Error("All selected employees must belong to the chosen department.");
   }
   const { departmentId: _departmentId, selectedEmployeeIds, ...payrollBody } = request as any;
