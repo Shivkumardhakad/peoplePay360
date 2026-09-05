@@ -364,3 +364,21 @@
 ### Notes
 - Controllers currently follow the existing pattern of accepting Prisma input types directly; DTO validation and authorization guards are still needed before production exposure.
 - Payrun computation supports fixed and percentage rules. Formula rules currently compute as zero until a formula engine/parser is defined.
+
+## 2026-09-05 17:17 +05:30 — Capture hackathon product context
+
+### Summary
+- Added the HR & Payroll hackathon brief, role scope, demo priorities, and expected payroll deliverables to the agent instructions.
+
+### Files Changed
+- `AGENTS.md`: Added hackathon context, delivery priorities, role permissions, two-step payrun workflow, live dashboard expectations, and PDF/email deliverables.
+- `CHANGELOG_AGENTS.md`: Recorded this documentation update.
+
+### Reason
+- Future repository work needs to align with the provided hackathon problem statement and prioritize real HR/payroll business flows over static UI.
+
+### Validation
+- `git diff --check` — passed
+
+### Notes
+- This was a documentation/context update only; no application code was changed.

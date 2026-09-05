@@ -6,6 +6,29 @@ PeoplePay360 is an integrated HR and Payroll platform that manages employee reco
 
 The system must prioritize accurate business logic, reliable data relationships, historical tracking, role-based access, and an end-to-end employee-to-payslip workflow over superficial UI implementation.
 
+This hackathon implementation may also be presented as "HR & Payroll" by PeoplePay360. The core product story is a connected operational platform where employee master data, contracts, schedules, attendance, leave, salary rules, payruns, payslips, PDF delivery, and dashboard reporting work from live system records rather than static mocks.
+
+## Hackathon Context and Delivery Priorities
+
+- The main goal is a functional integrated HR and payroll system covering the employee lifecycle from master data and time tracking to payroll calculation, payslip history, reporting, and delivery.
+- Prioritize two demonstrable end-to-end scenarios:
+  - Employee-to-payslip: employee record, applicable period contract, assigned schedule, salary structure/rules, payrun creation, computation, validation, payment, and payslip view/PDF.
+  - Leave allocation-to-request: time-off type, allocation, employee request, approval/refusal, balance consumption, and payroll/dashboard visibility.
+- The payrun workflow must be two-step: define scope and period first, then select eligible employees before creating the payrun batch.
+- Salary rules must actively drive payslip generation. Configuration screens and APIs must not remain disconnected from computation.
+- Payroll warnings should surface incomplete or risky payroll data before finalization, including missing bank details, missing applicable contracts, duplicate payslips, incomplete salary structures, attendance exceptions, and leave-balance issues.
+- Payroll dashboard data must be derived from live HR/payroll records and support filtering by period, department, and employee type where practical.
+- Payslip PDF generation and bulk employee email delivery are expected deliverables for the payroll workflow.
+- For the hackathon demo, prefer complete, reliable flows over broad but shallow screens.
+
+## Role Scope
+
+- Employee: may view own employee details, attendance records, and leave balances; may create attendance entries and time-off requests; must not access HR administration or payroll administration.
+- HR Manager: has CRUD access to employees, attendance, contracts, working schedules, and time-off modules; may approve or refuse time-off requests; must not access payroll features.
+- HR Payroll User: has HR Manager permissions plus create, read, and update access to payruns and payslips; has read-only access to salary structures and salary rules.
+- HR Payroll Manager: has HR Payroll User permissions plus full CRUD access to payruns, payslips, salary structures, and salary rules.
+- Admin: has full access to all modules, user management, role assignment, permission updates, and system administration.
+
 ## Purpose of This File
 
 This document defines the engineering standards, workflow, and operating rules for all AI agents and automated contributors working in this repository.
