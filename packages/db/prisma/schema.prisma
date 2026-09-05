@@ -28,13 +28,54 @@ enum ContractStatus {
   CANCELLED
 }
 
-enum EmploymentType { FULL_TIME PART_TIME CONTRACT }
-enum RecordStatus { ACTIVE INACTIVE }
-enum ScheduleDay { MON TUE WED THU FRI SAT SUN }
-enum RuleCategoryType { EARNING DEDUCTION AGGREGATE }
-enum ComputationType { FIXED PERCENTAGE FORMULA }
-enum PayrunStatus { DRAFT COMPUTED VALIDATED PAID CANCELLED }
-enum PayslipStatus { DRAFT COMPUTED VALIDATED PAID CANCELLED }
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ScheduleDay {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+enum RuleCategoryType {
+  EARNING
+  DEDUCTION
+  AGGREGATE
+}
+
+enum ComputationType {
+  FIXED
+  PERCENTAGE
+  FORMULA
+}
+
+enum PayrunStatus {
+  DRAFT
+  COMPUTED
+  VALIDATED
+  PAID
+  CANCELLED
+}
+
+enum PayslipStatus {
+  DRAFT
+  COMPUTED
+  VALIDATED
+  PAID
+  CANCELLED
+}
 
 enum TimeOffUnit {
   DAYS

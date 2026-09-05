@@ -198,3 +198,22 @@
 
 ### Notes
 - `HrService` remains a shared application service for now; domain-specific services can be extracted next without changing the route contract.
+
+## 2026-09-05 14:25 IST — Fix Prisma enum syntax for CI
+
+### Summary
+- Converted newly added inline Prisma enums to multiline enum definitions supported by Prisma 6.15.
+
+### Files Changed
+- `packages/db/prisma/schema.prisma`: Fixed enum declarations for employment, record, schedule, salary rule, payrun, and payslip statuses.
+- `CHANGELOG_AGENTS.md`: Recorded the CI fix.
+
+### Reason
+- CI failed during `prisma generate` with P1012 because Prisma requires one enum value per line.
+
+### Validation
+- `git diff --check` — pending
+- Prisma generate — not run locally; dependency installation is unavailable in the local environment.
+
+### Notes
+- Turborepo telemetry and Prisma package.json deprecation messages are warnings and were not the failure cause.
