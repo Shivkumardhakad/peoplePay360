@@ -29,9 +29,10 @@ export class PayrollController {
 
   @Get("payruns") listPayruns() { return this.hr.listPayruns(); }
   @Get("payruns/:id") getPayrun(@Param("id") id: string) { return this.hr.getPayrun(id); }
-  @Post("payruns") createPayrun(@Body() body: Prisma.PayrunUncheckedCreateInput) { return this.hr.createPayrun(body); }
+  @Post("payruns") createPayrun(@Body() body: Prisma.PayrunUncheckedCreateInput & { employeeIds: string[] }) { return this.hr.createPayrun(body); }
   @Patch("payruns/:id") updatePayrun(@Param("id") id: string, @Body() body: Prisma.PayrunUncheckedUpdateInput) { return this.hr.updatePayrun(id, body); }
   @Post("payruns/:id/compute") computePayrun(@Param("id") id: string) { return this.hr.computePayrun(id); }
+  @Get("payruns/:id/warnings") getPayrunWarnings(@Param("id") id: string) { return this.hr.getPayrunWarnings(id); }
   @Post("payruns/:id/validate") validatePayrun(@Param("id") id: string) { return this.hr.validatePayrun(id); }
   @Post("payruns/:id/mark-paid") markPayrunPaid(@Param("id") id: string) { return this.hr.markPayrunPaid(id); }
   @Post("payruns/:id/cancel") cancelPayrun(@Param("id") id: string) { return this.hr.cancelPayrun(id); }

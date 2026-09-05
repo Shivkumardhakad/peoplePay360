@@ -751,6 +751,49 @@
 ### Notes
 - This was a documentation/context update only; no application code was changed.
 
+## 2026-09-05 — Strengthen HR and payroll business rules
+
+### Summary
+- Added backend safeguards for contract periods, schedules, attendance, time-off approvals, and payrun validation.
+
+### Files Changed
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Added active-contract overlap checks, automatic weekly schedule-hour calculation, derived attendance worked minutes, safe leave-balance consumption, payrun state guards, and payroll warning generation.
+- `apps/hr-api/src/modules/payroll/payroll.controller.ts`: Added the payrun warnings endpoint.
+- `CHANGELOG_AGENTS.md`: Recorded this implementation.
+
+### Reason
+- The HR modules existed as CRUD endpoints, but key operational rules from the hackathon requirements were not enforced consistently at the backend boundary.
+
+### Validation
+- `pnpm --filter @peoplepay360/hr-api build` — passed (`tsc --noEmit`).
+- `git diff --check` — passed.
+
+### Notes
+- Employee-selection persistence for the payrun wizard, authentication guards, formula evaluation, PDF generation, bulk email delivery, and automated API tests are still follow-up work.
+
+## 2026-09-05 — Add selected employees to payruns
+
+### Summary
+- Added persistent employee selection to payruns so computation is limited to explicitly selected active employees.
+
+### Files Changed
+- `packages/db/prisma/schema.prisma`: Added the `PayrunEmployee` selection entity and relations.
+- `packages/db/prisma/migrations/20260905150000_add_payrun_employee_selection/migration.sql`: Added the selection table, unique constraint, index, and foreign keys.
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Validates selected employees during payrun creation and computes only selected employees.
+- `apps/hr-api/src/modules/payroll/payroll.controller.ts`: Accepts `employeeIds` during payrun creation.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- The required two-step payrun workflow needs an explicit employee-selection boundary instead of silently processing every matching contract.
+
+### Validation
+- `pnpm --filter @peoplepay360/hr-api build` — passed (`tsc --noEmit`).
+- Prisma client generation — attempted; Windows reported an `EPERM` rename because the Prisma query engine file was in use. Run `pnpm --filter @peoplepay360/db exec prisma generate` after stopping running Node/Prisma processes.
+- `git diff --check` — pending final review.
+
+### Notes
+- The database migration must be deployed before using employee selection: `pnpm --filter @peoplepay360/db exec prisma migrate deploy`.
+
 ## 2026-09-05 17:38 +05:30 — Expand hackathon scope details
 
 ### Summary
