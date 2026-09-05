@@ -1,0 +1,21 @@
+{
+  "name": "peoplepay360",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev --filter=web --filter=@peoplepay360/hr-api",
+    "dev:web": "pnpm --filter web dev",
+    "dev:hr": "pnpm --filter @peoplepay360/hr-api dev",
+    "dev:payroll": "mvn -f apps/payroll-api/pom.xml spring-boot:run",
+    "build": "turbo run build",
+    "build:payroll": "mvn -f apps/payroll-api/pom.xml test",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:migrate": "pnpm --filter @peoplepay360/db exec prisma migrate dev",
+    "db:seed": "pnpm --filter @peoplepay360/db exec prisma db seed"
+  },
+  "devDependencies": {
+    "turbo": "2.5.6"
+  },
+  "packageManager": "pnpm@11.19.0"
+}

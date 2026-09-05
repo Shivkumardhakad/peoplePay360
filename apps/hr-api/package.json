@@ -1,0 +1,25 @@
+{
+  "name": "@peoplepay360/hr-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node src/main.ts",
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "echo \"hr-api tests not added yet\""
+  },
+  "dependencies": {
+    "@nestjs/common": "10.4.20",
+    "@nestjs/core": "10.4.20",
+    "@nestjs/platform-express": "10.4.20",
+    "@peoplepay360/db": "workspace:*",
+    "@peoplepay360/validation": "workspace:*",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.29",
+    "ts-node": "10.9.2",
+    "typescript": "5.9.2"
+  }
+}

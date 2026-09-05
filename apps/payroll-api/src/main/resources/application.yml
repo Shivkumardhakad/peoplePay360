@@ -1,0 +1,16 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: peoplepay360-payroll-api
+  datasource:
+    url: ${PAYROLL_DATABASE_URL:jdbc:mysql://localhost:3306/peoplepay360_payroll}
+    username: ${PAYROLL_DATABASE_USER:root}
+    password: ${PAYROLL_DATABASE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
