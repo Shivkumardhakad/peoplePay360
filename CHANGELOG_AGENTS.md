@@ -1745,3 +1745,26 @@
 
 ### Notes
 - Current Java `CreateRequest` creates the payrun scope from the salary structure/period; selected employee IDs remain a UI eligibility review until the Java API exposes a selection field.
+## 2026-09-06 04:45 IST — Align salary configuration with Payroll API
+
+### Summary
+- Connected salary structure archive/activate actions to the Java Payroll API `PUT` endpoint.
+- Aligned salary rule creation with the API's `FIXED`, `PERCENTAGE`, and `FORMULA` calculation methods.
+- Added a formula input to the salary rule form and removed the obsolete `SUM` UI mapping.
+
+### Files Changed
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Persist structure status changes through Payroll API and reload live structures.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: Send calculation method and formula values without mock conversion.
+- `apps/web/components/salary-rule-form.tsx`: Validate and render API-supported calculation methods.
+- `apps/web/lib/api-actions.ts`: Added the authenticated structure update action.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Salary configuration controls must update the same live records consumed by payroll computation.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- The Java Payroll API currently accepts formula rules, but payrun computation still requires a configured formula engine for executing them.

@@ -15,10 +15,11 @@ const ruleSchema = z.object({
   code: z.string().min(1, "Code is required"),
   category: z.enum(["BASIC", "ALLOWANCE", "DEDUCTION", "CONTRIBUTION", "GROSS", "NET"]),
   sequence: z.coerce.number().min(1, "Sequence must be at least 1"),
-  calculationType: z.enum(["FIXED", "PERCENTAGE", "SUM"]),
+  calculationType: z.enum(["FIXED", "PERCENTAGE", "FORMULA"]),
   referenceRuleCode: z.string().optional(),
   percentage: z.coerce.number().optional(),
   amount: z.coerce.number().optional(),
+  formula: z.string().optional(),
 });
 
 export type SalaryRuleFormInput = z.input<typeof ruleSchema>;
@@ -114,7 +115,7 @@ export function SalaryRuleForm({
           >
             <option value="FIXED">Fixed Value</option>
             <option value="PERCENTAGE">Percentage (%)</option>
-            <option value="SUM">Sum Aggregation</option>
+            <option value="FORMULA">Formula</option>
           </select>
         </div>
       </div>
@@ -143,6 +144,13 @@ export function SalaryRuleForm({
         <div className="space-y-1.5 p-3 border border-border rounded-md bg-muted/20">
           <Label htmlFor="amount" className="text-xs font-medium">Fixed Amount ($)</Label>
           <Input id="amount" type="number" step="0.01" placeholder="500.00" className="font-mono text-xs" {...register("amount")} />
+        </div>
+      )}
+
+      {calculationType === "FORMULA" && (
+        <div className="space-y-1.5 p-3 border border-border rounded-md bg-muted/20">
+          <Label htmlFor="formula" className="text-xs font-medium">Formula</Label>
+          <Input id="formula" placeholder="e.g. BASIC * 0.1" className="font-mono text-xs" {...register("formula")} />
         </div>
       )}
 

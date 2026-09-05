@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { SalaryStructureForm, type SalaryStructureFormValues } from "@/components/salary-structure-form";
 import { Layers, CheckCircle2, Archive, Loader2, Lock } from "lucide-react";
-import { createPayrollStructureAction, listPayrollRulesAction, listPayrollStructuresAction } from "@/lib/api-actions";
+import { createPayrollStructureAction, listPayrollRulesAction, listPayrollStructuresAction, updatePayrollStructureAction } from "@/lib/api-actions";
 
 interface StructureItem {
   id: string;
   name: string;
   ruleCount: number;
   status: "Active" | "Draft" | "Archived";
+  rules?: any[];
 }
 
 export default function SalaryStructuresPage() {
@@ -34,7 +35,7 @@ export default function SalaryStructuresPage() {
   useEffect(() => {
     Promise.all([listPayrollStructuresAction(), listPayrollRulesAction()]).then(([loadedStructures, loadedRules]) => {
       setRules(loadedRules as any[]);
-      setStructures((loadedStructures as any[]).map((structure) => ({ id: structure.id, name: structure.name, ruleCount: structure.rules?.length ?? 0, status: structure.status === "ACTIVE" ? "Active" : structure.status === "DRAFT" ? "Draft" : "Archived" })));
+      setStructures((loadedStructures as any[]).map((structure) => ({ id: structure.id, name: structure.name, rules: structure.rules ?? [], ruleCount: structure.rules?.length ?? 0, status: structure.status === "ACTIVE" ? "Active" : structure.status === "DRAFT" ? "Draft" : "Archived" })));
     }).catch((error) => toast({ title: "Payroll API unavailable", description: error.message, type: "error" }));
   }, [toast]);
 
@@ -44,18 +45,16 @@ export default function SalaryStructuresPage() {
 
   const handleToggleStatus = async (id: string) => {
     setTogglingId(id);
-    await new Promise((r) => setTimeout(r, 400));
-    setStructures((prev) =>
-      prev.map((s) =>
-        s.id === id ? { ...s, status: s.status === "Active" ? "Archived" : "Active" } : s
-      )
-    );
-    setTogglingId(null);
-    toast({
-      title: "Structure Status Updated",
-      description: `Structure ${id} updated.`,
-      type: "success",
-    });
+    try {
+      const current = structures.find((structure) => structure.id === id);
+      if (!current) throw new Error("Structure not found");
+      const saved = await updatePayrollStructureAction(id, { name: current.name, description: "Updated from PeoplePay360 payroll UI", status: current.status === "Active" ? "INACTIVE" : "ACTIVE", rules: (current.rules ?? []).map((rule: any) => ({ salaryRuleId: rule.salaryRuleId, sequence: rule.sequence })) });
+      if (!saved.success) throw new Error(saved.error);
+      const loaded = await listPayrollStructuresAction();
+      setStructures((loaded as any[]).map((structure) => ({ id: structure.id, name: structure.name, rules: structure.rules ?? [], ruleCount: structure.rules?.length ?? 0, status: structure.status === "ACTIVE" ? "Active" : structure.status === "DRAFT" ? "Draft" : "Archived" })));
+      toast({ title: "Structure Status Updated", description: `${current.name} updated in Payroll API.`, type: "success" });
+    } catch (error) { toast({ title: "Unable to update structure", description: error instanceof Error ? error.message : "Payroll API request failed.", type: "error" }); }
+    finally { setTogglingId(null); }
   };
 
   return (
@@ -158,7 +157,7 @@ export default function SalaryStructuresPage() {
                     const saved = await createPayrollStructureAction({ name: data.name, code: data.name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 30), description: "Created from PeoplePay360 payroll UI", rules: rules.slice(0, 10).map((rule, index) => ({ salaryRuleId: rule.id, sequence: (index + 1) * 10 })) });
                     if (!saved.success) throw new Error(saved.error);
                     const loaded = await listPayrollStructuresAction();
-                    setStructures((loaded as any[]).map((structure) => ({ id: structure.id, name: structure.name, ruleCount: structure.rules?.length ?? 0, status: structure.status === "ACTIVE" ? "Active" : structure.status === "DRAFT" ? "Draft" : "Archived" })));
+                    setStructures((loaded as any[]).map((structure) => ({ id: structure.id, name: structure.name, rules: structure.rules ?? [], ruleCount: structure.rules?.length ?? 0, status: structure.status === "ACTIVE" ? "Active" : structure.status === "DRAFT" ? "Draft" : "Archived" })));
                   }}
                 />
               </CardContent>

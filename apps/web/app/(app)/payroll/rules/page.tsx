@@ -149,7 +149,7 @@ export default function SalaryRulesPage() {
                   onSave={async (data) => {
                     const category = categories.find((item) => item.code === data.category);
                     if (!category) throw new Error("Select a valid payroll category");
-                    const saved = await createPayrollRuleAction({ name: data.name, code: data.code, categoryId: category.id, sequence: Number(data.sequence), calculationType: data.calculationType === "SUM" ? "FORMULA" : data.calculationType, value: data.calculationType === "FIXED" ? data.amount : data.percentage, formula: data.calculationType === "SUM" ? "SUM" : null });
+                    const saved = await createPayrollRuleAction({ name: data.name, code: data.code, categoryId: category.id, sequence: Number(data.sequence), calculationType: data.calculationType, value: data.calculationType === "FIXED" ? data.amount : data.percentage, formula: data.calculationType === "FORMULA" ? data.formula : null });
                     if (!saved.success) throw new Error(saved.error);
                     const loaded = await listPayrollRulesAction();
                     setRules((loaded as any[]).map((rule) => ({ ...rule, category: categories.find((item) => item.id === rule.categoryId)?.code ?? rule.categoryId, type: rule.calculationType })));

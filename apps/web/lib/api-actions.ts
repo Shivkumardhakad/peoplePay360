@@ -643,6 +643,16 @@ export async function listPayrunPayslipsAction(payrunId: string) {
   }));
 }
 
+export async function updatePayrollStructureAction(id: string, body: unknown) {
+  try {
+    const result = await payrollApiFetch(`/api/payroll/salary-structures/${id}`, { method: "PUT", body });
+    revalidatePath("/payroll/structures");
+    return { success: true, result };
+  } catch (error) {
+    return { success: false, error: payrollUnavailableMessage(error) };
+  }
+}
+
 export async function getPayslipAction(id: string) {
   const payslip = await payrollApiFetch<any>(`/api/payroll/payslips/${id}`);
   const employee = await prisma.employee.findUnique({ where: { id: payslip.employeeId }, include: { department: true, jobPosition: true } });
