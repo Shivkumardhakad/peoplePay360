@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast";
-import { createEmployeeAction } from "@/lib/api-actions";
+import { createEmployeeAction, updateEmployeeAction } from "@/lib/api-actions";
 import { Loader2 } from "lucide-react";
 
 const employeeSchema = z.object({
@@ -24,11 +24,13 @@ const employeeSchema = z.object({
 export type EmployeeFormValues = z.infer<typeof employeeSchema>;
 
 export function EmployeeForm({
+  employeeId,
   defaultValues,
   onSuccess,
   onCancel,
   readOnly = false,
 }: {
+  employeeId?: string;
   defaultValues?: Partial<EmployeeFormValues>;
   onSuccess?: (emp: EmployeeFormValues) => void;
   onCancel?: () => void;
@@ -52,17 +54,23 @@ export function EmployeeForm({
   const onSubmit = async (data: EmployeeFormValues) => {
     setSubmitting(true);
     try {
-      const res = await createEmployeeAction(data);
+      const isEditing = Boolean(employeeId);
+      const res = isEditing && employeeId
+        ? await updateEmployeeAction(employeeId, data)
+        : await createEmployeeAction(data);
+
       if (res.success) {
         toast({
-          title: "Employee Created",
-          description: `${data.firstName} ${data.lastName} added to employee records.`,
+          title: isEditing ? "Employee Updated" : "Employee Created",
+          description: isEditing
+            ? `${data.firstName} ${data.lastName} record updated.`
+            : `${data.firstName} ${data.lastName} added to employee records.`,
           type: "success",
         });
         onSuccess?.(data);
       } else {
         toast({
-          title: "Failed to create",
+          title: isEditing ? "Failed to update" : "Failed to create",
           description: res.error || "An error occurred",
           type: "error",
         });

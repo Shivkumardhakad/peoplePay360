@@ -145,7 +145,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-3">
-          <EmployeeForm defaultValues={mockEmployee} readOnly={isEmployee} />
+          <EmployeeForm employeeId={mockEmployee.id} defaultValues={mockEmployee} readOnly={isEmployee} />
         </CardContent>
       </Card>
     </div>

@@ -49,9 +49,58 @@ export class HrService {
     });
   }
 
-  getEmployee(id: string) { return this.prisma.client.employee.findUniqueOrThrow({ where: { id }, include: { department: true, jobPosition: true, contracts: true, attendance: true, allocations: { include: { timeOffType: true } } } }); }
-  createEmployee(data: Prisma.EmployeeUncheckedCreateInput) { return this.prisma.client.employee.create({ data }); }
-  updateEmployee(id: string, data: Prisma.EmployeeUncheckedUpdateInput) { return this.prisma.client.employee.update({ where: { id }, data }); }
+  getEmployee(id: string) {
+    return this.prisma.client.employee.findUniqueOrThrow({
+      where: { id },
+      include: {
+        department: true,
+        jobPosition: true,
+        contracts: true,
+        attendance: true,
+        allocations: { include: { timeOffType: true } },
+      },
+    });
+  }
+
+  async createEmployee(data: Prisma.EmployeeUncheckedCreateInput) {
+    if (data.email) {
+      const existing = await this.prisma.client.employee.findFirst({
+        where: { email: { equals: data.email.trim(), mode: "insensitive" } },
+      });
+      if (existing) {
+        throw new ConflictException(`An employee with email "${data.email}" already exists.`);
+      }
+    }
+    try {
+      return await this.prisma.client.employee.create({ data });
+    } catch (err: any) {
+      if (err?.code === "P2002") {
+        throw new ConflictException(`An employee with email "${data.email}" already exists.`);
+      }
+      throw err;
+    }
+  }
+  async updateEmployee(id: string, data: Prisma.EmployeeUncheckedUpdateInput) {
+    if (typeof data.email === "string") {
+      const existing = await this.prisma.client.employee.findFirst({
+        where: {
+          email: { equals: data.email.trim(), mode: "insensitive" },
+          NOT: { id },
+        },
+      });
+      if (existing) {
+        throw new ConflictException(`An employee with email "${data.email}" already exists.`);
+      }
+    }
+    try {
+      return await this.prisma.client.employee.update({ where: { id }, data });
+    } catch (err: any) {
+      if (err?.code === "P2002") {
+        throw new ConflictException(`An employee with email "${data.email}" already exists.`);
+      }
+      throw err;
+    }
+  }
   terminateEmployee(id: string) { return this.prisma.client.employee.update({ where: { id }, data: { status: "TERMINATED" } }); }
 
   requireAuthenticatedEmployeeId(employeeId: string | null | undefined) {
