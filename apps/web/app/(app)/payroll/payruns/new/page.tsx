@@ -45,7 +45,7 @@ export default function NewPayrunWizard() {
     setIsCreating(true);
     try {
       if (!structureId || !selectedEmployees.length) throw new Error("Select a salary structure and at least one employee.");
-      const created = await createPayrunAction({ name: `Payroll ${periodStart} to ${periodEnd}`, periodStart: `${periodStart}T00:00:00`, periodEnd: `${periodEnd}T23:59:59`, salaryStructureId: structureId });
+      const created = await createPayrunAction({ name: `Payroll ${periodStart} to ${periodEnd}`, periodStart: `${periodStart}T00:00:00`, periodEnd: `${periodEnd}T23:59:59`, salaryStructureId: structureId, selectedEmployeeIds: selectedEmployees });
       toast({ title: "Payrun Batch Initialized", description: "Payrun created in the Java Payroll API.", type: "success" });
       router.push(`/payroll/payruns/${(created as any).id}`);
     } catch (error) {
@@ -92,6 +92,8 @@ export default function NewPayrunWizard() {
               <Label htmlFor="structure" className="text-xs font-medium">Salary Structure</Label>
               <select
                 id="structure"
+                value={structureId}
+                onChange={(event) => setStructureId(event.target.value)}
                 className="flex h-8 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 {structures.map((structure) => <option key={structure.id} value={structure.id}>{structure.name} ({structure.code})</option>)}

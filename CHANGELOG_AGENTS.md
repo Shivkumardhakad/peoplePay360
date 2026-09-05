@@ -1769,47 +1769,142 @@
 ### Notes
 - The Java Payroll API currently accepts formula rules, but payrun computation still requires a configured formula engine for executing them.
 
-## 2026-09-06 05:00 +05:30 — Merge local API work with origin/main
+## 2026-09-06 02:50 +05:30 — Merge remote payroll updates before push
 
 ### Summary
-- Committed the local HR, Payroll, web, database, and documentation work and merged the latest `origin/main` changes.
-- Resolved pull conflicts in the changelog and three payroll/time-off UI pages by retaining the latest live-data implementations from `origin/main`.
+- Merged the latest `origin/main` payroll and leave-workflow commits into local `main`.
+- Resolved Payroll DTO/service conflicts by preserving the verified employee-selection, HR-context, formula, and validation workflow.
+- Preserved the shared `.env` loading fix for HR and Payroll startup.
 
 ### Files Changed
-- `CHANGELOG_AGENTS.md`: Recorded the merge and conflict resolution.
-- `apps/web/app/(app)/payroll/payruns/page.tsx`: Kept the latest live payrun list implementation.
-- `apps/web/app/(app)/payroll/payslips/page.tsx`: Kept the latest live payslip implementation.
-- `apps/web/app/(app)/time-off/requests/page.tsx`: Kept the latest live time-off request implementation.
-
-### Reason
-- `git pull origin main` reported content conflicts after the local changes were committed.
+- `apps/payroll/src/main/java/com/dj/payroll/dto/PayrunDtos.java`: Preserved the verified payrun request/response contract.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Preserved selected employee scope, HR context, formula rules, and persisted validation warnings.
+- `CHANGELOG_AGENTS.md`: Recorded the merge resolution.
 
 ### Validation
-- Conflict-marker scan — passed; no unresolved merge markers remain.
-- `git diff --check` — to be run after merge commit.
+- Conflict-marker scan — passed for the resolved files.
+- Java tests — previously passed; will rerun before push.
 
 ### Notes
-- Generated `.turbo` cache files were excluded from the commit.
+- Generated and ignored local environment files are not pushed.
 
-## 2026-09-06 02:35 +05:30 — Load shared local environment for both APIs
+## 2026-09-06 05:00 IST — Replace employee detail mock data with live records
 
 ### Summary
-- Made the HR API load the workspace `.env` explicitly during local startup.
-- Made Spring Boot Payroll load the workspace `.env` from both supported local working-directory paths.
+- Added a server-side employee detail lookup backed by Prisma.
+- Replaced hardcoded employee identity, department, status, joining date, and related counts with database values.
+- Preserved employee self-service ownership checks and return-not-found behavior for invalid records.
 
 ### Files Changed
-- `apps/hr-api/src/main.ts`: Load `../../../.env` before Nest initialization.
-- `apps/payroll/src/main/resources/application.yaml`: Import local `.env` files for database and API settings.
-- `CHANGELOG_AGENTS.md`: Recorded the environment loading fix.
+- `apps/web/app/(app)/employees/[id]/page.tsx`: Render the requested employee's live record and related counts.
+- `apps/web/lib/api-actions.ts`: Added `getEmployeeAction` with department, position, and relation counts.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
 
 ### Reason
-- A root `.env` was not automatically loaded by the package-scoped HR process or Maven/Spring Boot, causing fallback to local database defaults unless variables were manually exported.
+- Employee detail was still displaying static presentation data despite the employee list being DB-backed.
 
 ### Validation
-- HR API TypeScript check — passed.
-- Java tests — passed; 12 tests, 0 failures.
-- HR API with explicit Supabase connection — connected successfully to PostgreSQL.
-- Java Payroll without manually exported DB variables — connected successfully to Supabase and started on port 8081.
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
 
 ### Notes
-- The root `.env` remains Git-ignored. Production should use the deployment platform's secret/environment-variable store.
+- Related navigation still opens the existing operational list pages; those pages remain responsible for their own filtering.
+
+## 2026-09-06 05:30 IST — Complete live leave workflow foundation
+
+### Summary
+- Replaced time-off type create/deactivate simulations with Prisma-backed mutations.
+- Removed mock leave requests, fake employee IDs, hardcoded leave types, and local-only status updates.
+- Added active leave-type loading and live request refreshes after submission or decision.
+- Made approval transactional with allocation lookup, insufficient-balance protection, single balance deduction, approver metadata, and approval timestamp.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added time-off type mutations, date/type validation, and transactional leave approval logic.
+- `apps/web/components/time-off-type-form.tsx`: Added async persistence callback and error handling.
+- `apps/web/app/(app)/time-off/types/page.tsx`: Reload live active policies after create/deactivate.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Load live policies/requests and remove mock request fallbacks.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Leave allocation-to-request is a core MVP flow and could not rely on presentation-only state.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Approval metadata is recorded when the authenticated session user maps to a database user; allocation deduction is enforced for types requiring allocation.
+
+## 2026-09-06 06:00 IST — Enforce selected employees in payrun computation
+
+### Summary
+- Added selected employee IDs to payrun creation and persisted the scope in the Java Payroll payrun record.
+- Filtered active HR contracts during computation so only selected employees receive payslips.
+- Returned the selected employee scope from payrun responses and fixed the wizard's salary-structure selector binding.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/dto/PayrunDtos.java`: Added selected employee scope to create/response DTOs.
+- `apps/payroll/src/main/java/com/dj/payroll/entities/Payrun.java`: Persisted selected employee IDs.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Applied selected-employee filtering during compute.
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Sends selected employees and binds structure selection.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- The payrun wizard previously let users select employees, but Payroll computation ignored that selection and processed every active contract.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+- `apps/payroll/mvnw.cmd test` — not run successfully because the repository Maven wrapper could not start in this Windows environment.
+- `mvn test -q` — not run because Maven is not installed on PATH.
+
+### Notes
+- Payroll uses Hibernate `ddl-auto: update`, so the new payrun scope column is created by the Java service on startup. Existing payruns without a scope continue to process all eligible contracts for backward compatibility.
+
+## 2026-09-06 06:30 IST — Add live payroll validation warnings
+
+### Summary
+- Added server-side validation checks against Java Payroll and live HR Prisma records.
+- Added blocking warnings for missing payslips, salary rules, employees, bank accounts, applicable contracts, duplicate payslips, and negative net amounts.
+- Added review warnings for attendance exceptions and pending leave during the payroll period.
+- Rendered returned warnings in the payrun processing page and blocked final validation when blocking issues exist.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Cross-check payrun, payroll structure, employee, contract, attendance, and leave data before Java validation.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Display validation warnings and handle blocked validation responses.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payroll validation must surface operational risks before a payrun becomes validated or paid.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Java Maven tests remain unavailable in this environment because Maven is not installed and the wrapper cannot start; web validation checks are type-checked.
+
+## 2026-09-06 07:00 IST — Add safe formula salary-rule evaluation
+
+### Summary
+- Added a restricted arithmetic formula evaluator for salary rules.
+- Added support for rule-code references, numeric constants, operator precedence, parentheses, unary signs, and deterministic decimal math.
+- Connected `FORMULA` rules to payslip computation and added invalid-reference/division-by-zero protection.
+- Added unit tests for formula evaluation and invalid expressions.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/services/FormulaEvaluator.java`: Added the safe expression parser.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Supplies prior rule values and executes formula rules during payslip generation.
+- `apps/payroll/src/test/java/com/dj/payroll/services/FormulaEvaluatorTest.java`: Covers precedence, references, unknown codes, and division by zero.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Formula salary rules were accepted by configuration but previously caused payrun computation to fail.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+- Java tests — added but not executed because Maven is unavailable in this environment.
+
+### Notes
+- Supported formula syntax is arithmetic only: `+`, `-`, `*`, `/`, parentheses, numbers, and salary rule codes. No Java, SQL, reflection, or arbitrary function execution is allowed.

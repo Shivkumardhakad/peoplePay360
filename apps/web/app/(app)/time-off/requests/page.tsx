@@ -9,11 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
-import { updateLeaveRequestStatusAction, createTimeOffRequestAction, getTimeOffRequestsAction } from "@/lib/api-actions";
+import { updateLeaveRequestStatusAction, createTimeOffRequestAction, getTimeOffRequestsAction, getTimeOffTypesAction } from "@/lib/api-actions";
 import { Search, CheckCircle, XCircle, Plus, Loader2 } from "lucide-react";
 
 interface LeaveRequestItem {
   id: string;
+  employeeId: string;
   employee: string;
   type: string;
   dates: string;
@@ -21,29 +22,32 @@ interface LeaveRequestItem {
   status: "Pending" | "Approved" | "Rejected";
 }
 
-const INITIAL_REQUESTS: LeaveRequestItem[] = [
-  { id: "REQ-001", employee: "Alice Johnson", type: "Annual Leave", dates: "2023-11-20 to 2023-11-24", duration: "5 Days", status: "Pending" },
-  { id: "REQ-002", employee: "Bob Smith", type: "Sick Leave", dates: "2023-10-15 to 2023-10-15", duration: "1 Day", status: "Approved" },
-  { id: "REQ-003", employee: "Charlie Davis", type: "Unpaid Leave", dates: "2023-09-01 to 2023-09-01", duration: "1 Day", status: "Rejected" },
-  { id: "REQ-004", employee: "Emily Watson", type: "Annual Leave", dates: "2023-12-24 to 2023-12-29", duration: "4 Days", status: "Pending" },
-];
-
 export default function TimeOffRequestsPage() {
   const { data: session } = useSession();
   const { toast } = useToast();
   const [requests, setRequests] = useState<LeaveRequestItem[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<Array<{ id: string; name: string; unit: string }>>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Form State
-  const [leaveType, setLeaveType] = useState("Annual Leave");
-  const [startDate, setStartDate] = useState("2023-12-10");
-  const [endDate, setEndDate] = useState("2023-12-12");
+  const [leaveType, setLeaveType] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
 
-  useEffect(() => { getTimeOffRequestsAction().then((rows) => setRequests(rows as LeaveRequestItem[])); }, []);
+  const reloadRequests = async () => setRequests(await getTimeOffRequestsAction() as LeaveRequestItem[]);
+
+  useEffect(() => {
+    void Promise.all([getTimeOffRequestsAction(), getTimeOffTypesAction()]).then(([rows, types]) => {
+      setRequests(rows as LeaveRequestItem[]);
+      const activeTypes = types.filter((type) => type.status === "ACTIVE").map((type) => ({ id: type.id, name: type.name, unit: type.unit }));
+      setLeaveTypes(activeTypes);
+      setLeaveType(activeTypes[0]?.id ?? "");
+    });
+  }, []);
 
   const role = session?.user?.role || "ADMIN";
   const isEmployee = role === "EMPLOYEE";
@@ -53,19 +57,16 @@ export default function TimeOffRequestsPage() {
     role === "HR_PAYROLL_MANAGER" ||
     role === "PAYROLL_MANAGER" ||
     role === "HR_PAYROLL_USER";
-  const currentUserName = session?.user?.name || "Emily Watson";
+  const currentUserName = session?.user?.name || "";
 
   const handleDecision = async (id: string, decision: "Approved" | "Rejected") => {
     const actionKey = `${id}-${decision.toLowerCase()}`;
     setActionLoading(actionKey);
 
     try {
-      await updateLeaveRequestStatusAction(id, decision === "Approved" ? "APPROVED" : "REJECTED");
-      await new Promise((r) => setTimeout(r, 400)); // perceptible smooth loading feedback
-
-      setRequests((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, status: decision } : r))
-      );
+      const result = await updateLeaveRequestStatusAction(id, decision === "Approved" ? "APPROVED" : "REJECTED", session?.user?.id);
+      if (!result.success) throw new Error(result.error);
+      await reloadRequests();
       toast({
         title: `Leave ${decision}`,
         description: `Request ${id} updated to ${decision.toLowerCase()}.`,
@@ -79,35 +80,31 @@ export default function TimeOffRequestsPage() {
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmittingRequest(true);
-    const empName = session?.user?.name || "Current User";
-    const empId = session?.user?.employeeId || "EMP-001";
+    const empId = session?.user?.employeeId;
+    if (!empId || !leaveType || !startDate || !endDate) {
+      toast({ title: "Incomplete request", description: "Select a leave type and valid dates first.", type: "error" });
+      setSubmittingRequest(false);
+      return;
+    }
 
     try {
-      await createTimeOffRequestAction({
+      const result = await createTimeOffRequestAction({
         employeeId: empId,
         leaveTypeId: leaveType,
         startDate,
         endDate,
         reason,
       });
-      await new Promise((r) => setTimeout(r, 450));
-
-      const newReq: LeaveRequestItem = {
-        id: `REQ-${String(requests.length + 1).padStart(3, "0")}`,
-        employee: empName,
-        type: leaveType,
-        dates: `${startDate} to ${endDate}`,
-        duration: "3 Days",
-        status: "Pending",
-      };
-
-      setRequests([newReq, ...requests]);
+      if (!result.success) throw new Error(result.error);
+      await reloadRequests();
       toast({
         title: "Application Submitted",
         description: "Your leave request is queued for manager review.",
         type: "success",
       });
       setDialogOpen(false);
+    } catch (error) {
+      toast({ title: "Unable to submit request", description: error instanceof Error ? error.message : "Database request failed.", type: "error" });
     } finally {
       setSubmittingRequest(false);
     }
@@ -115,18 +112,7 @@ export default function TimeOffRequestsPage() {
 
   // RBAC Scoping: Employees see ONLY their own requests. Managers see all requests.
   const scopedRequests = isEmployee
-    ? (requests.some((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
-        ? requests.filter((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
-        : [
-            {
-              id: "REQ-MINE",
-              employee: currentUserName,
-              type: "Annual Leave",
-              dates: "2024-01-10 to 2024-01-12",
-              duration: "3 Days",
-              status: "Pending" as const,
-            },
-          ])
+    ? requests.filter((r) => r.employeeId === session?.user?.employeeId)
     : requests;
 
   const filteredRequests = scopedRequests.filter(
@@ -171,10 +157,7 @@ export default function TimeOffRequestsPage() {
                   onChange={(e) => setLeaveType(e.target.value)}
                   className="flex h-8 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="Annual Leave">Annual Paid Leave</option>
-                  <option value="Sick Leave">Sick Leave</option>
-                  <option value="Casual Leave">Casual Absence</option>
-                  <option value="Unpaid Leave">Unpaid Leave</option>
+                  {leaveTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
                 </select>
               </div>
 
