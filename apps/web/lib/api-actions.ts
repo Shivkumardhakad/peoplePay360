@@ -3,6 +3,7 @@
 import { prisma } from "@peoplepay360/db";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import nodemailer from "nodemailer";
 import { payrollApiFetch } from "@/lib/payroll-api";
 
 const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:4000/api/hr";
@@ -659,7 +660,35 @@ export async function markPayrunPaidAction(payrunId: string) {
 }
 
 export async function sendPayrunPayslipsAction(payrunId: string) {
-  return { success: false, message: `Payslip email delivery is not available in Java API yet (payrun ${payrunId}).` };
+  try {
+    const payrun = await payrollApiFetch<any>(`/api/payroll/payruns/${payrunId}`);
+    if (!['VALIDATED', 'PAID'].includes(payrun.status)) return { success: false, message: "Payslips can only be emailed after validation." };
+    const summaries = Array.isArray(payrun.payslips) ? payrun.payslips : [];
+    if (!summaries.length) return { success: false, message: "Payrun has no payslips to deliver." };
+    if (!process.env.SMTP_HOST || !process.env.SMTP_FROM && !process.env.SMTP_USER) return { success: false, message: "Configure SMTP_HOST and SMTP_FROM (or SMTP_USER) before sending payslips." };
+
+    const employeeIds = summaries.map((summary: any) => summary.employeeId).filter(Boolean);
+    const employees = await prisma.employee.findMany({ where: { id: { in: employeeIds } }, select: { id: true, firstName: true, email: true } });
+    const employeesById = new Map(employees.map((employee) => [employee.id, employee]));
+    const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT ?? 587), secure: process.env.SMTP_SECURE === "true", auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined });
+    const from = process.env.SMTP_FROM ?? process.env.SMTP_USER;
+    const results: Array<{ employeeId: string; email: string; status: "sent" }> = [];
+    for (const summary of summaries) {
+      const employee = employeesById.get(summary.employeeId);
+      if (!employee?.email) throw new Error(`Employee email is missing for ${summary.employeeId}.`);
+      const payslip = await getPayslipAction(summary.id);
+      const lines = (payslip.lines ?? []).map((line: any) => `<tr><td>${escapeEmailHtml(line.rule)}</td><td>${escapeEmailHtml(line.category)}</td><td>${Number(line.amount).toFixed(2)}</td></tr>`).join("");
+      await transporter.sendMail({ from, to: employee.email, subject: `Payslip - ${payrun.name}`, html: `<p>Hello ${escapeEmailHtml(employee.firstName)},</p><p>Your payslip for ${escapeEmailHtml(String(payrun.periodStart).slice(0, 10))} to ${escapeEmailHtml(String(payrun.periodEnd).slice(0, 10))} is ready.</p><table><thead><tr><th>Component</th><th>Category</th><th>Amount</th></tr></thead><tbody>${lines}</tbody></table><p>Gross: ${Number(payslip.gross).toFixed(2)}<br>Deductions: ${Number(payslip.deductions).toFixed(2)}<br><strong>Net: ${Number(payslip.net).toFixed(2)}</strong></p>` });
+      results.push({ employeeId: employee.id, email: employee.email, status: "sent" });
+    }
+    return { success: true, message: `Sent ${results.length} payslip(s).`, sent: results.length, results };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Payslip delivery failed." };
+  }
+}
+
+function escapeEmailHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character] ?? character));
 }
 
 export async function listPayrollRulesAction() {
@@ -752,7 +781,7 @@ export async function getPayslipAction(id: string) {
 
 export async function listPayrollPayslipsAction() {
   const payruns = await payrollApiFetch<any[]>("/api/payroll/payruns");
-  const slips = (await Promise.all(payruns.flatMap((payrun) => (payrun.payslips ?? []).map((summary: any) => getPayslipAction(summary.id))))).flat();
+  const slips = (await Promise.all(payruns.flatMap((payrun) => (payrun.payslips ?? []).map((summary: any) => getPayslipAction(summary.id).then((payslip) => ({ ...payslip, payrun: payrun.name })))))).flat();
   return slips;
 }
 

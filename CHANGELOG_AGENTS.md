@@ -1889,3 +1889,32 @@
 
 ### Notes
 - Supported formula syntax is arithmetic only: `+`, `-`, `*`, `/`, parentheses, numbers, and salary rule codes. No Java, SQL, reflection, or arbitrary function execution is allowed.
+
+## 2026-09-06 07:30 IST — Connect payslip PDF and bulk email delivery
+
+### Summary
+- Replaced the payslip email stub with SMTP-backed server delivery for validated or paid Java payruns.
+- Loads live payslip details and employee email addresses before sending each message.
+- Added HTML escaping and explicit configuration/error handling for missing SMTP or employee email data.
+- Removed leftover payslip list/detail mock records and fallback identities.
+- Ensured payslip list entries carry their live payrun name and removed simulated download/send delays.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added bulk SMTP delivery and live payrun-name enrichment.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Handles delivery failures instead of showing false success.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Removed mock data and live fallback identities.
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: Removed mock detail data and uses live payslip only.
+- `apps/web/package.json`: Added Nodemailer dependencies.
+- `pnpm-lock.yaml`: Updated dependency lockfile.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payslip PDF viewing existed, but bulk delivery was a fake success path and payslip screens still contained static fallback data.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+- `pnpm add nodemailer @types/nodemailer --filter web` — passed.
+
+### Notes
+- Individual PDF generation remains browser-side. Bulk email sends a live HTML salary statement and requires `SMTP_HOST`, plus `SMTP_FROM` or `SMTP_USER`; delivery is restricted to `VALIDATED` or `PAID` payruns.
