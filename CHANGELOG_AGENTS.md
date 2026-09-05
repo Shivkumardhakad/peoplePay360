@@ -1,3 +1,22 @@
+## 2026-09-06 00:35 IST — Resolve git merge conflicts in attendance and API actions
+
+### Summary
+- Resolved active git merge conflicts in `apps/web/app/(app)/attendance/page.tsx` and `apps/web/lib/api-actions.ts`.
+- Integrated quick check-in state handling with live attendance list refreshing.
+- Merged HR API endpoints (`/attendance`, `/time-off/requests`) fetch attempts with direct Prisma fallback logic in `api-actions.ts`.
+- Concluded merge commit cleanly.
+
+### Files Changed
+- `apps/web/app/(app)/attendance/page.tsx`: Resolved conflict markers around `quickCheckInAction`.
+- `apps/web/lib/api-actions.ts`: Combined HR API calls with fallback Prisma handlers for attendance and time-off requests.
+- `CHANGELOG_AGENTS.md`: Recorded conflict resolution.
+
+### Reason
+- Fulfill user request to resolve active git merge conflicts between local `main` branch and `origin/main`.
+
+### Validation
+- `git status` — clean working tree (`nothing to commit, working tree clean`).
+
 ## 2026-09-06 00:30 IST — Add Kanban view system across operational and management modules
 
 ### Summary
