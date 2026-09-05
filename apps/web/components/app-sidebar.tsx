@@ -19,6 +19,7 @@ import {
   Receipt,
   ListChecks,
   SlidersHorizontal,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -132,6 +133,7 @@ export function AppSidebar({ session }: { session: Session }) {
                 <NavLink href="/payroll/payslips" icon={Receipt} nested>Payslips</NavLink>
                 <NavLink href="/payroll/structures" icon={ListChecks} nested>Structures</NavLink>
                 <NavLink href="/payroll/rules" icon={SlidersHorizontal} nested>Rules</NavLink>
+                <NavLink href="/reports" icon={BarChart3} nested>Reports</NavLink>
               </>
             ) : (
               <NavLink href="/payroll/payslips" icon={Receipt} nested>My Payslips</NavLink>

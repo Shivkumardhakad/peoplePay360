@@ -2053,3 +2053,27 @@
 
 ### Notes
 - Payment status loading is non-blocking for payslip detail; the payslip remains viewable if the status endpoint is temporarily unavailable.
+## 2026-09-06 10:30 IST — Add live payroll reports page
+
+### Summary
+- Added web actions for Java payroll summary and payslip report endpoints.
+- Added a protected `/reports` page with date range and payslip status filters.
+- Added live payrun/payslip totals and enriched report rows with HR employee names and departments.
+- Added Reports navigation for payroll-authorized roles and middleware route protection.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added report aggregation and HR employee/department enrichment.
+- `apps/web/app/(app)/reports/page.tsx`: Added live payroll reports UI.
+- `apps/web/components/app-sidebar.tsx`: Added Reports navigation.
+- `apps/web/middleware.ts`: Protected `/reports` for payroll-authorized roles.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payroll report endpoints existed in the Java API but had no user-facing reporting workflow.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` on changed files — passed.
+
+### Notes
+- Report rows intentionally show business-facing employee and department names instead of internal IDs.

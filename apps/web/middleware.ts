@@ -18,6 +18,10 @@ export default withAuth(
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
+    if (pathname.startsWith("/reports") && !["ADMIN", "PAYROLL_MANAGER", "HR_PAYROLL_MANAGER", "HR_PAYROLL_USER"].includes(role ?? "")) {
+      return NextResponse.redirect(new URL(role === "EMPLOYEE" ? "/payroll/payslips" : "/dashboard", request.url));
+    }
+
     // EMPLOYEE role boundaries per AGENTS.md:
     if (role === "EMPLOYEE") {
       // Employees cannot access dashboard -> redirect to self profile
@@ -66,5 +70,6 @@ export const config = {
     "/time-off/:path*",
     "/payroll/:path*",
     "/users/:path*",
+    "/reports/:path*",
   ],
 };

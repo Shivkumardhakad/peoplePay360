@@ -786,6 +786,23 @@ export async function getPayrunAction(id: string) {
   return payrollApiFetch(`/api/payroll/payruns/${id}`);
 }
 
+export async function getPayrollReportAction(from: string, to: string, status?: string) {
+  const query = new URLSearchParams({ from: `${from}T00:00:00`, to: `${to}T23:59:59` });
+  if (status) query.set("status", status);
+  const [summary, report] = await Promise.all([
+    payrollApiFetch<any>(`/api/payroll/reports/summary?${query.toString()}`),
+    payrollApiFetch<any>(`/api/payroll/reports/payslips?${query.toString()}`),
+  ]);
+  const employeeIds: string[] = Array.from(new Set<string>((report.payslips ?? []).map((row: any) => String(row.employeeId ?? "")).filter(Boolean)));
+  const [employees, departments] = await Promise.all([
+    prisma.employee.findMany({ where: { id: { in: employeeIds } }, select: { id: true, firstName: true, lastName: true, departmentId: true } }),
+    prisma.department.findMany({ select: { id: true, name: true } }),
+  ]);
+  const employeeMap = new Map(employees.map((employee) => [employee.id, employee]));
+  const departmentMap = new Map(departments.map((department) => [department.id, department.name]));
+  return { summary, payslips: (report.payslips ?? []).map((row: any) => ({ ...row, employeeName: employeeMap.get(row.employeeId) ? `${employeeMap.get(row.employeeId)?.firstName} ${employeeMap.get(row.employeeId)?.lastName}` : "Unknown employee", department: departmentMap.get(employeeMap.get(row.employeeId)?.departmentId ?? "") ?? "Unassigned" })) };
+}
+
 export async function getPayrollAuditAction(payrunId: string) {
   return payrollApiFetch(`/api/payroll/payruns/${payrunId}/audit`);
 }
