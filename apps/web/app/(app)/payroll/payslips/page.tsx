@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
-import { generatePayslipPDF } from "@/lib/payslip-pdf";
-import { listPayrollPayslipsAction } from "@/lib/api-actions";
+import { getPayslipPdfAction, listPayrollPayslipsAction } from "@/lib/api-actions";
 
 function money(value: number) {
   return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -50,7 +49,14 @@ export default function PayslipsPage() {
   const handleDownload = async (slip: any) => {
     setDownloadingId(slip.id);
     try {
-      generatePayslipPDF(slip);
+      const base64 = await getPayslipPdfAction(slip.id);
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Payslip_${slip.id}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
       toast({
         title: "Payslip Downloaded",
         description: `Exported PDF for ${slip.employeeName} (${slip.id}).`,
@@ -59,7 +65,7 @@ export default function PayslipsPage() {
     } catch {
       toast({
         title: "Download Failed",
-        description: "Failed to generate PDF.",
+        description: "PDF is available only after the payslip is validated or paid.",
         type: "error",
       });
     } finally {

@@ -2098,3 +2098,22 @@
 
 ### Notes
 - The Payroll API must be running and configured for the download to succeed.
+## 2026-09-06 11:25 IST — Route payslip list downloads through Payroll API
+
+### Summary
+- Replaced client-side payslip PDF generation on the payslip list with the authenticated Java Payroll API endpoint.
+- Added a clear finalized-status error when a draft payslip cannot produce a PDF.
+
+### Files Changed
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Uses the shared server action and downloads the backend-generated PDF.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- All payslip download entry points must use the live finalized payroll record and avoid presentation-only PDF output.
+
+### Validation
+- `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- PDF downloads require the Payroll API to be running and the payslip to be `VALIDATED` or `PAID`.
