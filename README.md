@@ -43,7 +43,7 @@ Payroll database migrations live in the Spring service under `apps/payroll-api/s
 
 ## Local Setup
 
-Install Java, Maven, Node.js, pnpm, and MySQL, then run:
+Install Java, Maven, Node.js, pnpm, and PostgreSQL, then run:
 
 ```bash
 pnpm install
@@ -55,5 +55,5 @@ pnpm dev:payroll
 
 Set these local environment variables before database commands:
 
-- `DATABASE_URL` for the HR Prisma schema
+- `DATABASE_URL` for the HR Prisma schema, using a PostgreSQL connection string
 - `PAYROLL_DATABASE_URL`, `PAYROLL_DATABASE_USER`, and `PAYROLL_DATABASE_PASSWORD` for the Spring payroll service

@@ -5,8 +5,8 @@ spring:
   application:
     name: peoplepay360-payroll-api
   datasource:
-    url: ${PAYROLL_DATABASE_URL:jdbc:mysql://localhost:3306/peoplepay360_payroll}
-    username: ${PAYROLL_DATABASE_USER:root}
+    url: ${PAYROLL_DATABASE_URL:jdbc:postgresql://localhost:5432/peoplepay360_payroll}
+    username: ${PAYROLL_DATABASE_USER:postgres}
     password: ${PAYROLL_DATABASE_PASSWORD:}
   jpa:
     hibernate:

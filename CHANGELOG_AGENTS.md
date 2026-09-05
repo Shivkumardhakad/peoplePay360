@@ -236,3 +236,46 @@
 
 ### Notes
 - Turborepo telemetry and output warnings remain non-blocking.
+
+## 2026-09-05 15:05 IST — Standardize databases on PostgreSQL
+
+### Summary
+- Switched the Prisma HR database and Spring payroll database configuration from MySQL to PostgreSQL.
+
+### Files Changed
+- `packages/db/prisma/schema.prisma`: Changed datasource provider to `postgresql`.
+- `apps/payroll-api/pom.xml`: Replaced MySQL Flyway/database dependencies with PostgreSQL equivalents.
+- `apps/payroll-api/src/main/resources/application.yml`: Updated default JDBC URL and username.
+- `apps/payroll-api/src/main/resources/db/migration/V1__payroll_schema.sql`: Removed MySQL-only timestamp update clauses.
+- `README.md`: Updated local setup documentation.
+- `CHANGELOG_AGENTS.md`: Recorded the database switch.
+
+### Reason
+- PostgreSQL matches the company’s database standard and gives the hackathon a consistent database story across both services.
+
+### Validation
+- `git diff --check` — pending
+- Prisma generate — not run locally; dependencies are unavailable.
+- Maven tests — not run locally; Maven is unavailable.
+
+### Notes
+- Existing MySQL databases are not migrated automatically. A fresh PostgreSQL database and new Prisma/Flyway migrations are required.
+
+## 2026-09-05 15:25 IST — Modernize TypeScript module resolution
+
+### Summary
+- Updated the HR API TypeScript configuration to use the modern Node16 module and module-resolution pair.
+
+### Files Changed
+- `apps/hr-api/tsconfig.json`: Replaced deprecated `CommonJS`/`Node` resolution settings with `node16`/`node16`.
+- `CHANGELOG_AGENTS.md`: Recorded the TypeScript configuration fix.
+
+### Reason
+- CI/editor TypeScript reported that the legacy `node10` resolution strategy is deprecated.
+
+### Validation
+- `git diff --check` — pending
+- TypeScript build — not run locally; dependencies are unavailable.
+
+### Notes
+- The Node16 pair keeps Node-aware resolution while preserving CommonJS behavior for this NestJS package because it does not declare ESM in its package metadata.
