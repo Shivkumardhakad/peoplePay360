@@ -89,6 +89,19 @@ export async function getEmployeesAction() {
   }
 }
 
+export async function updateEmployeeAction(employeeId: string, data: {
+  firstName: string; lastName: string; email: string; phone?: string; department?: string; jobPosition?: string; dateOfJoining?: string; status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED";
+}) {
+  try {
+    const employee = await prisma.employee.update({ where: { id: employeeId }, data: { firstName: data.firstName, lastName: data.lastName, email: data.email.trim().toLowerCase(), phone: data.phone || null, ...(data.dateOfJoining ? { hireDate: new Date(data.dateOfJoining) } : {}), status: data.status === "INACTIVE" ? "TERMINATED" : data.status } });
+    revalidatePath("/employees");
+    revalidatePath(`/employees/${employeeId}`);
+    return { success: true, employee };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to update employee" };
+  }
+}
+
 // -------------------------------------------------------------
 // CONTRACTS
 // -------------------------------------------------------------

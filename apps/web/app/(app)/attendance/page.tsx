@@ -107,7 +107,7 @@ export default function AttendancePage() {
       toast({
         title: "Check-in Error",
         description: "Failed to record attendance state.",
-        type: "destructive",
+        type: "error",
       });
     } finally {
       if (type === "IN") setCheckingIn(false);
