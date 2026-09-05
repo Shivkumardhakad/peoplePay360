@@ -453,26 +453,24 @@ export async function createTimeOffRequestAction(data: {
       return { success: false, error: `Employee record not found (${data.employeeId})` };
     }
 
-    let type = await prisma.timeOffType.findFirst({
+    const type = await prisma.timeOffType.findFirst({
       where: {
         OR: [
           { id: data.leaveTypeId },
           { code: data.leaveTypeId },
           { name: { contains: data.leaveTypeId, mode: "insensitive" } },
         ],
+        status: "ACTIVE",
       },
     });
 
     if (!type) {
-      type = await prisma.timeOffType.findFirst();
-    }
-
-    if (!type) {
-      return { success: false, error: "No active time off type found." };
+      return { success: false, error: "Selected active time-off type was not found." };
     }
 
     const start = new Date(data.startDate);
     const end = new Date(data.endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return { success: false, error: "Time-off end date must be on or after start date." };
     const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
     const req = await prisma.timeOffRequest.create({
@@ -499,30 +497,31 @@ export async function createTimeOffRequestAction(data: {
   }
 }
 
-export async function updateLeaveRequestStatusAction(id: string, status: "APPROVED" | "REJECTED") {
+export async function updateLeaveRequestStatusAction(id: string, status: "APPROVED" | "REJECTED", approvedById?: string) {
   try {
-    const res = await fetch(`${HR_API_URL}/time-off/requests/${id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-      cache: "no-store",
-    });
+    const request = await prisma.$transaction(async (tx) => {
+      const existing = await tx.timeOffRequest.findUnique({ where: { id }, include: { timeOffType: true } });
+      if (!existing) throw new Error("Leave request not found.");
+      if (existing.status === "APPROVED" && status === "APPROVED") return existing;
+      if (existing.status !== "SUBMITTED") throw new Error(`Cannot change a ${existing.status.toLowerCase()} request.`);
 
-    if (res.ok) {
-      revalidatePath("/time-off/requests");
-      return { success: true, request: await res.json() };
-    }
-  } catch {
-    // Fallback
-  }
+      let approverId: string | null = null;
+      if (status === "APPROVED" && approvedById) {
+        approverId = (await tx.user.findUnique({ where: { id: approvedById }, select: { id: true } }))?.id ?? null;
+      }
 
-  try {
-    const req = await prisma.timeOffRequest.update({
-      where: { id },
-      data: { status },
+      if (status === "APPROVED" && existing.timeOffType.requiresAllocation) {
+        const allocation = await tx.allocation.findFirst({ where: { employeeId: existing.employeeId, timeOffTypeId: existing.timeOffTypeId, periodStart: { lte: existing.startDate }, periodEnd: { gte: existing.endDate }, status: "ACTIVE" } });
+        if (!allocation) throw new Error("No valid leave allocation exists for this request.");
+        if (Number(allocation.remaining ?? 0) < Number(existing.quantity)) throw new Error("Insufficient leave balance.");
+        await tx.allocation.update({ where: { id: allocation.id }, data: { consumed: { increment: existing.quantity }, remaining: { decrement: existing.quantity } } });
+      }
+
+      return tx.timeOffRequest.update({ where: { id }, data: { status, approvedById: status === "APPROVED" ? approverId : null, approvedAt: status === "APPROVED" ? new Date() : null } });
     });
     revalidatePath("/time-off/requests");
-    return { success: true, request: req };
+    revalidatePath("/time-off/allocations");
+    return { success: true, request };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to update status";
     return { success: false, error: msg };
@@ -541,6 +540,26 @@ export async function computePayrunAction(payrunId: string) {
 
 export async function getTimeOffTypesAction() {
   return prisma.timeOffType.findMany({ orderBy: { name: "asc" } });
+}
+
+export async function createTimeOffTypeAction(data: { name: string; unit: "DAYS" | "HOURS"; requiresApproval: boolean; isPaid: boolean }) {
+  try {
+    const type = await prisma.timeOffType.create({ data: { name: data.name.trim(), code: data.name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 30), unit: data.unit, requiresAllocation: true, approvalRequired: data.requiresApproval, paid: data.isPaid, payrollBehavior: data.isPaid ? "PAID" : "UNPAID" } });
+    revalidatePath("/time-off/types");
+    return { success: true, type };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to create time-off type" };
+  }
+}
+
+export async function deactivateTimeOffTypeAction(id: string) {
+  try {
+    const type = await prisma.timeOffType.update({ where: { id }, data: { status: "INACTIVE" } });
+    revalidatePath("/time-off/types");
+    return { success: true, type };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to deactivate time-off type" };
+  }
 }
 
 export async function getAllocationsAction() {

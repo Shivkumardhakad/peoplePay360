@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { TimeOffTypeForm, type TimeOffTypeFormValues } from "@/components/time-off-type-form";
 import { Sparkles, Trash2, Loader2 } from "lucide-react";
-import { getTimeOffTypesAction } from "@/lib/api-actions";
+import { createTimeOffTypeAction, deactivateTimeOffTypeAction, getTimeOffTypesAction } from "@/lib/api-actions";
 
 interface LeaveTypeItem {
   id: string;
@@ -23,29 +23,25 @@ export default function TimeOffTypesPage() {
   const [types, setTypes] = useState<LeaveTypeItem[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => { getTimeOffTypesAction().then((rows) => setTypes(rows.map((row) => ({ id: row.id, name: row.name, unit: row.unit === "DAYS" ? "Days" : "Hours", requiresApproval: row.approvalRequired, isPaid: row.paid })))); }, []);
-
-  const handleCreated = (data: TimeOffTypeFormValues) => {
-    const newType: LeaveTypeItem = {
-      id: `TYP-${String(types.length + 1).padStart(3, "0")}`,
-      name: data.name,
-      unit: data.unit === "DAYS" ? "Days" : "Hours",
-      requiresApproval: data.requiresApproval,
-      isPaid: data.isPaid,
-    };
-    setTypes([...types, newType]);
+  const reloadTypes = async () => {
+    const rows = await getTimeOffTypesAction();
+    setTypes(rows.filter((row) => row.status === "ACTIVE").map((row) => ({ id: row.id, name: row.name, unit: row.unit === "DAYS" ? "Days" : "Hours", requiresApproval: row.approvalRequired, isPaid: row.paid })));
   };
+
+  useEffect(() => { void reloadTypes(); }, []);
+
+  const handleCreated = (_data: TimeOffTypeFormValues) => { void reloadTypes(); };
 
   const handleDelete = async (id: string, name: string) => {
     setDeletingId(id);
-    await new Promise((r) => setTimeout(r, 450));
-    setTypes((prev) => prev.filter((t) => t.id !== id));
-    setDeletingId(null);
-    toast({
-      title: "Leave Policy Removed",
-      description: `Policy ${name} (${id}) has been removed.`,
-      type: "info",
-    });
+    try {
+      const result = await deactivateTimeOffTypeAction(id);
+      if (!result.success) throw new Error(result.error);
+      await reloadTypes();
+      toast({ title: "Leave Policy Deactivated", description: `Policy ${name} is no longer available for new requests.`, type: "info" });
+    } catch (error) {
+      toast({ title: "Unable to remove policy", description: error instanceof Error ? error.message : "Database request failed.", type: "error" });
+    } finally { setDeletingId(null); }
   };
 
   return (
@@ -124,7 +120,10 @@ export default function TimeOffTypesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
-              <TimeOffTypeForm onSuccess={handleCreated} />
+              <TimeOffTypeForm onSuccess={handleCreated} onSave={async (data) => {
+                const result = await createTimeOffTypeAction(data);
+                if (!result.success) throw new Error(result.error);
+              }} />
             </CardContent>
           </Card>
         </div>

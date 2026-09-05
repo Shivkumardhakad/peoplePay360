@@ -22,9 +22,11 @@ export type TimeOffTypeFormValues = z.infer<typeof typeSchema>;
 export function TimeOffTypeForm({
   defaultValues,
   onSuccess,
+  onSave,
 }: {
   defaultValues?: Partial<TimeOffTypeFormValues>;
   onSuccess?: (data: TimeOffTypeFormValues) => void;
+  onSave?: (data: TimeOffTypeFormValues) => Promise<void>;
 }) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
@@ -45,16 +47,16 @@ export function TimeOffTypeForm({
 
   const onSubmit = async (data: TimeOffTypeFormValues) => {
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 400));
-    setSubmitting(false);
-
-    toast({
-      title: "Leave Policy Created",
-      description: `Policy "${data.name}" added to leave catalog.`,
-      type: "success",
-    });
-    onSuccess?.(data);
-    reset();
+    try {
+      await onSave?.(data);
+      toast({ title: "Leave Policy Created", description: `Policy "${data.name}" added to leave catalog.`, type: "success" });
+      onSuccess?.(data);
+      reset();
+    } catch (error) {
+      toast({ title: "Unable to create policy", description: error instanceof Error ? error.message : "Database request failed.", type: "error" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

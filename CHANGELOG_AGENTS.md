@@ -1790,3 +1790,28 @@
 
 ### Notes
 - Related navigation still opens the existing operational list pages; those pages remain responsible for their own filtering.
+
+## 2026-09-06 05:30 IST — Complete live leave workflow foundation
+
+### Summary
+- Replaced time-off type create/deactivate simulations with Prisma-backed mutations.
+- Removed mock leave requests, fake employee IDs, hardcoded leave types, and local-only status updates.
+- Added active leave-type loading and live request refreshes after submission or decision.
+- Made approval transactional with allocation lookup, insufficient-balance protection, single balance deduction, approver metadata, and approval timestamp.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added time-off type mutations, date/type validation, and transactional leave approval logic.
+- `apps/web/components/time-off-type-form.tsx`: Added async persistence callback and error handling.
+- `apps/web/app/(app)/time-off/types/page.tsx`: Reload live active policies after create/deactivate.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Load live policies/requests and remove mock request fallbacks.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Leave allocation-to-request is a core MVP flow and could not rely on presentation-only state.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Approval metadata is recorded when the authenticated session user maps to a database user; allocation deduction is enforced for types requiring allocation.
