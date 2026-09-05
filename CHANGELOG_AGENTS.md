@@ -1790,3 +1790,26 @@
 
 ### Notes
 - Generated `.turbo` cache files were excluded from the commit.
+
+## 2026-09-06 02:35 +05:30 — Load shared local environment for both APIs
+
+### Summary
+- Made the HR API load the workspace `.env` explicitly during local startup.
+- Made Spring Boot Payroll load the workspace `.env` from both supported local working-directory paths.
+
+### Files Changed
+- `apps/hr-api/src/main.ts`: Load `../../../.env` before Nest initialization.
+- `apps/payroll/src/main/resources/application.yaml`: Import local `.env` files for database and API settings.
+- `CHANGELOG_AGENTS.md`: Recorded the environment loading fix.
+
+### Reason
+- A root `.env` was not automatically loaded by the package-scoped HR process or Maven/Spring Boot, causing fallback to local database defaults unless variables were manually exported.
+
+### Validation
+- HR API TypeScript check — passed.
+- Java tests — passed; 12 tests, 0 failures.
+- HR API with explicit Supabase connection — connected successfully to PostgreSQL.
+- Java Payroll without manually exported DB variables — connected successfully to Supabase and started on port 8081.
+
+### Notes
+- The root `.env` remains Git-ignored. Production should use the deployment platform's secret/environment-variable store.

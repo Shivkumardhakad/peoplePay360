@@ -1,7 +1,12 @@
-import "dotenv/config";
+import { config as loadDotenv } from "dotenv";
 import "reflect-metadata";
+import { resolve } from "node:path";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
+
+// Load the workspace-level .env for local development. Production deployments
+// should provide these values through the process environment or secret store.
+loadDotenv({ path: resolve(__dirname, "../../../.env") });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
