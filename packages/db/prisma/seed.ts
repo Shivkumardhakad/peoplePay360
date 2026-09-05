@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
 async function main() {
-  const adminPasswordHash = await bcrypt.hash("Admin123!", 10);
+  const passwordHash = await bcrypt.hash("Admin123!", 10);
   const employeePasswordHash = await bcrypt.hash("Employee123!", 10);
 
   const schedule = await prisma.workingSchedule.upsert({
@@ -193,42 +193,43 @@ async function main() {
       })),
       skipDuplicates: true
     });
+
+    await prisma.user.upsert({
+      where: { email },
+      update: {
+        name: `${firstName} ${lastName}`,
+        role: "EMPLOYEE",
+        employeeId: employee.id,
+        passwordHash: employeePasswordHash
+      },
+      create: {
+        email,
+        name: `${firstName} ${lastName}`,
+        passwordHash: employeePasswordHash,
+        role: "EMPLOYEE",
+        employeeId: employee.id
+      }
+    });
   }
 
   const adminEmployee = await prisma.employee.findUniqueOrThrow({
     where: { employeeNumber: "EMP-001" }
   });
 
-  const employeeUserProfile = await prisma.employee.findUniqueOrThrow({
-    where: { employeeNumber: "EMP-003" }
-  });
-
   await prisma.user.upsert({
     where: { email: "admin@peoplepay360.local" },
-    update: {},
+    update: {
+      name: "PeoplePay360 Admin",
+      passwordHash,
+      role: "ADMIN",
+      employeeId: adminEmployee.id
+    },
     create: {
       email: "admin@peoplepay360.local",
       name: "PeoplePay360 Admin",
-      passwordHash: adminPasswordHash,
+      passwordHash,
       role: "ADMIN",
       employeeId: adminEmployee.id
-    }
-  });
-
-  await prisma.user.upsert({
-    where: { email: "employee@peoplepay360.local" },
-    update: {
-      name: "Noah Kim",
-      passwordHash: employeePasswordHash,
-      role: "EMPLOYEE",
-      employeeId: employeeUserProfile.id
-    },
-    create: {
-      email: "employee@peoplepay360.local",
-      name: "Noah Kim",
-      passwordHash: employeePasswordHash,
-      role: "EMPLOYEE",
-      employeeId: employeeUserProfile.id
     }
   });
 }

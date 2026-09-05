@@ -6,41 +6,52 @@ export default withAuth(
     const role = request.nextauth.token?.role;
     const pathname = request.nextUrl.pathname;
 
-    if (role === "EMPLOYEE") {
-      const employeeRoutes = ["/self"];
-      const redirectedEmployeeRoutes: Record<string, string> = {
-        "/dashboard": "/self/dashboard",
-        "/attendance": "/self/attendance",
-        "/time-off": "/self/time-off"
-      };
+    // Team & Roles (/users) is strictly ADMIN only
+    if (pathname.startsWith("/users") && role !== "ADMIN") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
 
-      if (employeeRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
-        return NextResponse.next();
-      }
+    // HR_MANAGER has no payroll access
+    if (pathname.startsWith("/payroll") && role === "HR_MANAGER") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
 
-      for (const [adminRoute, selfRoute] of Object.entries(redirectedEmployeeRoutes)) {
-        if (pathname === adminRoute || pathname.startsWith(`${adminRoute}/`)) {
-          return NextResponse.redirect(new URL(selfRoute, request.url));
-        }
-      }
+    // EMPLOYEE cannot access payroll processing (payruns, structures, rules), but can access payslips
+    if (
+      (pathname.startsWith("/payroll/payruns") ||
+        pathname.startsWith("/payroll/structures") ||
+        pathname.startsWith("/payroll/rules")) &&
+      role === "EMPLOYEE"
+    ) {
+      return NextResponse.redirect(new URL("/payroll/payslips", request.url));
+    }
 
-      if (pathname.startsWith("/employees") || pathname.startsWith("/contracts") || pathname.startsWith("/payroll") || pathname.startsWith("/users")) {
-        return NextResponse.redirect(new URL("/self/dashboard", request.url));
-      }
+    // EMPLOYEE cannot access administrative /dashboard
+    if (pathname === "/dashboard" && role === "EMPLOYEE") {
+      const empId = request.nextauth.token?.employeeId;
+      return NextResponse.redirect(new URL(empId ? `/employees/${empId}` : "/employees", request.url));
     }
 
     return NextResponse.next();
   },
   {
     callbacks: {
-      authorized: ({ token }) => Boolean(token)
+      authorized: ({ token }) => Boolean(token),
     },
     pages: {
-      signIn: "/login"
-    }
+      signIn: "/login",
+    },
   }
 );
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/employees/:path*", "/contracts/:path*", "/attendance/:path*", "/time-off/:path*", "/payroll/:path*", "/users/:path*", "/self/:path*"]
+  matcher: [
+    "/dashboard/:path*",
+    "/employees/:path*",
+    "/contracts/:path*",
+    "/attendance/:path*",
+    "/time-off/:path*",
+    "/payroll/:path*",
+    "/users/:path*",
+  ],
 };

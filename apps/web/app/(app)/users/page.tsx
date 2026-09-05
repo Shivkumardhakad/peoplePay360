@@ -1,106 +1,239 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Search, ShieldCheck } from "lucide-react";
-import { getRoleMeta, type RoleKey } from "@/lib/role-meta";
-import { StatusBadge, type StatusBadgeTone } from "@/components/status-badge";
+import { useToast } from "@/components/ui/toast";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, ShieldCheck, Loader2, KeyRound } from "lucide-react";
+import {
+  getUsersAction,
+  createUserAction,
+  resetUserPasswordAction,
+  type SystemUserRole,
+} from "@/lib/api-actions";
 
-type UserStatus = "Active" | "Inactive";
+type SystemUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: SystemUserRole;
+  employeeId?: string | null;
+  createdAt?: string | Date;
+};
 
-const MOCK_USERS = [
-  { id: "USR-001", name: "Admin User", email: "admin@peoplepay360.local", role: "ADMIN" as RoleKey, status: "Active" as UserStatus },
-  { id: "USR-002", name: "Bob Smith", email: "hr.manager@peoplepay360.local", role: "HR_MANAGER" as RoleKey, status: "Active" as UserStatus },
-  { id: "USR-003", name: "Alice Johnson", email: "payroll.manager@peoplepay360.local", role: "HR_PAYROLL_MANAGER" as RoleKey, status: "Active" as UserStatus },
-  { id: "USR-004", name: "Charlie Davis", email: "payroll.user@peoplepay360.local", role: "HR_PAYROLL_USER" as RoleKey, status: "Active" as UserStatus },
-  { id: "USR-005", name: "Emily Watson", email: "employee@peoplepay360.local", role: "EMPLOYEE" as RoleKey, status: "Inactive" as UserStatus },
+const INITIAL_USERS: SystemUser[] = [
+  { id: "USR-001", name: "Admin User", email: "admin@peoplepay360.local", role: "ADMIN" },
+  { id: "USR-002", name: "Bob Smith", email: "hr.manager@peoplepay360.local", role: "HR_MANAGER" },
+  { id: "USR-003", name: "Alice Johnson", email: "payroll.manager@peoplepay360.local", role: "PAYROLL_MANAGER" },
+  { id: "USR-004", name: "Emily Watson", email: "employee@peoplepay360.local", role: "EMPLOYEE" },
 ];
 
-function statusTone(status: UserStatus): StatusBadgeTone {
-  return status === "Active" ? "success" : "neutral";
-}
-
-function RoleBadge({ role }: { role: RoleKey }) {
-  const meta = getRoleMeta(role);
-
-  return (
-    <span
-      className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
-      style={{
-        backgroundColor: meta.background,
-        color: meta.foreground,
-      }}
-    >
-      {meta.label}
-    </span>
-  );
+function formatRoleLabel(role: SystemUserRole) {
+  switch (role) {
+    case "ADMIN":
+      return "Admin";
+    case "HR_MANAGER":
+      return "HR Manager";
+    case "PAYROLL_MANAGER":
+      return "Payroll Manager";
+    case "HR_PAYROLL_USER":
+      return "Payroll User";
+    case "EMPLOYEE":
+      return "Employee";
+    default:
+      return role;
+  }
 }
 
 export default function UsersPage() {
-  const [users, setUsers] = useState(MOCK_USERS);
+  const { toast } = useToast();
+  const [users, setUsers] = useState<SystemUser[]>(INITIAL_USERS);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<RoleKey>("HR_MANAGER");
+  const [role, setRole] = useState<SystemUserRole>("HR_MANAGER");
   const [password, setPassword] = useState("");
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(search.toLowerCase()) || 
-    u.email.toLowerCase().includes(search.toLowerCase()) ||
-    u.role.toLowerCase().includes(search.toLowerCase())
-  );
+  const loadUsers = async () => {
+    try {
+      const res = await getUsersAction();
+      if (res.success && res.users && res.users.length > 0) {
+        setUsers(
+          res.users.map((u) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role as SystemUserRole,
+            employeeId: u.employeeId,
+            createdAt: u.createdAt,
+          }))
+        );
+      }
+    } catch {
+      // Keep initial users on network failure
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const handleAddUser = (e: React.FormEvent) => {
+  useEffect(() => {
+    void loadUsers();
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    const term = search.toLowerCase().trim();
+    if (!term) return users;
+    return users.filter(
+      (u) =>
+        u.name.toLowerCase().includes(term) ||
+        u.email.toLowerCase().includes(term) ||
+        u.role.toLowerCase().includes(term) ||
+        u.id.toLowerCase().includes(term)
+    );
+  }, [search, users]);
+
+  const handleResetPassword = async (id: string, userName: string) => {
+    setActionLoadingId(id);
+    try {
+      const res = await resetUserPasswordAction(id);
+      if (res.success) {
+        toast({
+          title: "Password Reset Successful",
+          description: `Temporary password for ${userName} set to: ${res.temporaryPassword}`,
+          type: "success",
+        });
+      } else {
+        toast({
+          title: "Password Reset Failed",
+          description: res.error || "Unable to reset password.",
+          type: "error",
+        });
+      }
+    } catch (err: unknown) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to reset password.",
+        type: "error",
+      });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email) return;
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
 
-    const newUser = {
-      id: `USR-${String(users.length + 1).padStart(3, "0")}`,
-      name,
-      email,
-      role,
-      status: "Active" as UserStatus,
-    };
+    if (!cleanName || !cleanEmail || !cleanPassword) {
+      setError("Please fill out all required fields.");
+      return;
+    }
 
-    setUsers([...users, newUser]);
-    setName("");
-    setEmail("");
-    setPassword("");
-    setRole("HR_MANAGER");
-    setDialogOpen(false);
+    if (cleanPassword.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await createUserAction({
+        name: cleanName,
+        email: cleanEmail,
+        role,
+        password: cleanPassword,
+      });
+
+      if (!res.success || !res.user) {
+        setError(res.error || "Failed to create user");
+        setSubmitting(false);
+        toast({
+          title: "User Creation Failed",
+          description: res.error || "Could not save user to the database.",
+          type: "error",
+        });
+        return;
+      }
+
+      const createdUser: SystemUser = {
+        id: res.user.id,
+        name: res.user.name,
+        email: res.user.email,
+        role: res.user.role as SystemUserRole,
+        employeeId: res.user.employeeId,
+        createdAt: res.user.createdAt,
+      };
+
+      setUsers((current) => [createdUser, ...current]);
+      toast({
+        title: "User Created Successfully",
+        description: `${createdUser.name} (${createdUser.email}) can now log in immediately.`,
+        type: "success",
+      });
+
+      setName("");
+      setEmail("");
+      setPassword("");
+      setRole("HR_MANAGER");
+      setDialogOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setError(msg);
+      toast({
+        title: "System Error",
+        description: msg,
+        type: "error",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-accent" />
-            <h1 className="text-2xl font-bold tracking-tight">Team & Roles</h1>
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-primary" />
+            <h1 className="text-base font-semibold tracking-tight text-foreground">Team & Roles</h1>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage system access and assign user roles.</p>
+          <p className="text-xs text-muted-foreground">
+            Administer user accounts, security profiles, and role-based access permissions.
+          </p>
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="gap-2 bg-card">
-              <Plus className="w-4 h-4" />
+            <Button size="sm" className="gap-1.5 h-8">
+              <Plus className="w-3.5 h-3.5" />
               Add User
             </Button>
           </DialogTrigger>
-          <DialogContent className="pp-solid-surface sm:max-w-md">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Create System User</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAddUser} className="space-y-4 pt-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+              {error && (
+                <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                  {error}
+                </p>
+              )}
+              <div className="space-y-1.5">
+                <Label htmlFor="name" className="text-xs font-medium">Full Name</Label>
                 <Input
                   id="name"
                   placeholder="e.g. Sarah Connor"
@@ -110,55 +243,56 @@ export default function UsersPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-xs font-medium">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="sarah@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="font-mono text-sm"
+                  className="font-mono text-xs"
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="role">Assigned Role</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="role" className="text-xs font-medium">Assigned Role</Label>
                 <select
                   id="role"
                   value={role}
-                  onChange={(e) => setRole(e.target.value as RoleKey)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  onChange={(e) => setRole(e.target.value as SystemUserRole)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="HR_MANAGER">HR_MANAGER</option>
-                  <option value="PAYROLL_MANAGER">PAYROLL_MANAGER</option>
-                  <option value="HR_PAYROLL_MANAGER">HR_PAYROLL_MANAGER</option>
-                  <option value="HR_PAYROLL_USER">HR_PAYROLL_USER</option>
-                  <option value="EMPLOYEE">EMPLOYEE</option>
+                  <option value="ADMIN">ADMIN (Full Access)</option>
+                  <option value="HR_MANAGER">HR_MANAGER (People, Contracts, Time-off)</option>
+                  <option value="PAYROLL_MANAGER">PAYROLL_MANAGER (Payroll & Ledger)</option>
+                  <option value="HR_PAYROLL_USER">HR_PAYROLL_USER (Payroll & Time-off Assistant)</option>
+                  <option value="EMPLOYEE">EMPLOYEE (Self-Service Portal)</option>
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Temporary Password</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-xs font-medium">Temporary Password</Label>
                 <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="font-mono text-sm"
+                  className="font-mono text-xs"
+                  minLength={8}
                   required
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(false)} disabled={submitting}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                  Create User
+                <Button type="submit" size="sm" disabled={submitting} className="gap-1.5 h-8">
+                  {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {submitting ? "Creating User..." : "Create User"}
                 </Button>
               </div>
             </form>
@@ -166,49 +300,94 @@ export default function UsersPage() {
         </Dialog>
       </div>
 
-      {/* Filter bar as glass */}
-      <div className="p-4 pp-glass flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by name, email, or role..." 
+      {/* Filter bar */}
+      <div className="p-2 rounded-lg border border-border bg-card flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search users..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-background/80 font-mono text-sm" 
+            className="pl-8 h-7 text-xs"
           />
         </div>
-        <div className="text-xs font-mono text-muted-foreground">
-          Showing <span className="font-bold text-foreground">{filteredUsers.length}</span> user records
+        <div className="flex items-center gap-2">
+          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+          <span className="text-[11px] font-mono text-muted-foreground">
+            {filteredUsers.length} users
+          </span>
         </div>
       </div>
 
-      <div className="pp-solid-surface overflow-hidden">
-        <Table className="table-fixed">
+      {/* Table */}
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <Table>
           <TableHeader>
-            <TableRow className="border-b-[0.5px] border-border bg-muted/20 hover:bg-muted/20">
-              <TableHead className="w-[100px]">User ID</TableHead>
-              <TableHead className="w-[22%]">Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead className="w-[190px]">Role</TableHead>
-              <TableHead className="w-[120px]">Status</TableHead>
+            <TableRow>
+              <TableHead className="w-[110px]">User ID</TableHead>
+              <TableHead>User Name</TableHead>
+              <TableHead>Email Address</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead className="text-right">Status</TableHead>
+              <TableHead className="w-[110px] text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredUsers.map((u) => (
-              <TableRow key={u.id} className="border-b-[0.5px] border-border hover:bg-muted/30">
-                <TableCell className="font-mono text-xs text-muted-foreground">{u.id}</TableCell>
-                <TableCell className="font-medium text-foreground">{u.name}</TableCell>
-                <TableCell className="truncate font-mono text-xs text-muted-foreground" title={u.email}>
-                  {u.email}
-                </TableCell>
-                <TableCell>
-                  <RoleBadge role={u.role} />
-                </TableCell>
-                <TableCell>
-                  <StatusBadge tone={statusTone(u.status)} label={u.status} />
+            {loading && users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    <span>Loading users...</span>
+                  </div>
                 </TableCell>
               </TableRow>
-            ))}
+            ) : filteredUsers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                  No users found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredUsers.map((u) => {
+                const isResetting = actionLoadingId === u.id;
+
+                return (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-mono text-[11px] text-muted-foreground truncate max-w-[110px]">{u.id}</TableCell>
+                    <TableCell className="font-medium text-xs">{u.name}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{u.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px] font-mono">
+                        {formatRoleLabel(u.role)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="success" className="text-[10px] font-mono">
+                        Active
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right p-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleResetPassword(u.id, u.name)}
+                        disabled={isResetting}
+                        className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1"
+                        title="Reset user password"
+                      >
+                        {isResetting ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <KeyRound className="w-3 h-3 text-muted-foreground" />
+                        )}
+                        <span>{isResetting ? "Resetting..." : "Reset PW"}</span>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </div>

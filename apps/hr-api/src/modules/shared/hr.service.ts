@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from "@nestjs/common";
 import { AttendanceStatus, ComputationType, ContractStatus, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import nodemailer from "nodemailer";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 
 type CreateUserInput = Omit<Prisma.UserUncheckedCreateInput, "passwordHash"> & {
@@ -248,10 +249,14 @@ export class HrService {
     });
   }
   async createAttendance(data: Prisma.AttendanceUncheckedCreateInput) {
-    return this.prisma.client.attendance.create({ data: this.withWorkedMinutes(data) });
+    const status = await this.deriveAttendanceStatus(data);
+    return this.prisma.client.attendance.create({ data: { ...this.withWorkedMinutes(data), status } });
   }
   async correctAttendance(id: string, data: Prisma.AttendanceUncheckedUpdateInput) {
-    return this.prisma.client.attendance.update({ where: { id }, data: { ...data, ...this.withWorkedMinutes(data), corrected: true } });
+    const existing = await this.prisma.client.attendance.findUniqueOrThrow({ where: { id } });
+    const merged = { ...existing, ...data } as Prisma.AttendanceUncheckedCreateInput;
+    const status = await this.deriveAttendanceStatus(merged);
+    return this.prisma.client.attendance.update({ where: { id }, data: { ...data, ...this.withWorkedMinutes(data), status, corrected: true } });
   }
 
   listTimeOffRequests() {
@@ -371,6 +376,34 @@ export class HrService {
     const current = await this.prisma.client.payrun.findUniqueOrThrow({ where: { id } });
     if (["PAID", "CANCELLED"].includes(current.status)) throw new ConflictException(`Cannot cancel a ${current.status.toLowerCase()} payrun`);
     return this.prisma.client.payrun.update({ where: { id }, data: { status: "CANCELLED" } });
+  }
+  async sendPayrunPayslips(id: string) {
+    const payrun = await this.prisma.client.payrun.findUniqueOrThrow({
+      where: { id },
+      include: { payslips: { include: { employee: true, lines: { include: { category: true }, orderBy: { sequence: "asc" } } } } }
+    });
+    if (!["VALIDATED", "PAID"].includes(payrun.status)) throw new ConflictException("Payslips can only be emailed after validation");
+    if (payrun.payslips.length === 0) throw new BadRequestException("Payrun has no payslips");
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT ?? 587),
+      secure: process.env.SMTP_SECURE === "true",
+      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined
+    });
+    const from = process.env.SMTP_FROM ?? process.env.SMTP_USER;
+    if (!from) throw new BadRequestException("SMTP_FROM or SMTP_USER must be configured");
+    const results: Array<{ employeeId: string; email: string; status: "sent" }> = [];
+    for (const payslip of payrun.payslips) {
+      const lines = payslip.lines.map((line) => `<tr><td>${this.escapeHtml(line.name)}</td><td>${this.escapeHtml(line.category.name)}</td><td>${Number(line.amount).toFixed(2)}</td></tr>`).join("");
+      await transporter.sendMail({
+        from,
+        to: payslip.employee.email,
+        subject: `Payslip - ${payrun.name}`,
+        html: `<p>Hello ${this.escapeHtml(payslip.employee.firstName)},</p><p>Your payslip for ${payrun.periodStart.toISOString().slice(0, 10)} to ${payrun.periodEnd.toISOString().slice(0, 10)} is ready.</p><table><thead><tr><th>Component</th><th>Category</th><th>Amount</th></tr></thead><tbody>${lines}</tbody></table><p>Gross: ${Number(payslip.grossAmount).toFixed(2)}<br> Deductions: ${Number(payslip.deductionAmount).toFixed(2)}<br>Net: ${Number(payslip.netAmount).toFixed(2)}</p>`
+      });
+      results.push({ employeeId: payslip.employeeId, email: payslip.employee.email, status: "sent" });
+    }
+    return { payrunId: id, sent: results.length, results };
   }
 
   async computePayrun(id: string) {
@@ -523,15 +556,47 @@ export class HrService {
   }
   async createUser(data: CreateUserInput) {
     const { email, password, temporaryPassword, passwordHash, ...userData } = data;
-    if (!email?.trim()) throw new BadRequestException("Email is required");
+    const normalizedEmail = email?.toLowerCase().trim();
+    if (!normalizedEmail) throw new BadRequestException("Email is required");
 
-    return this.prisma.client.user.create({
-      data: {
-        ...userData,
-        email: email.toLowerCase().trim(),
-        passwordHash: (await this.resolvePasswordHash({ password, temporaryPassword, passwordHash }, true))!
-      },
-      select: this.userSelect()
+    const resolvedPasswordHash = (await this.resolvePasswordHash({ password, temporaryPassword, passwordHash }, true))!;
+
+    return this.prisma.client.$transaction(async (tx) => {
+      let employeeId = userData.employeeId;
+
+      // Employee logins must have an employee record so profile, attendance,
+      // leave and payslip access can be resolved from the authenticated user.
+      if (userData.role === "EMPLOYEE" && !employeeId) {
+        const existingEmployee = await tx.employee.findUnique({ where: { email: normalizedEmail } });
+        if (existingEmployee) {
+          employeeId = existingEmployee.id;
+        } else {
+          const fullName = typeof userData.name === "string" ? userData.name.trim() : "Employee";
+          const [firstName, ...lastNameParts] = fullName.split(/\s+/);
+          const safeFirstName = firstName || "Employee";
+          const lastName = lastNameParts.join(" ") || safeFirstName;
+          const employee = await tx.employee.create({
+            data: {
+              employeeNumber: `EMP-${Date.now().toString().slice(-8)}`,
+              firstName: safeFirstName,
+              lastName,
+              email: normalizedEmail,
+              hireDate: new Date()
+            }
+          });
+          employeeId = employee.id;
+        }
+      }
+
+      return tx.user.create({
+        data: {
+          ...userData,
+          ...(employeeId ? { employeeId } : {}),
+          email: normalizedEmail,
+          passwordHash: resolvedPasswordHash
+        },
+        select: this.userSelect()
+      });
     });
   }
   async updateUser(id: string, data: UpdateUserInput) {
@@ -623,6 +688,18 @@ export class HrService {
     return { ...data, workedMinutes };
   }
 
+  private async deriveAttendanceStatus(data: { date: Date | string; checkIn?: Date | string | null; checkOut?: Date | string | null; status?: string; workingScheduleId?: string | null }) {
+    if (data.status && data.status !== "PRESENT") return data.status as Prisma.AttendanceUncheckedCreateInput["status"];
+    if (!data.checkIn) return "ABSENT";
+    if (!data.checkOut) return "EXCEPTION";
+    if (!data.workingScheduleId) return "PRESENT";
+    const schedule = await this.prisma.client.workingSchedule.findUnique({ where: { id: data.workingScheduleId }, include: { scheduleDays: true } });
+    const dayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
+    const scheduleDay = schedule?.scheduleDays.find((day) => day.dayOfWeek === dayNames[new Date(data.date).getDay()]);
+    if (scheduleDay?.startTime && this.timeToMinutes(new Date(data.checkIn).getHours().toString().padStart(2, "0") + ":" + new Date(data.checkIn).getMinutes().toString().padStart(2, "0")) > this.timeToMinutes(scheduleDay.startTime)) return "LATE";
+    return "PRESENT";
+  }
+
   private async resolvePasswordHash(
     credentials: { password?: string; temporaryPassword?: string; passwordHash?: string },
     required: boolean
@@ -647,6 +724,10 @@ export class HrService {
 
   private isBcryptHash(value: string) {
     return /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(value);
+  }
+
+  private escapeHtml(value: string) {
+    return value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character] ?? character));
   }
 
   private userSelect() {

@@ -1,108 +1,160 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Search, FileText } from "lucide-react";
-import { ContractForm } from "@/components/contract-form";
+import { Plus, Search } from "lucide-react";
+import { ContractForm, type ContractFormValues } from "@/components/contract-form";
 
-const MOCK_CONTRACTS = [
+interface ContractItem {
+  id: string;
+  employee: string;
+  position: string;
+  department: string;
+  startDate: string;
+  endDate: string;
+  wage: number;
+  status: "Active" | "Ended";
+}
+
+const INITIAL_CONTRACTS: ContractItem[] = [
   { id: "CON-1001", employee: "Alice Johnson", position: "Senior Frontend Engineer", department: "Engineering", startDate: "2023-01-15", endDate: "-", wage: 120000, status: "Active" },
-  { id: "CON-1002", employee: "Bob Smith", position: "HR Manager", department: "HR", startDate: "2021-06-01", endDate: "-", wage: 95000, status: "Active" },
-  { id: "CON-1003", employee: "Charlie Davis", position: "Payroll Specialist", department: "Finance", startDate: "2022-03-10", endDate: "2023-12-31", wage: 75000, status: "Ended" },
+  { id: "CON-1002", employee: "Bob Smith", position: "HR Manager", department: "Human Resources", startDate: "2021-06-01", endDate: "-", wage: 95000, status: "Active" },
+  { id: "CON-1003", employee: "Charlie Davis", position: "Payroll Specialist", department: "Finance & Accounting", startDate: "2022-03-10", endDate: "2023-12-31", wage: 75000, status: "Ended" },
+  { id: "CON-1004", employee: "Emily Watson", position: "Lead UX Designer", department: "Product & Design", startDate: "2023-08-01", endDate: "-", wage: 110000, status: "Active" },
 ];
 
 export default function ContractsPage() {
+  const { data: session } = useSession();
+  const [contracts, setContracts] = useState<ContractItem[]>(INITIAL_CONTRACTS);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const filteredContracts = MOCK_CONTRACTS.filter(c => 
-    c.employee.toLowerCase().includes(search.toLowerCase()) ||
-    c.position.toLowerCase().includes(search.toLowerCase()) ||
-    c.department.toLowerCase().includes(search.toLowerCase())
+  const role = session?.user?.role || "ADMIN";
+  const canCreateContract = role === "ADMIN" || role === "HR_MANAGER";
+
+  const filteredContracts = contracts.filter(
+    (c) =>
+      c.employee.toLowerCase().includes(search.toLowerCase()) ||
+      c.position.toLowerCase().includes(search.toLowerCase()) ||
+      c.department.toLowerCase().includes(search.toLowerCase()) ||
+      c.id.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleCreated = (data: ContractFormValues) => {
+    const employeeNames: Record<string, string> = {
+      "EMP-001": "Alice Johnson",
+      "EMP-002": "Bob Smith",
+      "EMP-003": "Charlie Davis",
+      "EMP-004": "Emily Watson",
+    };
+
+    const newContract: ContractItem = {
+      id: `CON-${String(contracts.length + 1001)}`,
+      employee: employeeNames[data.employeeId] || data.employeeId,
+      position: data.position,
+      department: data.department,
+      startDate: data.startDate,
+      endDate: data.endDate || "-",
+      wage: Number(data.wage),
+      status: "Active",
+    };
+
+    setContracts([newContract, ...contracts]);
+    setDialogOpen(false);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Contracts</h1>
-          <p className="text-sm text-muted-foreground">Manage employee terms, compensation, and active contracts.</p>
+          <h1 className="text-base font-semibold tracking-tight text-foreground">Contracts</h1>
+          <p className="text-xs text-muted-foreground">Employment terms, compensation, and active ledger ties.</p>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Create Contract
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="pp-solid-surface sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>New Employment Contract</DialogTitle>
-            </DialogHeader>
-            <ContractForm />
-          </DialogContent>
-        </Dialog>
+        {canCreateContract && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1.5 h-8">
+                <Plus className="w-3.5 h-3.5" />
+                Create Contract
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>New Employment Contract</DialogTitle>
+              </DialogHeader>
+              <ContractForm onSuccess={handleCreated} onCancel={() => setDialogOpen(false)} />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
-      {/* Filter bar as glass */}
-      <div className="p-4 pp-glass flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search contracts..." 
+      {/* Filter Bar */}
+      <div className="p-2 rounded-lg border border-border bg-card flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Filter contracts..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-background/80" 
+            className="pl-8 h-7 text-xs"
           />
         </div>
-        <div className="text-xs font-mono text-muted-foreground">
-          Showing <span className="font-bold text-foreground">{filteredContracts.length}</span> contract records
-        </div>
+        <span className="text-[11px] font-mono text-muted-foreground">
+          {filteredContracts.length} records
+        </span>
       </div>
 
-      {/* Solid Surface Table */}
-      <div className="pp-solid-surface overflow-hidden">
+      {/* Table */}
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="border-b border-border bg-muted/20">
-              <TableHead>Contract Ref</TableHead>
+            <TableRow>
+              <TableHead className="w-[90px]">Ref ID</TableHead>
               <TableHead>Employee</TableHead>
               <TableHead>Position</TableHead>
               <TableHead>Department</TableHead>
-              <TableHead>Start Date</TableHead>
-              <TableHead>End Date</TableHead>
-              <TableHead className="text-right">Wage</TableHead>
+              <TableHead>Term</TableHead>
+              <TableHead className="text-right">Base Wage</TableHead>
               <TableHead className="text-right">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredContracts.map((contract) => (
-              <TableRow 
-                key={contract.id} 
-                className={`hover:bg-muted/50 border-b border-border/60 ${contract.status === 'Active' ? 'border-l-4 border-l-success' : ''}`}
-              >
-                <TableCell className="font-mono text-xs text-muted-foreground">{contract.id}</TableCell>
-                <TableCell className="font-medium text-foreground">{contract.employee}</TableCell>
-                <TableCell>{contract.position}</TableCell>
-                <TableCell>{contract.department}</TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">{contract.startDate}</TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">{contract.endDate}</TableCell>
-                <TableCell className="font-mono text-right font-medium">
-                  ${contract.wage.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    contract.status === 'Active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {contract.status}
-                  </span>
+            {filteredContracts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
+                  No contracts found.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              filteredContracts.map((contract) => (
+                <TableRow key={contract.id}>
+                  <TableCell className="font-mono text-[11px] text-muted-foreground">{contract.id}</TableCell>
+                  <TableCell className="font-medium text-xs">{contract.employee}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{contract.position}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{contract.department}</TableCell>
+                  <TableCell className="font-mono text-[11px] text-muted-foreground">
+                    {contract.startDate} → {contract.endDate}
+                  </TableCell>
+                  <TableCell className="font-mono text-right text-xs font-semibold">
+                    ${contract.wage.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Badge
+                      variant={contract.status === "Active" ? "success" : "secondary"}
+                      className="text-[10px] font-mono"
+                    >
+                      {contract.status}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
