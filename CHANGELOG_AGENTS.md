@@ -337,3 +337,30 @@
 
 ### Notes
 - Dashboard data remains static fixture data.
+
+## 2026-09-05 16:47 +05:30 — Complete HR API model routes
+
+### Summary
+- Added backend API routes for the remaining normalized PeoplePay360 models and payroll workflow operations.
+- Added a basic payrun compute lifecycle that generates/upserts payslips from active contracts and salary structure rules.
+
+### Files Changed
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Added bank account, working schedule, time-off type, allocation, salary rule/category/structure, payrun, payslip, RBAC, and user operations.
+- `apps/hr-api/src/modules/bank-accounts/bank-accounts.controller.ts`: Added bank account CRUD routes.
+- `apps/hr-api/src/modules/working-schedules/working-schedules.controller.ts`: Added working schedule and schedule-day CRUD routes.
+- `apps/hr-api/src/modules/payroll/payroll.controller.ts`: Added salary, payrun, payslip, and payroll lifecycle routes.
+- `apps/hr-api/src/modules/rbac/rbac.controller.ts`: Added role, permission, role-permission, and user-role assignment routes.
+- `apps/hr-api/src/modules/time-off/time-off.controller.ts`: Added time-off type and allocation routes.
+- `apps/hr-api/src/modules/users/users.controller.ts`: Added user detail/create/update/delete routes.
+- `apps/hr-api/src/modules/hr.module.ts`: Registered the new API controllers.
+- `CHANGELOG_AGENTS.md`: Recorded this API work.
+
+### Reason
+- The normalized schema had models that were not reachable through the API layer, leaving large parts of the backend workflow unavailable.
+
+### Validation
+- `pnpm --filter @peoplepay360/hr-api build` — passed
+
+### Notes
+- Controllers currently follow the existing pattern of accepting Prisma input types directly; DTO validation and authorization guards are still needed before production exposure.
+- Payrun computation supports fixed and percentage rules. Formula rules currently compute as zero until a formula engine/parser is defined.
