@@ -2166,3 +2166,27 @@
 
 ### Notes
 - Employee type is resolved from the contract applicable to the selected report range; records without an applicable contract are shown as `UNKNOWN`.
+## 2026-09-06 13:20 IST — Create employee login credentials with employee records
+
+### Summary
+- Added an initial login password field to the New Employee form.
+- Creates or updates the linked `EMPLOYEE` user account with a bcrypt password hash.
+- Reloads the employee list from the database after creation instead of inserting a client-side placeholder row.
+- Added optional password reset support while editing an employee.
+
+### Files Changed
+- `apps/web/components/employee-form.tsx`: Added initial/optional login password input and validation.
+- `apps/web/lib/api-actions.ts`: Hashes credentials and upserts the linked employee user account.
+- `apps/web/app/(app)/employees/page.tsx`: Refreshes the live employee list after creation.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Employees created from the HR directory must be able to sign in immediately with credentials communicated by the administrator.
+
+### Validation
+- `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+- `pnpm --filter web build` — passed.
+
+### Notes
+- Plain-text passwords are never persisted; administrators must communicate the entered initial password securely to the employee.

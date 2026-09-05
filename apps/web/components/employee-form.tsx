@@ -19,6 +19,7 @@ const employeeSchema = z.object({
   dateOfJoining: z.string().min(1, "Date of joining is required"),
   department: z.string().min(1, "Department is required"),
   status: z.enum(["ACTIVE", "INACTIVE", "ON_LEAVE", "TERMINATED"]),
+  password: z.string().optional(),
 });
 
 export type EmployeeFormValues = z.infer<typeof employeeSchema>;
@@ -55,6 +56,11 @@ export function EmployeeForm({
     setSubmitting(true);
     try {
       const isEditing = Boolean(employeeId);
+      if (!isEditing && (!data.password || data.password.trim().length < 8)) {
+        toast({ title: "Password required", description: "Set an initial login password of at least 8 characters.", type: "error" });
+        setSubmitting(false);
+        return;
+      }
       const res = isEditing && employeeId
         ? await updateEmployeeAction(employeeId, data)
         : await createEmployeeAction(data);
@@ -151,6 +157,12 @@ export function EmployeeForm({
           <option value="ON_LEAVE">On Leave</option>
         </select>
       </div>
+
+      {!readOnly && <div className="space-y-1.5 border-t border-border pt-3">
+        <Label htmlFor="password" className="text-xs font-medium">{employeeId ? "New Login Password (optional)" : "Initial Login Password"}</Label>
+        <Input id="password" type="password" minLength={8} placeholder="At least 8 characters" className="font-mono text-xs" {...register("password")} />
+        <p className="text-[10px] text-muted-foreground">Use the work email and this password for employee login. Only a secure hash is stored.</p>
+      </div>}
 
       {!readOnly ? (
         <div className="flex justify-end gap-2 pt-3 border-t border-border">

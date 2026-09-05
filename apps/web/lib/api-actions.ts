@@ -23,6 +23,7 @@ export async function createEmployeeAction(data: {
   jobPosition?: string;
   dateOfJoining: string;
   status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED";
+  password?: string;
 }) {
   const prismaStatus = data.status === "INACTIVE" ? "TERMINATED" : data.status;
 
@@ -43,6 +44,10 @@ export async function createEmployeeAction(data: {
 
     if (res.ok) {
       const created = await res.json();
+      if (data.password?.trim()) {
+        const passwordHash = await bcrypt.hash(data.password.trim(), 10);
+        await prisma.user.upsert({ where: { email: data.email.trim().toLowerCase() }, update: { name: `${data.firstName} ${data.lastName}`, passwordHash, role: "EMPLOYEE", employeeId: created.id }, create: { email: data.email.trim().toLowerCase(), name: `${data.firstName} ${data.lastName}`, passwordHash, role: "EMPLOYEE", employeeId: created.id } });
+      }
       revalidatePath("/employees");
       return { success: true, employee: created };
     }
@@ -62,6 +67,10 @@ export async function createEmployeeAction(data: {
         status: prismaStatus,
       },
     });
+    if (data.password?.trim()) {
+      const passwordHash = await bcrypt.hash(data.password.trim(), 10);
+      await prisma.user.upsert({ where: { email: data.email.trim().toLowerCase() }, update: { name: `${data.firstName} ${data.lastName}`, passwordHash, role: "EMPLOYEE", employeeId: fallback.id }, create: { email: data.email.trim().toLowerCase(), name: `${data.firstName} ${data.lastName}`, passwordHash, role: "EMPLOYEE", employeeId: fallback.id } });
+    }
     revalidatePath("/employees");
     return { success: true, employee: fallback };
   } catch (err: unknown) {
@@ -93,10 +102,16 @@ export async function getEmployeesAction() {
 }
 
 export async function updateEmployeeAction(employeeId: string, data: {
-  firstName: string; lastName: string; email: string; phone?: string; department?: string; jobPosition?: string; dateOfJoining?: string; status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED";
+  firstName: string; lastName: string; email: string; phone?: string; department?: string; jobPosition?: string; dateOfJoining?: string; status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED"; password?: string;
 }) {
   try {
     const employee = await prisma.employee.update({ where: { id: employeeId }, data: { firstName: data.firstName, lastName: data.lastName, email: data.email.trim().toLowerCase(), phone: data.phone || null, ...(data.dateOfJoining ? { hireDate: new Date(data.dateOfJoining) } : {}), status: data.status === "INACTIVE" ? "TERMINATED" : data.status } });
+    if (data.password?.trim()) {
+      const passwordHash = await bcrypt.hash(data.password.trim(), 10);
+      const linkedUser = await prisma.user.findFirst({ where: { employeeId }, select: { id: true } });
+      if (linkedUser) await prisma.user.update({ where: { id: linkedUser.id }, data: { passwordHash } });
+      else await prisma.user.create({ data: { email: employee.email, name: `${employee.firstName} ${employee.lastName}`, passwordHash, role: "EMPLOYEE", employeeId } });
+    }
     revalidatePath("/employees");
     revalidatePath(`/employees/${employeeId}`);
     return { success: true, employee };

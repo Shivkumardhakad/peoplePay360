@@ -51,15 +51,9 @@ export default function EmployeesPage() {
       e.id.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleCreated = (data: EmployeeFormValues) => {
-    const newEmp: EmployeeItem = {
-      id: `EMP-${String(employees.length + 1).padStart(3, "0")}`,
-      name: `${data.firstName} ${data.lastName}`,
-      department: data.department,
-      position: "New Hire",
-      status: data.status === "ACTIVE" ? "Active" : data.status === "ON_LEAVE" ? "On Leave" : "Inactive",
-    };
-    setEmployees([newEmp, ...employees]);
+  const handleCreated = async (_data: EmployeeFormValues) => {
+    const rows = await getEmployeesAction();
+    setEmployees(rows.map((row) => ({ ...row, status: row.status === "ACTIVE" ? "Active" : row.status === "ON_LEAVE" ? "On Leave" : "Inactive" })));
     setDialogOpen(false);
   };
 
