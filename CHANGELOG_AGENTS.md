@@ -1918,3 +1918,26 @@
 
 ### Notes
 - Individual PDF generation remains browser-side. Bulk email sends a live HTML salary statement and requires `SMTP_HOST`, plus `SMTP_FROM` or `SMTP_USER`; delivery is restricted to `VALIDATED` or `PAID` payruns.
+
+## 2026-09-06 08:00 IST — Connect live payroll dashboard reporting
+
+### Summary
+- Added a live payroll dashboard action aggregating Java payruns/payslips with HR employee, department, attendance, and leave records.
+- Replaced static payroll KPI values and department salary chart data with live values.
+- Added period and department filters plus payroll alerts for missing bank details, attendance exceptions, and pending leave approvals.
+- Removed the static HR dashboard new-hire count text.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added live payroll dashboard aggregation and filtering.
+- `apps/web/app/(app)/dashboard/page.tsx`: Rendered live payroll KPIs, chart, filters, and alerts.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Dashboard/reporting was still showing hardcoded payroll amounts, counts, and department costs instead of operational records.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check -- apps/web/app/(app)/dashboard/page.tsx apps/web/lib/api-actions.ts` — passed.
+
+### Notes
+- Payroll dashboard data is based on Java payrun records; department and operational alert context is resolved from the HR Prisma database.

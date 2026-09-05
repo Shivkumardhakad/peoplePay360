@@ -5,30 +5,18 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { TrendingUp, Users, Calendar, DollarSign, UserCheck, Clock } from "lucide-react";
-import { getHrDashboardAction } from "@/lib/api-actions";
-
-const payrollDepartmentData = [
-  { name: "Eng", total: 185000 },
-  { name: "HR", total: 45000 },
-  { name: "Finance", total: 65000 },
-  { name: "Sales", total: 110000 },
-  { name: "Design", total: 55000 },
-];
-
-const hrDepartmentData = [
-  { name: "Eng", total: 52 },
-  { name: "HR", total: 8 },
-  { name: "Finance", total: 14 },
-  { name: "Sales", total: 32 },
-  { name: "Design", total: 18 },
-];
+import { getHrDashboardAction, getPayrollDashboardAction } from "@/lib/api-actions";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const role = session?.user?.role || "ADMIN";
   const isHrManager = role === "HR_MANAGER";
   const [hrData, setHrData] = useState({ headcount: 0, attendanceRate: 0, pendingLeave: 0, approvedLeave: 0, departments: [] as { name: string; total: number }[] });
+  const [payrollData, setPayrollData] = useState({ totalNetPaid: 0, payslipsGenerated: 0, averageNet: 0, approvedLeave: 0, salaryByDepartment: [] as { name: string; total: number }[], departments: [] as { id: string; name: string }[], alerts: { attendanceExceptions: 0, pendingApprovals: 0, missingBankDetails: 0 } });
+  const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
+  const [departmentId, setDepartmentId] = useState("");
   useEffect(() => { if (isHrManager) getHrDashboardAction().then(setHrData); }, [isHrManager]);
+  useEffect(() => { if (!isHrManager) getPayrollDashboardAction(period, departmentId).then(setPayrollData).catch(() => undefined); }, [departmentId, isHrManager, period]);
 
   return (
     <div className="space-y-4">
@@ -57,7 +45,7 @@ export default function DashboardPage() {
             <div className="mt-2">
               <div className="text-xl font-bold font-mono tracking-tight text-foreground">{hrData.headcount}</div>
               <p className="text-[11px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1">
-                <span className="text-emerald-600 font-medium">+6</span> new hires this quarter
+                Live active employee records
               </p>
             </div>
           </Card>
@@ -103,10 +91,8 @@ export default function DashboardPage() {
               <DollarSign className="w-3.5 h-3.5" />
             </div>
             <div className="mt-2">
-              <div className="text-xl font-bold font-mono tracking-tight text-foreground">$460,000.00</div>
-              <p className="text-[11px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1">
-                <span className="text-emerald-600 font-medium">+4.2%</span> from prior batch
-              </p>
+              <div className="text-xl font-bold font-mono tracking-tight text-foreground">${payrollData.totalNetPaid.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
+              <p className="text-[11px] text-muted-foreground font-mono mt-0.5">Paid payroll for selected period</p>
             </div>
           </Card>
 
@@ -116,8 +102,8 @@ export default function DashboardPage() {
               <Users className="w-3.5 h-3.5" />
             </div>
             <div className="mt-2">
-              <div className="text-xl font-bold font-mono tracking-tight text-foreground">124</div>
-              <p className="text-[11px] text-muted-foreground font-mono mt-0.5">All verified active employees</p>
+              <div className="text-xl font-bold font-mono tracking-tight text-foreground">{payrollData.payslipsGenerated}</div>
+              <p className="text-[11px] text-muted-foreground font-mono mt-0.5">Generated payslips</p>
             </div>
           </Card>
 
@@ -127,7 +113,7 @@ export default function DashboardPage() {
               <TrendingUp className="w-3.5 h-3.5" />
             </div>
             <div className="mt-2">
-              <div className="text-xl font-bold font-mono tracking-tight text-foreground">$3,709.67</div>
+              <div className="text-xl font-bold font-mono tracking-tight text-foreground">${payrollData.averageNet.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
               <p className="text-[11px] text-muted-foreground font-mono mt-0.5">Per employee/period</p>
             </div>
           </Card>
@@ -138,7 +124,7 @@ export default function DashboardPage() {
               <Calendar className="w-3.5 h-3.5" />
             </div>
             <div className="mt-2">
-              <div className="text-xl font-bold font-mono tracking-tight text-foreground">45 Days</div>
+              <div className="text-xl font-bold font-mono tracking-tight text-foreground">{payrollData.approvedLeave} Days</div>
               <p className="text-[11px] text-muted-foreground font-mono mt-0.5">Current month cycle</p>
             </div>
           </Card>
@@ -146,6 +132,18 @@ export default function DashboardPage() {
       )}
 
       {/* Chart Card */}
+      {!isHrManager && (
+        <div className="p-2 rounded-lg border border-border bg-card flex items-center gap-3">
+          <label className="text-[11px] font-mono text-muted-foreground" htmlFor="dashboard-period">Period</label>
+          <input id="dashboard-period" type="month" value={period} onChange={(event) => setPeriod(event.target.value)} className="h-7 rounded-md border border-input bg-background px-2 text-xs font-mono" />
+          <label className="text-[11px] font-mono text-muted-foreground" htmlFor="dashboard-department">Department</label>
+          <select id="dashboard-department" value={departmentId} onChange={(event) => setDepartmentId(event.target.value)} className="h-7 rounded-md border border-input bg-background px-2 text-xs">
+            <option value="">All departments</option>
+            {payrollData.departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+          </select>
+        </div>
+      )}
+
       <Card className="p-4">
         <div className="flex items-center justify-between pb-3 border-b border-border">
           <div>
@@ -160,7 +158,7 @@ export default function DashboardPage() {
 
         <div className="h-[240px] w-full pt-4">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={isHrManager ? hrData.departments : payrollDepartmentData}>
+            <BarChart data={isHrManager ? hrData.departments : payrollData.salaryByDepartment}>
               <XAxis
                 dataKey="name"
                 stroke="hsl(var(--muted-foreground))"
@@ -199,6 +197,20 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </div>
       </Card>
+
+      {!isHrManager && (
+        <Card className="p-4">
+          <CardHeader className="p-0 pb-3">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider font-mono text-muted-foreground">Payroll Alerts</CardTitle>
+            <CardDescription className="text-[11px]">Operational items requiring review for the selected period.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="rounded-md border border-border p-2 text-xs"><span className="font-mono font-semibold">{payrollData.alerts.missingBankDetails}</span><span className="ml-1.5 text-muted-foreground">missing bank details</span></div>
+            <div className="rounded-md border border-border p-2 text-xs"><span className="font-mono font-semibold">{payrollData.alerts.attendanceExceptions}</span><span className="ml-1.5 text-muted-foreground">attendance exceptions</span></div>
+            <div className="rounded-md border border-border p-2 text-xs"><span className="font-mono font-semibold">{payrollData.alerts.pendingApprovals}</span><span className="ml-1.5 text-muted-foreground">pending leave approvals</span></div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
