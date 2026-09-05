@@ -1,0 +1,9 @@
+{
+  "name": "@peoplepay360/ui",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"ui package intentionally empty for MVP\"",
+    "lint": "echo \"ui package intentionally empty for MVP\""
+  }
+}
