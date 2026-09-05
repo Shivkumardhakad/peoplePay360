@@ -2113,6 +2113,7 @@
 
 ### Validation
 - `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `pnpm --filter web build` — passed on retry; first run hit a transient Next static-generation webpack runtime error.
 - `git diff --check` — passed.
 
 ### Notes
@@ -2144,3 +2145,24 @@
 ### Notes
 - Audit logs currently aggregate payroll audit findings; a full cross-module immutable activity-log store would be a separate compliance enhancement.
 - Schedule deactivation is blocked while active contracts reference the schedule.
+## 2026-09-06 12:45 IST — Add report segmentation and salary category administration
+
+### Summary
+- Added live department and employee-type filters to payroll reports with recalculated filtered totals.
+- Added salary-rule category create, edit, and delete controls for payroll managers.
+
+### Files Changed
+- `apps/web/app/(app)/reports/page.tsx`: Added department and employee-type filters.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: Added category administration UI.
+- `apps/web/lib/api-actions.ts`: Added category CRUD actions and server-side report segmentation.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Complete the remaining operational filtering and payroll configuration requirements using live API and database records.
+
+### Validation
+- `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Employee type is resolved from the contract applicable to the selected report range; records without an applicable contract are shown as `UNKNOWN`.

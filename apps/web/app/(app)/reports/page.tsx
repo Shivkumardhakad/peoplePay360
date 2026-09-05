@@ -14,11 +14,13 @@ export default function PayrollReportsPage() {
   const [from, setFrom] = useState(`${now.getFullYear()}-01-01`);
   const [to, setTo] = useState(now.toISOString().slice(0, 10));
   const [status, setStatus] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
+  const [employeeType, setEmployeeType] = useState("");
   const [report, setReport] = useState<any>(null);
 
   useEffect(() => {
-    getPayrollReportAction(from, to, status).then(setReport).catch((error) => toast({ title: "Unable to load reports", description: error.message, type: "error" }));
-  }, [from, status, to, toast]);
+    getPayrollReportAction(from, to, status, departmentId, employeeType).then(setReport).catch((error) => toast({ title: "Unable to load reports", description: error.message, type: "error" }));
+  }, [from, status, to, departmentId, employeeType, toast]);
 
   const summary = report?.summary;
   return (
@@ -35,6 +37,8 @@ export default function PayrollReportsPage() {
         <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-7 rounded-md border border-input bg-background px-2 text-xs">
           <option value="">All statuses</option><option value="DRAFT">Draft</option><option value="COMPUTED">Computed</option><option value="VALIDATED">Validated</option><option value="PAID">Paid</option>
         </select>
+        <select value={departmentId} onChange={(event) => setDepartmentId(event.target.value)} className="h-7 rounded-md border border-input bg-background px-2 text-xs"><option value="">All departments</option>{(report?.departments ?? []).map((department: any) => <option key={department.id} value={department.id}>{department.name}</option>)}</select>
+        <select value={employeeType} onChange={(event) => setEmployeeType(event.target.value)} className="h-7 rounded-md border border-input bg-background px-2 text-xs"><option value="">All employee types</option><option value="FULL_TIME">Full time</option><option value="PART_TIME">Part time</option><option value="CONTRACTOR">Contractor</option></select>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
         {[['Payruns', summary?.payrunCount ?? 0], ['Payslips', summary?.payslipCount ?? 0], ['Gross', `$${Number(summary?.grossAmount ?? 0).toLocaleString()}`], ['Deductions', `$${Number(summary?.deductionAmount ?? 0).toLocaleString()}`], ['Net', `$${Number(summary?.netAmount ?? 0).toLocaleString()}`]].map(([label, value]) => <Card key={String(label)} className="p-3"><p className="text-[10px] uppercase font-mono text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold font-mono">{value}</p></Card>)}

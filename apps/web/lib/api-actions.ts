@@ -784,6 +784,21 @@ export async function listPayrollCategoriesAction() {
   return payrollApiFetch<unknown[]>("/api/payroll/salary-rule-categories");
 }
 
+export async function createPayrollCategoryAction(body: unknown) {
+  try { return { success: true, result: await payrollApiFetch("/api/payroll/salary-rule-categories", { method: "POST", body }) }; }
+  catch (error) { return { success: false, error: payrollUnavailableMessage(error) }; }
+}
+
+export async function updatePayrollCategoryAction(id: string, body: unknown) {
+  try { return { success: true, result: await payrollApiFetch(`/api/payroll/salary-rule-categories/${id}`, { method: "PUT", body }) }; }
+  catch (error) { return { success: false, error: payrollUnavailableMessage(error) }; }
+}
+
+export async function deletePayrollCategoryAction(id: string) {
+  try { await payrollApiFetch(`/api/payroll/salary-rule-categories/${id}`, { method: "DELETE" }); return { success: true }; }
+  catch (error) { return { success: false, error: payrollUnavailableMessage(error) }; }
+}
+
 export async function createPayrollRuleAction(body: unknown) {
   try {
     const result = await payrollApiFetch("/api/payroll/salary-rules", { method: "POST", body });
@@ -833,7 +848,7 @@ export async function getPayrunAction(id: string) {
   return payrollApiFetch(`/api/payroll/payruns/${id}`);
 }
 
-export async function getPayrollReportAction(from: string, to: string, status?: string) {
+export async function getPayrollReportAction(from: string, to: string, status?: string, departmentId?: string, employeeType?: string) {
   const query = new URLSearchParams({ from: `${from}T00:00:00`, to: `${to}T23:59:59` });
   if (status) query.set("status", status);
   const [summary, report] = await Promise.all([
@@ -842,12 +857,28 @@ export async function getPayrollReportAction(from: string, to: string, status?: 
   ]);
   const employeeIds: string[] = Array.from(new Set<string>((report.payslips ?? []).map((row: any) => String(row.employeeId ?? "")).filter(Boolean)));
   const [employees, departments] = await Promise.all([
-    prisma.employee.findMany({ where: { id: { in: employeeIds } }, select: { id: true, firstName: true, lastName: true, departmentId: true } }),
+    prisma.employee.findMany({
+      where: { id: { in: employeeIds } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        departmentId: true,
+        contracts: {
+          where: { startDate: { lte: new Date(`${to}T23:59:59`) }, OR: [{ endDate: null }, { endDate: { gte: new Date(`${from}T00:00:00`) } }] },
+          orderBy: { startDate: "desc" },
+          take: 1,
+          select: { employmentType: true },
+        },
+      },
+    }),
     prisma.department.findMany({ select: { id: true, name: true } }),
   ]);
   const employeeMap = new Map(employees.map((employee) => [employee.id, employee]));
   const departmentMap = new Map(departments.map((department) => [department.id, department.name]));
-  return { summary, payslips: (report.payslips ?? []).map((row: any) => ({ ...row, employeeName: employeeMap.get(row.employeeId) ? `${employeeMap.get(row.employeeId)?.firstName} ${employeeMap.get(row.employeeId)?.lastName}` : "Unknown employee", department: departmentMap.get(employeeMap.get(row.employeeId)?.departmentId ?? "") ?? "Unassigned" })) };
+  const payslips = (report.payslips ?? []).map((row: any) => ({ ...row, employeeName: employeeMap.get(row.employeeId) ? `${employeeMap.get(row.employeeId)?.firstName} ${employeeMap.get(row.employeeId)?.lastName}` : "Unknown employee", department: departmentMap.get(employeeMap.get(row.employeeId)?.departmentId ?? "") ?? "Unassigned", departmentId: employeeMap.get(row.employeeId)?.departmentId ?? "", employeeType: employeeMap.get(row.employeeId)?.contracts[0]?.employmentType ?? "UNKNOWN" })).filter((row: any) => (!departmentId || row.departmentId === departmentId) && (!employeeType || row.employeeType === employeeType));
+  const filteredSummary = { ...summary, payslipCount: payslips.length, payrunCount: new Set(payslips.map((row: any) => row.payrunId)).size, grossAmount: payslips.reduce((total: number, row: any) => total + Number(row.grossAmount ?? 0), 0), deductionAmount: payslips.reduce((total: number, row: any) => total + Number(row.deductionAmount ?? 0), 0), netAmount: payslips.reduce((total: number, row: any) => total + Number(row.netAmount ?? 0), 0) };
+  return { summary: filteredSummary, payslips, departments: departments.map((department) => ({ id: department.id, name: department.name })) };
 }
 
 export async function getPayrollAuditAction(payrunId: string) {

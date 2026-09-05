@@ -6,10 +6,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast";
 import { SalaryRuleForm, type SalaryRuleFormValues } from "@/components/salary-rule-form";
 import { Sparkles, Trash2, Loader2, Lock } from "lucide-react";
-import { createPayrollRuleAction, deactivatePayrollRuleAction, listPayrollCategoriesAction, listPayrollRulesAction } from "@/lib/api-actions";
+import { createPayrollCategoryAction, createPayrollRuleAction, deactivatePayrollRuleAction, deletePayrollCategoryAction, listPayrollCategoriesAction, listPayrollRulesAction, updatePayrollCategoryAction } from "@/lib/api-actions";
 
 interface RuleItem {
   id: string;
@@ -27,6 +29,11 @@ export default function SalaryRulesPage() {
   const [rules, setRules] = useState<RuleItem[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryCode, setCategoryCode] = useState("");
+  const [categoryType, setCategoryType] = useState("EARNING");
+  const [categoryDescription, setCategoryDescription] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
   const role = session?.user?.role || "ADMIN";
   const canEdit =
@@ -55,6 +62,19 @@ export default function SalaryRulesPage() {
       description: `Rule ${name} (${id}) has been removed.`,
       type: "info",
     });
+  };
+
+  const saveCategory = async () => {
+    const body = { name: categoryName, ...(editingCategoryId ? {} : { code: categoryCode }), type: categoryType, description: categoryDescription };
+    const result = editingCategoryId ? await updatePayrollCategoryAction(editingCategoryId, body) : await createPayrollCategoryAction(body);
+    if (!result.success) { toast({ title: "Category save failed", description: result.error, type: "error" }); return; }
+    const loaded = await listPayrollCategoriesAction(); setCategories(loaded as any[]); setCategoryName(""); setCategoryCode(""); setCategoryDescription(""); setEditingCategoryId(null); toast({ title: editingCategoryId ? "Category updated" : "Category created", type: "success" });
+  };
+
+  const removeCategory = async (id: string) => {
+    const result = await deletePayrollCategoryAction(id);
+    if (!result.success) { toast({ title: "Category delete failed", description: result.error, type: "error" }); return; }
+    setCategories((current) => current.filter((category) => category.id !== id));
   };
 
   return (
@@ -155,6 +175,15 @@ export default function SalaryRulesPage() {
                     setRules((loaded as any[]).map((rule) => ({ ...rule, category: categories.find((item) => item.id === rule.categoryId)?.code ?? rule.categoryId, type: rule.calculationType })));
                   }}
                 />
+              </CardContent>
+            </Card>
+            <Card className="mt-3">
+              <CardHeader className="border-b border-border pb-3"><CardTitle className="text-xs font-semibold uppercase tracking-wider font-mono text-muted-foreground">Rule Categories</CardTitle></CardHeader>
+              <CardContent className="space-y-2 pt-3">
+                <div className="grid grid-cols-2 gap-2"><div><Label className="text-[10px]">Name</Label><Input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} className="h-7 text-xs" placeholder="Earnings" /></div><div><Label className="text-[10px]">Code</Label><Input value={categoryCode} disabled={Boolean(editingCategoryId)} onChange={(event) => setCategoryCode(event.target.value.toUpperCase())} className="h-7 text-xs font-mono" placeholder="EARN" /></div></div>
+                <div className="grid grid-cols-2 gap-2"><select value={categoryType} onChange={(event) => setCategoryType(event.target.value)} className="h-7 rounded-md border border-input bg-background px-2 text-xs"><option value="EARNING">Earning</option><option value="DEDUCTION">Deduction</option><option value="AGGREGATE">Aggregate</option></select><Input value={categoryDescription} onChange={(event) => setCategoryDescription(event.target.value)} className="h-7 text-xs" placeholder="Description" /></div>
+                <div className="flex justify-end"><Button size="sm" className="h-7 text-xs" onClick={() => void saveCategory()}>{editingCategoryId ? "Update" : "Add category"}</Button></div>
+                <div className="space-y-1">{categories.map((category) => <div key={category.id} className="flex items-center justify-between rounded border px-2 py-1.5 text-[11px]"><span><Badge variant="outline" className="mr-1 text-[9px]">{category.code}</Badge>{category.name}</span><span className="flex gap-1"><Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px]" onClick={() => { setEditingCategoryId(category.id); setCategoryName(category.name); setCategoryCode(category.code); setCategoryType(category.type); setCategoryDescription(category.description ?? ""); }}>Edit</Button><Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px] text-destructive" onClick={() => void removeCategory(category.id)}>Delete</Button></span></div>)}</div>
               </CardContent>
             </Card>
           </div>
