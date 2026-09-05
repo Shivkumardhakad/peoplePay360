@@ -2,40 +2,75 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, Download, ArrowRight, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/components/ui/toast";
+import { generatePayslipPDF } from "@/lib/payslip-pdf";
 
 const MOCK_PAYSLIPS = [
   {
     id: "PS-1001",
-    employee: "Alice Johnson",
+    employeeName: "Alice Johnson",
+    employeeId: "EMP-001",
+    department: "Engineering",
+    position: "Senior Frontend Engineer",
     period: "2023-10",
     payrun: "October 2023 Payroll",
+    contractRef: "CON-1001 (Standard Tech)",
     gross: 10000,
     deductions: 2500,
     net: 7500,
-    status: "PAID",
+    status: "PAID" as const,
+    lines: [
+      { rule: "Basic Salary", category: "BASIC", amount: 8000.0, type: "EARNING" as const },
+      { rule: "Housing Allowance (HRA)", category: "ALLOWANCE", amount: 1500.0, type: "EARNING" as const },
+      { rule: "Transport & Remote Allowance", category: "ALLOWANCE", amount: 500.0, type: "EARNING" as const },
+      { rule: "Income Tax Withholding", category: "DEDUCTION", amount: -1800.0, type: "DEDUCTION" as const },
+      { rule: "Retirement / Provident Fund", category: "DEDUCTION", amount: -400.0, type: "DEDUCTION" as const },
+      { rule: "Health & Medical Insurance", category: "DEDUCTION", amount: -300.0, type: "DEDUCTION" as const },
+    ],
   },
   {
     id: "PS-1002",
-    employee: "Bob Smith",
+    employeeName: "Bob Smith",
+    employeeId: "EMP-002",
+    department: "Human Resources",
+    position: "HR Manager",
     period: "2023-10",
     payrun: "October 2023 Payroll",
+    contractRef: "CON-1002 (HR Package)",
     gross: 7916.67,
     deductions: 1800,
     net: 6116.67,
-    status: "PAID",
+    status: "PAID" as const,
+    lines: [
+      { rule: "Basic Salary", category: "BASIC", amount: 6500.0, type: "EARNING" as const },
+      { rule: "Housing Allowance", category: "ALLOWANCE", amount: 1416.67, type: "EARNING" as const },
+      { rule: "Income Tax Withholding", category: "DEDUCTION", amount: -1400.0, type: "DEDUCTION" as const },
+      { rule: "Provident Fund", category: "DEDUCTION", amount: -400.0, type: "DEDUCTION" as const },
+    ],
   },
   {
     id: "PS-1101",
-    employee: "Alice Johnson",
+    employeeName: "Alice Johnson",
+    employeeId: "EMP-001",
+    department: "Engineering",
+    position: "Senior Frontend Engineer",
     period: "2023-11",
     payrun: "November 2023 Payroll",
-    gross: 0,
-    deductions: 0,
-    net: 0,
-    status: "DRAFT",
+    contractRef: "CON-1001 (Standard Tech)",
+    gross: 10000,
+    deductions: 2500,
+    net: 7500,
+    status: "DRAFT" as const,
+    lines: [
+      { rule: "Basic Salary", category: "BASIC", amount: 8000.0, type: "EARNING" as const },
+      { rule: "Allowances", category: "ALLOWANCE", amount: 2000.0, type: "EARNING" as const },
+      { rule: "Deductions", category: "DEDUCTION", amount: -2500.0, type: "DEDUCTION" as const },
+    ],
   },
 ];
 
@@ -44,77 +79,140 @@ function money(value: number) {
 }
 
 export default function PayslipsPage() {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const filteredPayslips = MOCK_PAYSLIPS.filter(p =>
-    p.employee.toLowerCase().includes(search.toLowerCase()) ||
-    p.payrun.toLowerCase().includes(search.toLowerCase()) ||
-    p.period.includes(search)
+  const filteredPayslips = MOCK_PAYSLIPS.filter(
+    (p) =>
+      p.employeeName.toLowerCase().includes(search.toLowerCase()) ||
+      p.payrun.toLowerCase().includes(search.toLowerCase()) ||
+      p.period.includes(search) ||
+      p.id.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleDownload = async (slip: (typeof MOCK_PAYSLIPS)[0]) => {
+    setDownloadingId(slip.id);
+    await new Promise((r) => setTimeout(r, 500));
+
+    try {
+      generatePayslipPDF(slip);
+      toast({
+        title: "Payslip Downloaded",
+        description: `Exported PDF for ${slip.employeeName} (${slip.id}).`,
+        type: "success",
+      });
+    } catch {
+      toast({
+        title: "Download Failed",
+        description: "Failed to generate PDF.",
+        type: "error",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Payslips</h1>
-          <p className="text-sm text-muted-foreground">Generated employee salary statements ready for review and delivery.</p>
+          <h1 className="text-base font-semibold tracking-tight text-foreground">Payslips</h1>
+          <p className="text-xs text-muted-foreground">Generated employee salary statements ready for review and delivery.</p>
         </div>
       </div>
 
-      {/* Glass Filter Bar */}
-      <div className="p-4 pp-glass flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search payslips..." 
+      {/* Filter Bar */}
+      <div className="p-2 rounded-lg border border-border bg-card flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Filter payslips..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-background/80" 
+            className="pl-8 h-7 text-xs"
           />
         </div>
-        <div className="text-xs font-mono text-muted-foreground">
-          Showing <span className="font-bold text-foreground">{filteredPayslips.length}</span> payslips
-        </div>
+        <span className="text-[11px] font-mono text-muted-foreground">
+          {filteredPayslips.length} payslips
+        </span>
       </div>
 
-      {/* Solid Surface Table */}
-      <div className="pp-solid-surface overflow-hidden">
+      {/* Table */}
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="border-b border-border bg-muted/20">
-              <TableHead>Payslip Ref</TableHead>
+            <TableRow>
+              <TableHead className="w-[95px]">Ref</TableHead>
               <TableHead>Employee</TableHead>
-              <TableHead>Payrun Batch</TableHead>
+              <TableHead>Batch</TableHead>
               <TableHead>Period</TableHead>
               <TableHead className="text-right">Gross</TableHead>
               <TableHead className="text-right">Deductions</TableHead>
-              <TableHead className="text-right font-bold">Net Salary</TableHead>
+              <TableHead className="text-right font-semibold">Net Salary</TableHead>
               <TableHead className="text-right">Status</TableHead>
+              <TableHead className="w-[140px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredPayslips.map((payslip) => (
-              <TableRow key={payslip.id} className="hover:bg-muted/50 border-b border-border/60">
-                <TableCell className="font-mono text-xs text-muted-foreground">{payslip.id}</TableCell>
-                <TableCell className="font-medium text-foreground">
-                  <Link href={`/payroll/payslips/${payslip.id}`} className="hover:underline">
-                    {payslip.employee}
-                  </Link>
-                </TableCell>
-                <TableCell>{payslip.payrun}</TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">{payslip.period}</TableCell>
-                <TableCell className="text-right font-mono text-xs text-muted-foreground">{money(payslip.gross)}</TableCell>
-                <TableCell className="text-right font-mono text-xs text-destructive">-{money(payslip.deductions)}</TableCell>
-                <TableCell className="text-right font-mono text-xs font-bold text-accent">{money(payslip.net)}</TableCell>
-                <TableCell className="text-right">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    payslip.status === "PAID" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
-                  }`}>
-                    {payslip.status}
-                  </span>
+            {filteredPayslips.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="h-20 text-center text-xs text-muted-foreground">
+                  No payslips found.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              filteredPayslips.map((payslip) => {
+                const isDownloading = downloadingId === payslip.id;
+
+                return (
+                  <TableRow key={payslip.id}>
+                    <TableCell className="font-mono text-[11px] text-muted-foreground">{payslip.id}</TableCell>
+                    <TableCell className="font-medium text-xs">
+                      <Link href={`/payroll/payslips/${payslip.id}`} className="hover:underline">
+                        {payslip.employeeName}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{payslip.payrun}</TableCell>
+                    <TableCell className="font-mono text-[11px] text-muted-foreground">{payslip.period}</TableCell>
+                    <TableCell className="text-right font-mono text-xs text-muted-foreground">{money(payslip.gross)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs text-rose-600">-{money(payslip.deductions)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs font-semibold">{money(payslip.net)}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge
+                        variant={payslip.status === "PAID" ? "success" : "secondary"}
+                        className="text-[10px] font-mono"
+                      >
+                        {payslip.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right p-1.5">
+                      <div className="flex justify-end items-center gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownload(payslip)}
+                          disabled={isDownloading}
+                          className="h-6 px-2 text-[11px] gap-1"
+                        >
+                          {isDownloading ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Download className="w-3 h-3" />
+                          )}
+                          <span>{isDownloading ? "PDF..." : "PDF"}</span>
+                        </Button>
+                        <Link href={`/payroll/payslips/${payslip.id}`}>
+                          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Button>
+                        </Link>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
 const sans = IBM_Plex_Sans({
@@ -15,19 +16,19 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PeoplePay360",
-  description: "Integrated HR and payroll management platform"
+  title: "PeoplePay360 — HR & Payroll Ledger",
+  description: "Integrated HR and payroll management platform",
 };
 
 export default function RootLayout({
-  children
+  children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
     <html lang="en">
       <body className={`${sans.variable} ${mono.variable} font-sans antialiased bg-background text-foreground`}>
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

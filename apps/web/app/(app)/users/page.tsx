@@ -6,21 +6,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Search, ShieldCheck } from "lucide-react";
-
-const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:3001/api/hr";
-
-type UserRole = "ADMIN" | "HR_MANAGER" | "PAYROLL_MANAGER" | "EMPLOYEE";
+import { useToast } from "@/components/ui/toast";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, ShieldCheck, Loader2, KeyRound } from "lucide-react";
+import {
+  getUsersAction,
+  createUserAction,
+  resetUserPasswordAction,
+  type SystemUserRole,
+} from "@/lib/api-actions";
 
 type SystemUser = {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: SystemUserRole;
   employeeId?: string | null;
+  createdAt?: string | Date;
 };
 
-function formatRoleLabel(role: UserRole) {
+const INITIAL_USERS: SystemUser[] = [
+  { id: "USR-001", name: "Admin User", email: "admin@peoplepay360.local", role: "ADMIN" },
+  { id: "USR-002", name: "Bob Smith", email: "hr.manager@peoplepay360.local", role: "HR_MANAGER" },
+  { id: "USR-003", name: "Alice Johnson", email: "payroll.manager@peoplepay360.local", role: "PAYROLL_MANAGER" },
+  { id: "USR-004", name: "Emily Watson", email: "employee@peoplepay360.local", role: "EMPLOYEE" },
+];
+
+function formatRoleLabel(role: SystemUserRole) {
   switch (role) {
     case "ADMIN":
       return "Admin";
@@ -28,111 +40,189 @@ function formatRoleLabel(role: UserRole) {
       return "HR Manager";
     case "PAYROLL_MANAGER":
       return "Payroll Manager";
+    case "HR_PAYROLL_USER":
+      return "Payroll User";
     case "EMPLOYEE":
       return "Employee";
+    default:
+      return role;
   }
 }
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<SystemUser[]>([]);
+  const { toast } = useToast();
+  const [users, setUsers] = useState<SystemUser[]>(INITIAL_USERS);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<UserRole>("HR_MANAGER");
+  const [role, setRole] = useState<SystemUserRole>("HR_MANAGER");
   const [password, setPassword] = useState("");
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadUsers() {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`${HR_API_URL}/users`, { cache: "no-store" });
-        if (!response.ok) throw new Error(await readError(response));
-        const data = await response.json();
-        if (mounted) setUsers(data);
-      } catch (err) {
-        if (mounted) setError(err instanceof Error ? err.message : "Unable to load users");
-      } finally {
-        if (mounted) setLoading(false);
+  const loadUsers = async () => {
+    try {
+      const res = await getUsersAction();
+      if (res.success && res.users && res.users.length > 0) {
+        setUsers(
+          res.users.map((u) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role as SystemUserRole,
+            employeeId: u.employeeId,
+            createdAt: u.createdAt,
+          }))
+        );
       }
+    } catch {
+      // Keep initial users on network failure
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     void loadUsers();
-
-    return () => {
-      mounted = false;
-    };
   }, []);
 
   const filteredUsers = useMemo(() => {
-    const term = search.toLowerCase();
-    return users.filter((u) =>
-      u.name.toLowerCase().includes(term) ||
-      u.email.toLowerCase().includes(term) ||
-      u.role.toLowerCase().includes(term)
+    const term = search.toLowerCase().trim();
+    if (!term) return users;
+    return users.filter(
+      (u) =>
+        u.name.toLowerCase().includes(term) ||
+        u.email.toLowerCase().includes(term) ||
+        u.role.toLowerCase().includes(term) ||
+        u.id.toLowerCase().includes(term)
     );
   }, [search, users]);
 
+  const handleResetPassword = async (id: string, userName: string) => {
+    setActionLoadingId(id);
+    try {
+      const res = await resetUserPasswordAction(id);
+      if (res.success) {
+        toast({
+          title: "Password Reset Successful",
+          description: `Temporary password for ${userName} set to: ${res.temporaryPassword}`,
+          type: "success",
+        });
+      } else {
+        toast({
+          title: "Password Reset Failed",
+          description: res.error || "Unable to reset password.",
+          type: "error",
+        });
+      }
+    } catch (err: unknown) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to reset password.",
+        type: "error",
+      });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password) return;
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanName || !cleanEmail || !cleanPassword) {
+      setError("Please fill out all required fields.");
+      return;
+    }
+
+    if (cleanPassword.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
+
     try {
-      const response = await fetch(`${HR_API_URL}/users`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          role,
-          password
-        })
+      const res = await createUserAction({
+        name: cleanName,
+        email: cleanEmail,
+        role,
+        password: cleanPassword,
       });
 
-      if (!response.ok) throw new Error(await readError(response));
-      const createdUser = await response.json();
+      if (!res.success || !res.user) {
+        setError(res.error || "Failed to create user");
+        setSubmitting(false);
+        toast({
+          title: "User Creation Failed",
+          description: res.error || "Could not save user to the database.",
+          type: "error",
+        });
+        return;
+      }
 
-      setUsers((currentUsers) => [...currentUsers, createdUser].sort((a, b) => a.email.localeCompare(b.email)));
+      const createdUser: SystemUser = {
+        id: res.user.id,
+        name: res.user.name,
+        email: res.user.email,
+        role: res.user.role as SystemUserRole,
+        employeeId: res.user.employeeId,
+        createdAt: res.user.createdAt,
+      };
+
+      setUsers((current) => [createdUser, ...current]);
+      toast({
+        title: "User Created Successfully",
+        description: `${createdUser.name} (${createdUser.email}) can now log in immediately.`,
+        type: "success",
+      });
+
       setName("");
       setEmail("");
       setPassword("");
       setRole("HR_MANAGER");
       setDialogOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create user");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setError(msg);
+      toast({
+        title: "System Error",
+        description: msg,
+        type: "error",
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-accent" />
-            <h1 className="text-2xl font-bold tracking-tight">Team & Roles</h1>
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-primary" />
+            <h1 className="text-base font-semibold tracking-tight text-foreground">Team & Roles</h1>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage system access and assign user roles.</p>
+          <p className="text-xs text-muted-foreground">
+            Administer user accounts, security profiles, and role-based access permissions.
+          </p>
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
-              <Plus className="w-4 h-4" />
+            <Button size="sm" className="gap-1.5 h-8">
+              <Plus className="w-3.5 h-3.5" />
               Add User
             </Button>
           </DialogTrigger>
-          <DialogContent className="pp-solid-surface sm:max-w-md">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Create System User</DialogTitle>
             </DialogHeader>
@@ -142,8 +232,8 @@ export default function UsersPage() {
                   {error}
                 </p>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="name" className="text-xs font-medium">Full Name</Label>
                 <Input
                   id="name"
                   placeholder="e.g. Sarah Connor"
@@ -153,54 +243,56 @@ export default function UsersPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-xs font-medium">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="sarah@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="font-mono text-sm"
+                  className="font-mono text-xs"
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="role">Assigned Role</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="role" className="text-xs font-medium">Assigned Role</Label>
                 <select
                   id="role"
                   value={role}
-                  onChange={(e) => setRole(e.target.value as UserRole)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  onChange={(e) => setRole(e.target.value as SystemUserRole)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="HR_MANAGER">HR_MANAGER</option>
-                  <option value="PAYROLL_MANAGER">PAYROLL_MANAGER</option>
-                  <option value="EMPLOYEE">EMPLOYEE</option>
+                  <option value="ADMIN">ADMIN (Full Access)</option>
+                  <option value="HR_MANAGER">HR_MANAGER (People, Contracts, Time-off)</option>
+                  <option value="PAYROLL_MANAGER">PAYROLL_MANAGER (Payroll & Ledger)</option>
+                  <option value="HR_PAYROLL_USER">HR_PAYROLL_USER (Payroll & Time-off Assistant)</option>
+                  <option value="EMPLOYEE">EMPLOYEE (Self-Service Portal)</option>
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Temporary Password</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-xs font-medium">Temporary Password</Label>
                 <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="font-mono text-sm"
+                  className="font-mono text-xs"
                   minLength={8}
                   required
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(false)} disabled={submitting}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                  {submitting ? "Creating..." : "Create User"}
+                <Button type="submit" size="sm" disabled={submitting} className="gap-1.5 h-8">
+                  {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {submitting ? "Creating User..." : "Create User"}
                 </Button>
               </div>
             </form>
@@ -208,80 +300,97 @@ export default function UsersPage() {
         </Dialog>
       </div>
 
-      {/* Filter bar as glass */}
-      <div className="p-4 pp-glass flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by name, email, or role..." 
+      {/* Filter bar */}
+      <div className="p-2 rounded-lg border border-border bg-card flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search users..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-background/80 font-mono text-sm" 
+            className="pl-8 h-7 text-xs"
           />
         </div>
-        <div className="text-xs font-mono text-muted-foreground">
-          {loading ? "Loading user records..." : <>Showing <span className="font-bold text-foreground">{filteredUsers.length}</span> user records</>}
+        <div className="flex items-center gap-2">
+          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+          <span className="text-[11px] font-mono text-muted-foreground">
+            {filteredUsers.length} users
+          </span>
         </div>
       </div>
 
-      {error && !dialogOpen && (
-        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
-          {error}
-        </p>
-      )}
-
-      {/* Solid Surface Table */}
-      <div className="pp-solid-surface overflow-hidden">
+      {/* Table */}
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="border-b border-border bg-muted/20">
-              <TableHead className="w-[100px]">User ID</TableHead>
+            <TableRow>
+              <TableHead className="w-[110px]">User ID</TableHead>
               <TableHead>User Name</TableHead>
               <TableHead>Email Address</TableHead>
-              <TableHead>Assigned Role</TableHead>
+              <TableHead>Role</TableHead>
               <TableHead className="text-right">Status</TableHead>
+              <TableHead className="w-[110px] text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {!loading && filteredUsers.length === 0 && (
+            {loading && users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    <span>Loading users...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredUsers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
                   No users found.
                 </TableCell>
               </TableRow>
+            ) : (
+              filteredUsers.map((u) => {
+                const isResetting = actionLoadingId === u.id;
+
+                return (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-mono text-[11px] text-muted-foreground truncate max-w-[110px]">{u.id}</TableCell>
+                    <TableCell className="font-medium text-xs">{u.name}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{u.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px] font-mono">
+                        {formatRoleLabel(u.role)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="success" className="text-[10px] font-mono">
+                        Active
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right p-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleResetPassword(u.id, u.name)}
+                        disabled={isResetting}
+                        className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1"
+                        title="Reset user password"
+                      >
+                        {isResetting ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <KeyRound className="w-3 h-3 text-muted-foreground" />
+                        )}
+                        <span>{isResetting ? "Resetting..." : "Reset PW"}</span>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
-            {filteredUsers.map((u) => (
-              <TableRow key={u.id} className="hover:bg-muted/50 border-b border-border/60">
-                <TableCell className="font-mono text-xs text-muted-foreground">{u.id}</TableCell>
-                <TableCell className="font-medium text-foreground">{u.name}</TableCell>
-                <TableCell className="font-mono text-xs">{u.email}</TableCell>
-                <TableCell>
-                  <span className="font-mono text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-                    {formatRoleLabel(u.role)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-success/10 text-success">
-                    Active
-                  </span>
-                </TableCell>
-              </TableRow>
-            ))}
           </TableBody>
         </Table>
       </div>
     </div>
   );
-}
-
-async function readError(response: Response) {
-  const fallback = `Request failed with status ${response.status}`;
-  try {
-    const data = await response.json();
-    if (typeof data.message === "string") return data.message;
-    if (Array.isArray(data.message)) return data.message.join(", ");
-    return fallback;
-  } catch {
-    return fallback;
-  }
 }

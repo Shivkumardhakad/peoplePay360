@@ -435,15 +435,47 @@ export class HrService {
   }
   async createUser(data: CreateUserInput) {
     const { email, password, temporaryPassword, passwordHash, ...userData } = data;
-    if (!email?.trim()) throw new BadRequestException("Email is required");
+    const normalizedEmail = email?.toLowerCase().trim();
+    if (!normalizedEmail) throw new BadRequestException("Email is required");
 
-    return this.prisma.client.user.create({
-      data: {
-        ...userData,
-        email: email.toLowerCase().trim(),
-        passwordHash: (await this.resolvePasswordHash({ password, temporaryPassword, passwordHash }, true))!
-      },
-      select: this.userSelect()
+    const resolvedPasswordHash = (await this.resolvePasswordHash({ password, temporaryPassword, passwordHash }, true))!;
+
+    return this.prisma.client.$transaction(async (tx) => {
+      let employeeId = userData.employeeId;
+
+      // Employee logins must have an employee record so profile, attendance,
+      // leave and payslip access can be resolved from the authenticated user.
+      if (userData.role === "EMPLOYEE" && !employeeId) {
+        const existingEmployee = await tx.employee.findUnique({ where: { email: normalizedEmail } });
+        if (existingEmployee) {
+          employeeId = existingEmployee.id;
+        } else {
+          const fullName = typeof userData.name === "string" ? userData.name.trim() : "Employee";
+          const [firstName, ...lastNameParts] = fullName.split(/\s+/);
+          const safeFirstName = firstName || "Employee";
+          const lastName = lastNameParts.join(" ") || safeFirstName;
+          const employee = await tx.employee.create({
+            data: {
+              employeeNumber: `EMP-${Date.now().toString().slice(-8)}`,
+              firstName: safeFirstName,
+              lastName,
+              email: normalizedEmail,
+              hireDate: new Date()
+            }
+          });
+          employeeId = employee.id;
+        }
+      }
+
+      return tx.user.create({
+        data: {
+          ...userData,
+          ...(employeeId ? { employeeId } : {}),
+          email: normalizedEmail,
+          passwordHash: resolvedPasswordHash
+        },
+        select: this.userSelect()
+      });
     });
   }
   async updateUser(id: string, data: UpdateUserInput) {

@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Search, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const MOCK_PAYRUNS = [
@@ -16,7 +18,7 @@ const MOCK_PAYRUNS = [
     structure: "Standard Tech Package",
     employees: 124,
     netTotal: 460000,
-    status: "PAID",
+    status: "PAID" as const,
   },
   {
     id: "PR-2023-11",
@@ -26,94 +28,135 @@ const MOCK_PAYRUNS = [
     structure: "Standard Tech Package",
     employees: 126,
     netTotal: 0,
-    status: "DRAFT",
+    status: "DRAFT" as const,
   },
 ];
 
-function statusClass(status: string) {
-  if (status === "PAID") return "bg-success/10 text-success";
-  if (status === "DRAFT") return "bg-muted text-muted-foreground";
-  return "bg-primary/10 text-primary";
-}
-
 export default function PayrunsPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
-  const filteredPayruns = MOCK_PAYRUNS.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.structure.toLowerCase().includes(search.toLowerCase()) ||
-    p.status.toLowerCase().includes(search.toLowerCase())
+  const filteredPayruns = MOCK_PAYRUNS.filter(
+    (p) =>
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.structure.toLowerCase().includes(search.toLowerCase()) ||
+      p.status.toLowerCase().includes(search.toLowerCase()) ||
+      p.id.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleOpenBatch = (id: string) => {
+    setOpeningId(id);
+    router.push(`/payroll/payruns/${id}`);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Payruns</h1>
-          <p className="text-sm text-muted-foreground">Manage payroll processing batches and lifecycle states.</p>
+          <h1 className="text-base font-semibold tracking-tight text-foreground">Payruns</h1>
+          <p className="text-xs text-muted-foreground">Manage payroll processing batches and lifecycle states.</p>
         </div>
         <Link href="/payroll/payruns/new">
-          <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
-            <Plus className="h-4 w-4" />
+          <Button size="sm" className="gap-1.5 h-8">
+            <Plus className="w-3.5 h-3.5" />
             Create Payrun
           </Button>
         </Link>
       </div>
 
-      {/* Glass Filter Bar */}
-      <div className="p-4 pp-glass flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search payruns..." 
+      {/* Filter Bar */}
+      <div className="p-2 rounded-lg border border-border bg-card flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Filter payrun batches..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-background/80" 
+            className="pl-8 h-7 text-xs"
           />
         </div>
-        <div className="text-xs font-mono text-muted-foreground">
-          Showing <span className="font-bold text-foreground">{filteredPayruns.length}</span> payruns
-        </div>
+        <span className="text-[11px] font-mono text-muted-foreground">
+          {filteredPayruns.length} batches
+        </span>
       </div>
 
-      {/* Solid Surface Table */}
-      <div className="pp-solid-surface overflow-hidden">
+      {/* Table */}
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="border-b border-border bg-muted/20">
-              <TableHead>Payrun Ref</TableHead>
-              <TableHead>Name</TableHead>
+            <TableRow>
+              <TableHead className="w-[100px]">Batch Ref</TableHead>
+              <TableHead>Batch Name</TableHead>
               <TableHead>Period</TableHead>
               <TableHead>Salary Structure</TableHead>
               <TableHead className="text-right">Employees</TableHead>
               <TableHead className="text-right">Net Total</TableHead>
               <TableHead className="text-right">Status</TableHead>
+              <TableHead className="w-[90px] text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredPayruns.map((payrun) => (
-              <TableRow key={payrun.id} className="hover:bg-muted/50 border-b border-border/60">
-                <TableCell className="font-mono text-xs text-muted-foreground">{payrun.id}</TableCell>
-                <TableCell className="font-medium text-foreground">
-                  <Link href={`/payroll/payruns/${payrun.id}`} className="hover:underline">
-                    {payrun.name}
-                  </Link>
-                </TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">
-                  {payrun.periodStart} to {payrun.periodEnd}
-                </TableCell>
-                <TableCell>{payrun.structure}</TableCell>
-                <TableCell className="text-right font-mono text-xs">{payrun.employees}</TableCell>
-                <TableCell className="text-right font-mono text-xs font-medium">
-                  ${payrun.netTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClass(payrun.status)}`}>
-                    {payrun.status}
-                  </span>
+            {filteredPayruns.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-20 text-center text-xs text-muted-foreground">
+                  No payrun batches found.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              filteredPayruns.map((payrun) => {
+                const isOpening = openingId === payrun.id;
+
+                return (
+                  <TableRow key={payrun.id}>
+                    <TableCell className="font-mono text-[11px] text-muted-foreground">{payrun.id}</TableCell>
+                    <TableCell className="font-medium text-xs">
+                      <Link href={`/payroll/payruns/${payrun.id}`} className="hover:underline">
+                        {payrun.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="font-mono text-[11px] text-muted-foreground">
+                      {payrun.periodStart} → {payrun.periodEnd}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{payrun.structure}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{payrun.employees}</TableCell>
+                    <TableCell className="text-right font-mono text-xs font-semibold">
+                      ${payrun.netTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge
+                        variant={
+                          payrun.status === "PAID"
+                            ? "success"
+                            : payrun.status === "DRAFT"
+                            ? "secondary"
+                            : "default"
+                        }
+                        className="text-[10px] font-mono"
+                      >
+                        {payrun.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right p-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenBatch(payrun.id)}
+                        disabled={isOpening}
+                        className="h-6 px-2 text-[11px] gap-1"
+                      >
+                        {isOpening ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <ArrowRight className="w-3 h-3" />
+                        )}
+                        <span>{isOpening ? "Opening..." : "View"}</span>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </div>

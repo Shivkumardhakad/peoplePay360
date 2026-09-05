@@ -948,3 +948,87 @@
 
 ### Notes
 - No new dependencies were added. The existing mock session export remains in place for the current layout wiring.
+
+## 2026-09-05 19:10 +05:30 — Employee Seed Login Fix
+
+### Summary
+- Added login-capable demo users for all seeded employees.
+- Made admin-created `EMPLOYEE` users automatically link to an existing employee or create the required employee record.
+
+### Files Changed
+- `packages/db/prisma/seed.ts`: upserts employee users with bcrypt passwords and repairs the seeded admin credentials/link.
+- `apps/hr-api/src/modules/shared/hr.service.ts`: creates employee identity and user linkage transactionally for employee-role users.
+- `CHANGELOG_AGENTS.md`: recorded this change.
+
+### Reason
+- Seeded employees had no `User` records, and users created from the admin flow could have no `employeeId`, so employee login/profile resolution was incomplete.
+
+### Validation
+- `pnpm --filter @peoplepay360/hr-api build` — passed.
+- `pnpm --filter @peoplepay360/db exec prisma validate` — blocked because `DIRECT_URL` is not set in the local environment.
+- `pnpm --filter web exec tsc --noEmit` — blocked by the sandbox pnpm launcher failing with `EPERM` while resolving `C:\Users\DELL`.
+- `git diff --check -- CHANGELOG_AGENTS.md apps/hr-api/src/modules/shared/hr.service.ts packages/db/prisma/seed.ts` — passed.
+
+### Notes
+- Seed command was not executed because the same sandbox pnpm launcher error prevented Prisma execution.
+- Demo employee password is `Employee123!`; admin password remains `Admin123!`.
+- The current Employees page is still presentation scaffolding; the live employee-user path is Team & Roles with role `EMPLOYEE`.
+
+## 2026-09-05 20:00 +05:30 — Shadcn UI Design System & Interactive Loading Buttons Revamp
+
+### Summary
+- Overhauled the PeoplePay360 web application to a pure Shadcn UI aesthetic (clean Zinc theme, high-density compact typography `text-xs`/`text-[11px]`, clean borders `#e4e4e7`, tight padding `p-2`/`p-3`/`p-4`).
+- Upgraded every button across the app to be fully functional, with visible animated loading indicators (`<Loader2 className="animate-spin" />`), distinct "in-progress" button text (e.g., "Computing...", "Saving...", "Logging In...", "Allocating..."), disabled state during async operations, and user feedback toasts.
+- Implemented client-side A4 printable PDF generator for individual payslips (`lib/payslip-pdf.ts`).
+- Created "Grant Leave Allocation" workflow with interactive modal, validation, and balance updates.
+- Added direct PDF download and batch viewing actions with loaders on the Payslips and Payruns list pages.
+- Wired real `getServerSession(authOptions)` in app layout, compact topbar with role badge and logout spinner, and role-aware navigation.
+
+### Files Changed
+- `apps/web/app/globals.css`: pure Zinc theme with compact SaaS base font (`text-[13px]`) and clean border tokens.
+- `apps/web/components/ui/badge.tsx`: official Shadcn UI Badge component (`default`, `secondary`, `destructive`, `outline`, `success`, `warning`, `info`).
+- `apps/web/components/ui/button.tsx`: compact button sizes (`h-8 px-3 text-xs`, `sm: h-7 px-2.5 text-[11px]`) and CVA variants.
+- `apps/web/components/ui/card.tsx`: compact padding and clean card headers.
+- `apps/web/components/ui/dialog.tsx`: floating dialog modal.
+- `apps/web/components/ui/input.tsx`: compact input fields (`h-8 text-xs`).
+- `apps/web/components/ui/separator.tsx`: added Shadcn separator.
+- `apps/web/components/ui/table.tsx`: compact table cells (`py-2 px-3 text-xs`, headers `h-8 text-[11px]`).
+- `apps/web/components/ui/toast.tsx`: toast provider and `useToast` notification hook.
+- `apps/web/lib/api-actions.ts`: server actions with Prisma and HR API fallback for employees, contracts, attendance, time-off, and payruns.
+- `apps/web/lib/payslip-pdf.ts`: jsPDF-based client-side payslip generator.
+- `apps/web/app/(app)/attendance/page.tsx`: Quick Check-in/Check-out with spinners, manual log modal.
+- `apps/web/app/(app)/contracts/page.tsx`: compact table, create contract dialog with form loader.
+- `apps/web/app/(app)/dashboard/page.tsx`: compact KPI cards and department expenditure bar chart.
+- `apps/web/app/(app)/employees/page.tsx`: compact directory table, create employee dialog with form loader.
+- `apps/web/app/(app)/employees/[id]/page.tsx`: compact profile hub with smart links and edit form.
+- `apps/web/app/(app)/payroll/payruns/page.tsx`: compact batch table with "View" action button and loader.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: 4-stage lifecycle buttons (Compute, Validate, Mark Paid, Send Payslips) with spinners and disabled states.
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: 2-step payrun wizard with batch creation spinner.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: compact statement table with row-level "Download PDF" and "View" buttons with individual loaders.
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: detailed statement view with Print and Download PDF buttons with loaders.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: sequential rule table with delete action loader, create rule form.
+- `apps/web/app/(app)/payroll/structures/page.tsx`: structure table with status toggle loader, create structure form.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: leave balance table with "Grant Allocation" dialog, form loader, and toast.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: row-level Approve/Reject buttons with individual spinners, leave application form.
+- `apps/web/app/(app)/time-off/types/page.tsx`: leave policy table with delete action loader, create policy form.
+- `apps/web/app/(app)/users/page.tsx`: team table with reset password action loader, user creation dialog.
+- `apps/web/components/attendance-form.tsx`: submit button with loader.
+- `apps/web/components/contract-form.tsx`: submit button with loader.
+- `apps/web/components/employee-form.tsx`: submit button with loader.
+- `apps/web/components/salary-rule-form.tsx`: submit button with loader.
+- `apps/web/components/salary-structure-form.tsx`: submit button with loader.
+- `apps/web/components/time-off-type-form.tsx`: submit button with loader.
+- `apps/web/components/app-sidebar.tsx`: compact sidebar with role-aware route filtering.
+- `apps/web/components/app-topbar.tsx`: compact topbar with role badge and working signout loader.
+- `CHANGELOG_AGENTS.md`: recorded all changes.
+
+### Reason
+- Fulfill user request for compact Shadcn UI aesthetic, small fonts, tight SaaS margins, and ensure every button across the entire UI is functional, displays visible loading feedback when clicked, and gives explicit user feedback.
+
+### Validation
+- `pnpm --filter web build` — **Passed (Exit Code 0)** with all 18 routes compiled and static pages generated.
+- `git status` — verified all files.
+
+### Notes
+- PDF generation uses pure client-side `jspdf` without external server dependencies.
+- NextAuth session provides role-based authorization for action buttons and navigation links.

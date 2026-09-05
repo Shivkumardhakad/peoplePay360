@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
+import { Loader2 } from "lucide-react";
 
 const structureSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -14,62 +17,94 @@ const structureSchema = z.object({
 
 export type SalaryStructureFormValues = z.infer<typeof structureSchema>;
 
-export function SalaryStructureForm({ defaultValues }: { defaultValues?: Partial<SalaryStructureFormValues> }) {
-  const { register, handleSubmit, formState: { errors } } = useForm<SalaryStructureFormValues>({
+export function SalaryStructureForm({
+  defaultValues,
+  onSuccess,
+}: {
+  defaultValues?: Partial<SalaryStructureFormValues>;
+  onSuccess?: (data: SalaryStructureFormValues) => void;
+}) {
+  const { toast } = useToast();
+  const [submitting, setSubmitting] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<SalaryStructureFormValues>({
     resolver: zodResolver(structureSchema),
     defaultValues: defaultValues || {
-      status: "DRAFT",
+      status: "ACTIVE",
     },
   });
 
-  const onSubmit = (data: SalaryStructureFormValues) => {
-    console.log("Submit structure:", data);
+  const onSubmit = async (data: SalaryStructureFormValues) => {
+    setSubmitting(true);
+    await new Promise((r) => setTimeout(r, 400));
+    setSubmitting(false);
+
+    toast({
+      title: "Structure Created",
+      description: `Salary Structure "${data.name}" is now available for contracts.`,
+      type: "success",
+    });
+    onSuccess?.(data);
+    reset();
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="name">Structure Name</Label>
-        <Input id="name" {...register("name")} />
-        {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="name" className="text-xs font-medium">Structure Name</Label>
+        <Input id="name" placeholder="e.g. Sales Executive Package" {...register("name")} />
+        {errors.name && <p className="text-[11px] text-destructive">{errors.name.message}</p>}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="status">Status</Label>
-        <select 
-          id="status" 
+      <div className="space-y-1.5">
+        <Label htmlFor="status" className="text-xs font-medium">Lifecycle Status</Label>
+        <select
+          id="status"
           {...register("status")}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
-          <option value="DRAFT">Draft</option>
           <option value="ACTIVE">Active</option>
+          <option value="DRAFT">Draft</option>
           <option value="ARCHIVED">Archived</option>
         </select>
       </div>
 
-      <div className="space-y-2 pt-4 border-t">
-        <h4 className="text-sm font-medium mb-2">Attached Rules (Sequence)</h4>
-        
-        {/* Mocking the rule selection for MVP UI */}
-        <div className="space-y-2">
+      <div className="space-y-2 pt-3 border-t border-border">
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+          Attached Rules Sequence
+        </h4>
+        <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <Input type="number" className="w-20 font-mono text-center" defaultValue={10} />
-            <span className="text-sm border rounded-md px-3 py-2 bg-muted/50 flex-1">Basic Salary (BASIC)</span>
+            <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded w-12 text-center border">10</span>
+            <span className="text-xs border border-border rounded-md px-3 py-1.5 bg-background flex-1 text-foreground">
+              Basic Salary (BASIC)
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <Input type="number" className="w-20 font-mono text-center" defaultValue={20} />
-            <span className="text-sm border rounded-md px-3 py-2 bg-muted/50 flex-1">Housing Allowance (HRA)</span>
+            <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded w-12 text-center border">20</span>
+            <span className="text-xs border border-border rounded-md px-3 py-1.5 bg-background flex-1 text-foreground">
+              Housing Allowance (HRA)
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <Input type="number" className="w-20 font-mono text-center" defaultValue={100} />
-            <span className="text-sm border rounded-md px-3 py-2 bg-muted/50 flex-1">Gross Salary (GROSS)</span>
+            <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded w-12 text-center border">100</span>
+            <span className="text-xs border border-border rounded-md px-3 py-1.5 bg-background flex-1 text-foreground">
+              Gross Total (GROSS)
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline">Cancel</Button>
-        <Button type="submit">Save Structure</Button>
+      <div className="flex justify-end gap-2 pt-3 border-t border-border">
+        <Button type="submit" size="sm" disabled={submitting} className="gap-1.5 h-8">
+          {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          <span>{submitting ? "Saving Structure..." : "Save Structure"}</span>
+        </Button>
       </div>
     </form>
   );
