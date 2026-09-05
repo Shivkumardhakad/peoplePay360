@@ -176,6 +176,26 @@
 - Existing legacy HR fields (`baseSalary`, `payrollProfileCode`, `days`, and single `User.role`) remain for backward compatibility.
 - Payroll API currently owns its separate Spring database; these Prisma payroll models provide the normalized shared application model requested in `temp/one` and should be reconciled before production migrations.
 
+## 2026-09-05 18:10 IST — Add HR CRUD workflow endpoints
+
+### Summary
+- Added employee, department, job-position, contract, attendance, and time-off create/update/detail/decision endpoints.
+
+### Files Changed
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Added database operations and transactional leave approval balance consumption.
+- `apps/hr-api/src/modules/*/*.controller.ts`: Added CRUD and workflow routes while preserving existing list routes.
+- `apps/hr-api/package.json`: Declared the Prisma client as a direct HR API dependency.
+- `CHANGELOG_AGENTS.md`: Recorded the API work.
+
+### Reason
+- The API layer previously exposed only read-only list endpoints.
+
+### Validation
+- `pnpm --filter @peoplepay360/hr-api build` — initially failed because `@prisma/client` was not declared directly; dependency fix pending verification.
+
+### Notes
+- Request DTOs currently use Prisma input types; shared Zod validation and authorization guards should be added before production exposure.
+
 ## 2026-09-05 14:05 IST — Modularize HR API source
 
 ### Summary
