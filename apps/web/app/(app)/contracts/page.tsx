@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Search, LayoutList, Kanban, FileText, Calendar, Building2 } from "lucide-react";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { Plus, Search, LayoutList, Kanban, FileText, Calendar, Building2, ChevronLeft, ChevronRight } from "lucide-react";
 import { ContractForm } from "@/components/contract-form";
 import { getContractsAction } from "@/lib/api-actions";
 
@@ -28,6 +29,12 @@ export default function ContractsPage() {
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [activeColPage, setActiveColPage] = useState(1);
+  const [endedColPage, setEndedColPage] = useState(1);
 
   useEffect(() => {
     getContractsAction().then((liveContracts) => {
@@ -51,14 +58,30 @@ export default function ContractsPage() {
       c.id.toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredContracts.length / pageSize);
+  const paginatedContracts = filteredContracts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const activeContracts = filteredContracts.filter((c) => c.status === "Active");
+  const endedContracts = filteredContracts.filter((c) => c.status === "Ended");
+
+  const activeTotalPages = Math.ceil(activeContracts.length / pageSize);
+  const paginatedActive = activeContracts.slice((activeColPage - 1) * pageSize, activeColPage * pageSize);
+
+  const endedTotalPages = Math.ceil(endedContracts.length / pageSize);
+  const paginatedEnded = endedContracts.slice((endedColPage - 1) * pageSize, endedColPage * pageSize);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+    setActiveColPage(1);
+    setEndedColPage(1);
+  };
+
   const handleCreated = async () => {
     const live = await getContractsAction();
     setContracts(live);
     setDialogOpen(false);
   };
-
-  const activeContracts = filteredContracts.filter((c) => c.status === "Active");
-  const endedContracts = filteredContracts.filter((c) => c.status === "Ended");
 
   return (
     <div className="space-y-3">
@@ -117,7 +140,7 @@ export default function ContractsPage() {
           <Input
             placeholder="Filter contracts..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-8 h-7 text-xs"
           />
         </div>
@@ -128,50 +151,64 @@ export default function ContractsPage() {
 
       {/* Content View */}
       {viewMode === "list" ? (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead>Position</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Term</TableHead>
-                <TableHead className="text-right">Base Wage</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredContracts.length === 0 ? (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
-                    No contracts found.
-                  </TableCell>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Position</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Term</TableHead>
+                  <TableHead className="text-right">Base Wage</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
                 </TableRow>
-              ) : (
-                filteredContracts.map((contract) => (
-                  <TableRow key={contract.id}>
-                    <TableCell className="font-medium text-xs">{contract.employee}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{contract.position}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{contract.department}</TableCell>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">
-                      {contract.startDate} → {contract.endDate}
-                    </TableCell>
-                    <TableCell className="font-mono text-right text-xs font-semibold">
-                      ${contract.wage.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge
-                        variant={contract.status === "Active" ? "success" : "secondary"}
-                        className="text-[10px] font-mono"
-                      >
-                        {contract.status}
-                      </Badge>
+              </TableHeader>
+              <TableBody>
+                {paginatedContracts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                      No contracts found.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  paginatedContracts.map((contract) => (
+                    <TableRow key={contract.id}>
+                      <TableCell className="font-medium text-xs">{contract.employee}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{contract.position}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{contract.department}</TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">
+                        {contract.startDate} → {contract.endDate}
+                      </TableCell>
+                      <TableCell className="font-mono text-right text-xs font-semibold">
+                        ${contract.wage.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge
+                          variant={contract.status === "Active" ? "success" : "secondary"}
+                          className="text-[10px] font-mono"
+                        >
+                          {contract.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredContracts.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
+          />
         </div>
       ) : (
         /* Kanban View */
@@ -187,12 +224,12 @@ export default function ContractsPage() {
               </div>
             </div>
             <div className="space-y-2.5">
-              {activeContracts.length === 0 ? (
+              {paginatedActive.length === 0 ? (
                 <div className="p-6 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
                   No active contracts.
                 </div>
               ) : (
-                activeContracts.map((c) => (
+                paginatedActive.map((c) => (
                   <div
                     key={c.id}
                     className="p-3.5 rounded-lg border border-border/80 bg-card hover:border-emerald-500/40 hover:shadow-sm transition-all space-y-2.5"
@@ -225,6 +262,32 @@ export default function ContractsPage() {
                 ))
               )}
             </div>
+
+            {activeTotalPages > 1 && (
+              <div className="flex items-center justify-between pt-2 border-t border-border/60 text-[11px] font-mono text-muted-foreground">
+                <span>Page {activeColPage} of {activeTotalPages}</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="iconSm"
+                    className="h-6 w-6"
+                    disabled={activeColPage <= 1}
+                    onClick={() => setActiveColPage((prev) => prev - 1)}
+                  >
+                    <ChevronLeft className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="iconSm"
+                    className="h-6 w-6"
+                    disabled={activeColPage >= activeTotalPages}
+                    onClick={() => setActiveColPage((prev) => prev + 1)}
+                  >
+                    <ChevronRight className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Ended Column */}
@@ -238,12 +301,12 @@ export default function ContractsPage() {
               </div>
             </div>
             <div className="space-y-2.5">
-              {endedContracts.length === 0 ? (
+              {paginatedEnded.length === 0 ? (
                 <div className="p-6 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
                   No ended contracts.
                 </div>
               ) : (
-                endedContracts.map((c) => (
+                paginatedEnded.map((c) => (
                   <div
                     key={c.id}
                     className="p-3.5 rounded-lg border border-border/80 bg-card hover:border-border transition-all space-y-2.5 opacity-85"
@@ -276,10 +339,37 @@ export default function ContractsPage() {
                 ))
               )}
             </div>
+
+            {endedTotalPages > 1 && (
+              <div className="flex items-center justify-between pt-2 border-t border-border/60 text-[11px] font-mono text-muted-foreground">
+                <span>Page {endedColPage} of {endedTotalPages}</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="iconSm"
+                    className="h-6 w-6"
+                    disabled={endedColPage <= 1}
+                    onClick={() => setEndedColPage((prev) => prev - 1)}
+                  >
+                    <ChevronLeft className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="iconSm"
+                    className="h-6 w-6"
+                    disabled={endedColPage >= endedTotalPages}
+                    onClick={() => setEndedColPage((prev) => prev + 1)}
+                  >
+                    <ChevronRight className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
+
 

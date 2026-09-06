@@ -1,3 +1,40 @@
+## 2026-09-06 07:30 IST — Add client-side pagination across all list and Kanban views
+
+### Summary
+- Created a standard reusable `TablePagination` component in `apps/web/components/ui/table-pagination.tsx` featuring item range counts, page size selector (5/10), page indicators, and Previous/Next buttons with disabled states.
+- Implemented client-side pagination across all 17 operational list tables and Kanban board views in the PeoplePay360 web application.
+- Added per-column pagination for Kanban view boards to ensure columns remain compact, clean, and navigable independently.
+- Managed page resetting (`currentPage = 1`) on filter, search, and page size modifications.
+
+### Files Changed
+- `apps/web/components/ui/table-pagination.tsx`: Created reusable TablePagination component.
+- `apps/web/app/(app)/employees/page.tsx`: Added pagination to employee list table and per-column Kanban cards.
+- `apps/web/app/(app)/contracts/page.tsx`: Added pagination to contract list table and per-column Kanban cards.
+- `apps/web/app/(app)/attendance/page.tsx`: Added pagination to attendance list table and per-column Kanban cards.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Added pagination to leave requests table and per-column Kanban cards.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: Added pagination to leave allocations table.
+- `apps/web/app/(app)/time-off/types/page.tsx`: Added pagination to leave types table.
+- `apps/web/app/(app)/working-schedules/page.tsx`: Added pagination to working schedules table.
+- `apps/web/app/(app)/payroll/payruns/page.tsx`: Added pagination to payrun list table and per-column Kanban cards.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Added pagination to payrun details payslips table.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Added pagination to payslips list table and per-column Kanban cards.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: Added pagination to salary rules table.
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Added pagination to salary structures table.
+- `apps/web/app/(app)/users/page.tsx`: Added pagination to users list table and per-role Kanban columns.
+- `apps/web/app/(app)/audit-logs/page.tsx`: Added pagination to payroll audit logs list.
+- `apps/web/app/(app)/reports/page.tsx`: Added pagination to payroll reports payslips table.
+- `apps/web/app/(app)/self/attendance/attendance-table-client.tsx`: Created client attendance table component with pagination.
+- `apps/web/app/(app)/self/attendance/page.tsx`: Integrated client attendance table with pagination.
+- `apps/web/app/(app)/self/time-off/time-off-tables-client.tsx`: Created client time-off tables component with pagination for allocations and requests.
+- `apps/web/app/(app)/self/time-off/page.tsx`: Integrated client time-off tables with pagination.
+- `CHANGELOG_AGENTS.md`: Logged comprehensive pagination implementation.
+
+### Reason
+- Fulfill user request to show 5 to 10 entries at a time with page size selection and next/previous pagination across all listing and Kanban view options throughout the website.
+
+### Validation
+- `pnpm --filter web build` completed successfully without any compilation or TypeScript errors.
+
 ## 2026-09-06 00:35 IST — Resolve git merge conflicts in attendance and API actions
 
 ### Summary

@@ -22,6 +22,8 @@ interface LeaveRequestItem {
   status: "Pending" | "Approved" | "Rejected";
 }
 
+import { TablePagination } from "@/components/ui/table-pagination";
+
 export default function TimeOffRequestsPage() {
   const { data: session } = useSession();
   const { toast } = useToast();
@@ -31,6 +33,10 @@ export default function TimeOffRequestsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Form State
   const [leaveType, setLeaveType] = useState("");
@@ -122,6 +128,14 @@ export default function TimeOffRequestsPage() {
       r.status.toLowerCase().includes(search.toLowerCase()) ||
       r.id.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filteredRequests.length / pageSize);
+  const paginatedRequests = filteredRequests.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="space-y-3">
@@ -218,7 +232,7 @@ export default function TimeOffRequestsPage() {
           <Input
             placeholder="Filter requests..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-8 h-7 text-xs"
           />
         </div>
@@ -228,112 +242,127 @@ export default function TimeOffRequestsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Employee</TableHead>
-              <TableHead>Policy</TableHead>
-              <TableHead>Date Range</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Decision</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredRequests.length === 0 ? (
+      <div className="space-y-3">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
-                  No leave requests found.
-                </TableCell>
+                <TableHead>Employee</TableHead>
+                <TableHead>Policy</TableHead>
+                <TableHead>Date Range</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Decision</TableHead>
               </TableRow>
-            ) : (
-              filteredRequests.map((req) => {
-                const isApproving = actionLoading === `${req.id}-approved`;
-                const isRejecting = actionLoading === `${req.id}-rejected`;
-                const isRowLoading = isApproving || isRejecting;
-                const isSelf = req.employee.toLowerCase() === currentUserName.toLowerCase();
-                const canApproveThis = canApprove && (role === "ADMIN" || !isSelf);
+            </TableHeader>
+            <TableBody>
+              {paginatedRequests.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                    No leave requests found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedRequests.map((req) => {
+                  const isApproving = actionLoading === `${req.id}-approved`;
+                  const isRejecting = actionLoading === `${req.id}-rejected`;
+                  const isRowLoading = isApproving || isRejecting;
+                  const isSelf = req.employee.toLowerCase() === currentUserName.toLowerCase();
+                  const canApproveThis = canApprove && (role === "ADMIN" || !isSelf);
 
-                return (
-                  <TableRow key={req.id}>
-                    <TableCell className="font-medium text-xs">
-                      {req.employee}
-                      {isSelf && (
-                        <span className="ml-1.5 text-[10px] font-mono text-muted-foreground bg-muted px-1 py-0.2 rounded">
-                          (You)
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{req.type}</TableCell>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{req.dates}</TableCell>
-                    <TableCell className="font-mono text-[11px] font-medium">{req.duration}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          req.status === "Approved"
-                            ? "success"
-                            : req.status === "Rejected"
-                            ? "destructive"
-                            : "warning"
-                        }
-                        className="text-[10px] font-mono"
-                      >
-                        {req.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {req.status === "Pending" ? (
-                        isSelf && role !== "ADMIN" ? (
-                          <span className="text-[10px] text-amber-600 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                            Awaiting Admin
+                  return (
+                    <TableRow key={req.id}>
+                      <TableCell className="font-medium text-xs">
+                        {req.employee}
+                        {isSelf && (
+                          <span className="ml-1.5 text-[10px] font-mono text-muted-foreground bg-muted px-1 py-0.2 rounded">
+                            (You)
                           </span>
-                        ) : canApproveThis ? (
-                          <div className="flex justify-end gap-1.5">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDecision(req.id, "Rejected")}
-                              disabled={isRowLoading}
-                              className="h-6 px-2 text-[11px] text-destructive border-destructive/20 hover:bg-destructive/10"
-                            >
-                              {isRejecting ? (
-                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                              ) : (
-                                <XCircle className="w-3 h-3 mr-1" />
-                              )}
-                              {isRejecting ? "Rejecting..." : "Reject"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleDecision(req.id, "Approved")}
-                              disabled={isRowLoading}
-                              className="h-6 px-2 text-[11px] bg-emerald-600 text-white hover:bg-emerald-700"
-                            >
-                              {isApproving ? (
-                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                              ) : (
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                              )}
-                              {isApproving ? "Approving..." : "Approve"}
-                            </Button>
-                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{req.type}</TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">{req.dates}</TableCell>
+                      <TableCell className="font-mono text-[11px] font-medium">{req.duration}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            req.status === "Approved"
+                              ? "success"
+                              : req.status === "Rejected"
+                              ? "destructive"
+                              : "warning"
+                          }
+                          className="text-[10px] font-mono"
+                        >
+                          {req.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {req.status === "Pending" ? (
+                          isSelf && role !== "ADMIN" ? (
+                            <span className="text-[10px] text-amber-600 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              Awaiting Admin
+                            </span>
+                          ) : canApproveThis ? (
+                            <div className="flex justify-end gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDecision(req.id, "Rejected")}
+                                disabled={isRowLoading}
+                                className="h-6 px-2 text-[11px] text-destructive border-destructive/20 hover:bg-destructive/10"
+                              >
+                                {isRejecting ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                ) : (
+                                  <XCircle className="w-3 h-3 mr-1" />
+                                )}
+                                {isRejecting ? "Rejecting..." : "Reject"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleDecision(req.id, "Approved")}
+                                disabled={isRowLoading}
+                                className="h-6 px-2 text-[11px] bg-emerald-600 text-white hover:bg-emerald-700"
+                              >
+                                {isApproving ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                ) : (
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                )}
+                                {isApproving ? "Approving..." : "Approve"}
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground font-mono">Pending Review</span>
+                          )
                         ) : (
-                          <span className="text-[10px] text-muted-foreground font-mono">Pending Review</span>
-                        )
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground font-mono">
-                          {req.status === "Approved" ? "Approved" : "Rejected"}
-                        </span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {req.status === "Approved" ? "Approved" : "Rejected"}
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredRequests.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+        />
       </div>
     </div>
   );
 }
+

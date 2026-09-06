@@ -3,10 +3,9 @@ import { CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { StatusBadge } from "@/components/status-badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { hrApiFetch } from "@/lib/hr-api";
-import { formatDate, humanizeStatus, statusTone, todayInputValue } from "../self-service-utils";
+import { todayInputValue } from "../self-service-utils";
+import { TimeOffTablesClient } from "./time-off-tables-client";
 
 type TimeOffType = {
   id: string;
@@ -100,57 +99,8 @@ export default async function MyTimeOffPage() {
         </div>
       </form>
 
-      <div className="pp-solid-surface overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-b-[0.5px] border-border bg-muted/20 hover:bg-muted/20">
-              <TableHead>Leave Type</TableHead>
-              <TableHead className="text-right">Allocated</TableHead>
-              <TableHead className="text-right">Taken</TableHead>
-              <TableHead className="text-right">Remaining</TableHead>
-              <TableHead>Validity</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {allocations.map((allocation) => (
-              <TableRow key={allocation.id} className="border-b-[0.5px] border-border hover:bg-muted/30">
-                <TableCell className="font-medium">{allocation.timeOffType.name}</TableCell>
-                <TableCell className="text-right font-mono text-xs">{allocation.allocated}</TableCell>
-                <TableCell className="text-right font-mono text-xs">{allocation.consumed}</TableCell>
-                <TableCell className="text-right font-mono text-xs font-semibold">{allocation.remaining ?? allocation.allocated}</TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">{formatDate(allocation.periodStart)} - {formatDate(allocation.periodEnd)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="pp-solid-surface overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-b-[0.5px] border-border bg-muted/20 hover:bg-muted/20">
-              <TableHead>Request</TableHead>
-              <TableHead>Dates</TableHead>
-              <TableHead className="text-right">Duration</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Reason</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {requests.map((request) => (
-              <TableRow key={request.id} className="border-b-[0.5px] border-border hover:bg-muted/30">
-                <TableCell className="font-medium">{request.timeOffType.name}</TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">{formatDate(request.startDate)} - {formatDate(request.endDate)}</TableCell>
-                <TableCell className="text-right font-mono text-xs">{request.quantity} {request.timeOffType.unit.toLowerCase()}</TableCell>
-                <TableCell>
-                  <StatusBadge tone={statusTone(request.status)} label={request.status === "REJECTED" ? "Refused" : humanizeStatus(request.status)} />
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{request.reason || "-"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <TimeOffTablesClient allocations={allocations} requests={requests} />
     </div>
   );
 }
+

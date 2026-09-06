@@ -13,6 +13,8 @@ import { SalaryRuleForm, type SalaryRuleFormValues } from "@/components/salary-r
 import { Sparkles, Trash2, Loader2, Lock } from "lucide-react";
 import { createPayrollCategoryAction, createPayrollRuleAction, deactivatePayrollRuleAction, deletePayrollCategoryAction, listPayrollCategoriesAction, listPayrollRulesAction, updatePayrollCategoryAction } from "@/lib/api-actions";
 
+import { TablePagination } from "@/components/ui/table-pagination";
+
 interface RuleItem {
   id: string;
   name: string;
@@ -35,6 +37,10 @@ export default function SalaryRulesPage() {
   const [categoryDescription, setCategoryDescription] = useState("");
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const role = session?.user?.role || "ADMIN";
   const canEdit =
     role === "ADMIN" ||
@@ -47,6 +53,9 @@ export default function SalaryRulesPage() {
       setRules((loadedRules as any[]).map((rule) => ({ ...rule, category: (loadedCategories as any[]).find((category) => category.id === rule.categoryId)?.code ?? rule.categoryId, type: rule.calculationType })));
     }).catch((error) => toast({ title: "Payroll API unavailable", description: error.message, type: "error" }));
   }, [toast]);
+
+  const totalPages = Math.ceil(rules.length / pageSize);
+  const paginatedRules = rules.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleRuleCreated = (data: SalaryRuleFormValues) => {
     void data;
@@ -98,60 +107,74 @@ export default function SalaryRulesPage() {
       </div>
 
       <div className={`grid grid-cols-1 ${canEdit ? "lg:grid-cols-3" : "grid-cols-1"} gap-3 items-start`}>
-        {/* Rules Table */}
-        <div className={`${canEdit ? "lg:col-span-2" : "col-span-1"} rounded-lg border border-border bg-card overflow-hidden`}>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[60px]">Seq</TableHead>
-                <TableHead className="w-[85px]">Code</TableHead>
-                <TableHead>Rule Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Method</TableHead>
-                {canEdit && <TableHead className="w-[60px] text-right"></TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rules.map((rule) => {
-                const isDeleting = deletingId === rule.id;
+        {/* Rules Table & Pagination */}
+        <div className={`${canEdit ? "lg:col-span-2" : "col-span-1"} space-y-3`}>
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[60px]">Seq</TableHead>
+                  <TableHead className="w-[85px]">Code</TableHead>
+                  <TableHead>Rule Name</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Method</TableHead>
+                  {canEdit && <TableHead className="w-[60px] text-right"></TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedRules.map((rule) => {
+                  const isDeleting = deletingId === rule.id;
 
-                return (
-                  <TableRow key={rule.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{rule.sequence}</TableCell>
-                    <TableCell className="font-mono text-xs font-semibold text-foreground">{rule.code}</TableCell>
-                    <TableCell className="font-medium text-xs">{rule.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-[10px] font-mono">
-                        {rule.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="secondary" className="text-[10px] font-mono">
-                        {rule.type}
-                      </Badge>
-                    </TableCell>
-                    {canEdit && (
-                      <TableCell className="text-right p-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteRule(rule.id, rule.name)}
-                          disabled={isDeleting}
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                        >
-                          {isDeleting ? (
-                            <Loader2 className="w-3 h-3 animate-spin text-destructive" />
-                          ) : (
-                            <Trash2 className="w-3 h-3" />
-                          )}
-                        </Button>
+                  return (
+                    <TableRow key={rule.id}>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">{rule.sequence}</TableCell>
+                      <TableCell className="font-mono text-xs font-semibold text-foreground">{rule.code}</TableCell>
+                      <TableCell className="font-medium text-xs">{rule.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px] font-mono">
+                          {rule.category}
+                        </Badge>
                       </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      <TableCell className="text-right">
+                        <Badge variant="secondary" className="text-[10px] font-mono">
+                          {rule.type}
+                        </Badge>
+                      </TableCell>
+                      {canEdit && (
+                        <TableCell className="text-right p-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteRule(rule.id, rule.name)}
+                            disabled={isDeleting}
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="w-3 h-3 animate-spin text-destructive" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={rules.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
+          />
         </div>
 
         {/* Rule Form Card */}
@@ -192,3 +215,4 @@ export default function SalaryRulesPage() {
     </div>
   );
 }
+

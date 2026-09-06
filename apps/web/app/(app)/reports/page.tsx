@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useToast } from "@/components/ui/toast";
 import { getPayrollReportAction } from "@/lib/api-actions";
 
@@ -17,12 +18,18 @@ export default function PayrollReportsPage() {
   const [departmentId, setDepartmentId] = useState("");
   const [employeeType, setEmployeeType] = useState("");
   const [report, setReport] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
+    setCurrentPage(1);
     getPayrollReportAction(from, to, status, departmentId, employeeType).then(setReport).catch((error) => toast({ title: "Unable to load reports", description: error.message, type: "error" }));
   }, [from, status, to, departmentId, employeeType, toast]);
 
   const summary = report?.summary;
+  const allPayslips = report?.payslips ?? [];
+  const paginatedPayslips = allPayslips.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-3">
       <div>
@@ -45,10 +52,20 @@ export default function PayrollReportsPage() {
       </div>
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <Table><TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Department</TableHead><TableHead>Period</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Net</TableHead></TableRow></TableHeader><TableBody>
-          {(report?.payslips ?? []).map((row: any) => <TableRow key={row.payslipId}><TableCell className="text-xs font-medium">{row.employeeName}</TableCell><TableCell className="text-xs text-muted-foreground">{row.department}</TableCell><TableCell className="text-xs font-mono">{String(row.periodStart).slice(0, 10)} → {String(row.periodEnd).slice(0, 10)}</TableCell><TableCell><Badge variant={row.status === "PAID" ? "success" : "secondary"} className="text-[10px]">{row.status}</Badge></TableCell><TableCell className="text-right text-xs font-mono">${Number(row.netAmount ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell></TableRow>)}
+          {paginatedPayslips.map((row: any) => <TableRow key={row.payslipId}><TableCell className="text-xs font-medium">{row.employeeName}</TableCell><TableCell className="text-xs text-muted-foreground">{row.department}</TableCell><TableCell className="text-xs font-mono">{String(row.periodStart).slice(0, 10)} → {String(row.periodEnd).slice(0, 10)}</TableCell><TableCell><Badge variant={row.status === "PAID" ? "success" : "secondary"} className="text-[10px]">{row.status}</Badge></TableCell><TableCell className="text-right text-xs font-mono">${Number(row.netAmount ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell></TableRow>)}
           {report && !report.payslips.length && <TableRow><TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground">No payslips found for this range.</TableCell></TableRow>}
         </TableBody></Table>
+        <div className="p-2 border-t border-border">
+          <TablePagination
+            currentPage={currentPage}
+            totalItems={allPayslips.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+        </div>
       </div>
     </div>
   );
 }
+

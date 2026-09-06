@@ -11,6 +11,8 @@ import { useToast } from "@/components/ui/toast";
 import { Search, Plus, Loader2 } from "lucide-react";
 import { createAllocationAction, getAllocationsAction, getEmployeesAction, getTimeOffTypesAction } from "@/lib/api-actions";
 
+import { TablePagination } from "@/components/ui/table-pagination";
+
 interface AllocationItem {
   id: string;
   employee: string;
@@ -27,6 +29,10 @@ export default function TimeOffAllocationsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [employees, setEmployees] = useState<Array<{ id: string; employeeNumber: string; name: string }>>([]);
   const [types, setTypes] = useState<Array<{ id: string; name: string }>>([]);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Form State
   const [employee, setEmployee] = useState("");
@@ -49,6 +55,14 @@ export default function TimeOffAllocationsPage() {
       a.type.toLowerCase().includes(search.toLowerCase()) ||
       a.id.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filteredAllocations.length / pageSize);
+  const paginatedAllocations = filteredAllocations.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+  };
 
   const handleGrantAllocation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,7 +155,7 @@ export default function TimeOffAllocationsPage() {
           <Input
             placeholder="Filter allocations..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-8 h-7 text-xs"
           />
         </div>
@@ -151,60 +165,75 @@ export default function TimeOffAllocationsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Employee</TableHead>
-              <TableHead>Leave Type</TableHead>
-              <TableHead className="text-right">Allocated</TableHead>
-              <TableHead className="text-right">Consumed</TableHead>
-              <TableHead className="text-right">Remaining</TableHead>
-              <TableHead className="text-right">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredAllocations.length === 0 ? (
+      <div className="space-y-3">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
-                  No allocation records found.
-                </TableCell>
+                <TableHead>Employee</TableHead>
+                <TableHead>Leave Type</TableHead>
+                <TableHead className="text-right">Allocated</TableHead>
+                <TableHead className="text-right">Consumed</TableHead>
+                <TableHead className="text-right">Remaining</TableHead>
+                <TableHead className="text-right">Status</TableHead>
               </TableRow>
-            ) : (
-              filteredAllocations.map((alloc) => {
-                const remaining = alloc.allocated - alloc.used;
-                return (
-                  <TableRow key={alloc.id}>
-                    <TableCell className="font-medium text-xs">{alloc.employee}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{alloc.type}</TableCell>
-                    <TableCell className="font-mono text-right text-xs text-muted-foreground">
-                      {alloc.allocated} d
-                    </TableCell>
-                    <TableCell className="font-mono text-right text-xs text-muted-foreground">
-                      {alloc.used} d
-                    </TableCell>
-                    <TableCell
-                      className={`font-mono text-right text-xs font-semibold ${
-                        remaining === 0 ? "text-rose-600" : "text-foreground"
-                      }`}
-                    >
-                      {remaining} d
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge
-                        variant={remaining === 0 ? "destructive" : remaining < 5 ? "warning" : "success"}
-                        className="text-[10px] font-mono"
+            </TableHeader>
+            <TableBody>
+              {paginatedAllocations.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                    No allocation records found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedAllocations.map((alloc) => {
+                  const remaining = alloc.allocated - alloc.used;
+                  return (
+                    <TableRow key={alloc.id}>
+                      <TableCell className="font-medium text-xs">{alloc.employee}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{alloc.type}</TableCell>
+                      <TableCell className="font-mono text-right text-xs text-muted-foreground">
+                        {alloc.allocated} d
+                      </TableCell>
+                      <TableCell className="font-mono text-right text-xs text-muted-foreground">
+                        {alloc.used} d
+                      </TableCell>
+                      <TableCell
+                        className={`font-mono text-right text-xs font-semibold ${
+                          remaining === 0 ? "text-rose-600" : "text-foreground"
+                        }`}
                       >
-                        {remaining === 0 ? "Exhausted" : remaining < 5 ? "Low Balance" : "Available"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                        {remaining} d
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge
+                          variant={remaining === 0 ? "destructive" : remaining < 5 ? "warning" : "success"}
+                          className="text-[10px] font-mono"
+                        >
+                          {remaining === 0 ? "Exhausted" : remaining < 5 ? "Low Balance" : "Available"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredAllocations.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+        />
       </div>
     </div>
   );
 }
+

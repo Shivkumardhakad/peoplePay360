@@ -10,11 +10,17 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { listPayrunsAction } from "@/lib/api-actions";
 
+import { TablePagination } from "@/components/ui/table-pagination";
+
 export default function PayrunsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [payruns, setPayruns] = useState<any[]>([]);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     listPayrunsAction().then((result) => setPayruns(result as any[])).catch(() => setPayruns([]));
@@ -27,6 +33,14 @@ export default function PayrunsPage() {
       p.status.toLowerCase().includes(search.toLowerCase()) ||
       p.id.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filteredPayruns.length / pageSize);
+  const paginatedPayruns = filteredPayruns.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+  };
 
   const handleOpenBatch = (id: string) => {
     setOpeningId(id);
@@ -55,7 +69,7 @@ export default function PayrunsPage() {
           <Input
             placeholder="Filter payrun batches..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-8 h-7 text-xs"
           />
         </div>
@@ -65,82 +79,97 @@ export default function PayrunsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Batch Name</TableHead>
-              <TableHead>Period</TableHead>
-              <TableHead>Salary Structure</TableHead>
-              <TableHead className="text-right">Employees</TableHead>
-              <TableHead className="text-right">Net Total</TableHead>
-              <TableHead className="text-right">Status</TableHead>
-              <TableHead className="w-[90px] text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredPayruns.length === 0 ? (
+      <div className="space-y-3">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
-                  No payrun batches found.
-                </TableCell>
+                <TableHead>Batch Name</TableHead>
+                <TableHead>Period</TableHead>
+                <TableHead>Salary Structure</TableHead>
+                <TableHead className="text-right">Employees</TableHead>
+                <TableHead className="text-right">Net Total</TableHead>
+                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="w-[90px] text-right">Action</TableHead>
               </TableRow>
-            ) : (
-              filteredPayruns.map((payrun) => {
-                const isOpening = openingId === payrun.id;
+            </TableHeader>
+            <TableBody>
+              {paginatedPayruns.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
+                    No payrun batches found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedPayruns.map((payrun) => {
+                  const isOpening = openingId === payrun.id;
 
-                return (
-                  <TableRow key={payrun.id}>
-                    <TableCell className="font-medium text-xs">
-                      <Link href={`/payroll/payruns/${payrun.id}`} className="hover:underline">
-                        {payrun.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">
-                      {payrun.periodStart} → {payrun.periodEnd}
-                    </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{payrun.salaryStructureId}</TableCell>
-                    <TableCell className="text-right font-mono text-xs">{payrun.payslips?.length ?? 0}</TableCell>
-                    <TableCell className="text-right font-mono text-xs font-semibold">
-                      ${(payrun.payslips ?? []).reduce((total: number, slip: any) => total + Number(slip.netAmount ?? 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge
-                        variant={
-                          payrun.status === "PAID"
-                            ? "success"
-                            : payrun.status === "DRAFT"
-                            ? "secondary"
-                            : "default"
-                        }
-                        className="text-[10px] font-mono"
-                      >
-                        {payrun.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right p-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenBatch(payrun.id)}
-                        disabled={isOpening}
-                        className="h-6 px-2 text-[11px] gap-1"
-                      >
-                        {isOpening ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <ArrowRight className="w-3 h-3" />
-                        )}
-                        <span>{isOpening ? "Opening..." : "View"}</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                  return (
+                    <TableRow key={payrun.id}>
+                      <TableCell className="font-medium text-xs">
+                        <Link href={`/payroll/payruns/${payrun.id}`} className="hover:underline">
+                          {payrun.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">
+                        {payrun.periodStart} → {payrun.periodEnd}
+                      </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{payrun.salaryStructureId}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{payrun.payslips?.length ?? 0}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-semibold">
+                        ${(payrun.payslips ?? []).reduce((total: number, slip: any) => total + Number(slip.netAmount ?? 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge
+                          variant={
+                            payrun.status === "PAID"
+                              ? "success"
+                              : payrun.status === "DRAFT"
+                              ? "secondary"
+                              : "default"
+                          }
+                          className="text-[10px] font-mono"
+                        >
+                          {payrun.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right p-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenBatch(payrun.id)}
+                          disabled={isOpening}
+                          className="h-6 px-2 text-[11px] gap-1"
+                        >
+                          {isOpening ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <ArrowRight className="w-3 h-3" />
+                          )}
+                          <span>{isOpening ? "Opening..." : "View"}</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredPayruns.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+        />
       </div>
     </div>
   );
 }
+

@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/components/ui/toast";
 import { quickCheckInAction, getAttendanceAction } from "@/lib/api-actions";
 import { AttendanceForm, type AttendanceFormValues } from "@/components/attendance-form";
-import { Plus, Search, LogIn, LogOut, Loader2, LayoutList, Kanban, Clock, Calendar } from "lucide-react";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { Plus, Search, LogIn, LogOut, Loader2, LayoutList, Kanban, Clock, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface AttendanceRecord {
   id: string;
@@ -32,6 +33,11 @@ export default function AttendancePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [kanbanPages, setKanbanPages] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
     getAttendanceAction().then((live) => {
@@ -60,6 +66,15 @@ export default function AttendancePage() {
       r.status.toLowerCase().includes(search.toLowerCase()) ||
       r.id.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filteredAttendance.length / pageSize);
+  const paginatedAttendance = filteredAttendance.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+    setKanbanPages({});
+  };
 
   const handleQuickCheck = async (type: "IN" | "OUT") => {
     if (type === "IN") setCheckingIn(true);
@@ -118,6 +133,13 @@ export default function AttendancePage() {
   const lateRecords = filteredAttendance.filter((r) => r.status === "Late");
   const halfDayRecords = filteredAttendance.filter((r) => r.status === "Half Day");
   const absentRecords = filteredAttendance.filter((r) => r.status === "Absent");
+
+  const kanbanColumns = [
+    { key: "Present", title: "Present", records: presentRecords, color: "bg-emerald-500", hoverColor: "hover:border-emerald-500/40", badgeVariant: "success" as const, clockColor: "text-emerald-500" },
+    { key: "Late", title: "Late Arrival", records: lateRecords, color: "bg-amber-500", hoverColor: "hover:border-amber-500/40", badgeVariant: "warning" as const, clockColor: "text-amber-500" },
+    { key: "Half Day", title: "Half Day", records: halfDayRecords, color: "bg-blue-500", hoverColor: "hover:border-blue-500/40", badgeVariant: "outline" as const, clockColor: "text-blue-500" },
+    { key: "Absent", title: "Absent", records: absentRecords, color: "bg-rose-500", hoverColor: "hover:border-rose-500/40", badgeVariant: "destructive" as const, clockColor: "text-rose-500" },
+  ];
 
   return (
     <div className="space-y-3">
@@ -224,7 +246,7 @@ export default function AttendancePage() {
           <Input
             placeholder="Filter presence..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-8 h-7 text-xs"
           />
         </div>
@@ -235,213 +257,144 @@ export default function AttendancePage() {
 
       {/* Content View */}
       {viewMode === "list" ? (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>In</TableHead>
-                <TableHead>Out</TableHead>
-                <TableHead className="text-right">Hours</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAttendance.length === 0 ? (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
-                    No records.
-                  </TableCell>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>In</TableHead>
+                  <TableHead>Out</TableHead>
+                  <TableHead className="text-right">Hours</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
                 </TableRow>
-              ) : (
-                filteredAttendance.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell className="font-medium text-xs">{record.employee}</TableCell>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{record.date}</TableCell>
-                    <TableCell className="font-mono text-[11px]">{record.checkIn}</TableCell>
-                    <TableCell className="font-mono text-[11px]">{record.checkOut}</TableCell>
-                    <TableCell className="font-mono text-right text-xs font-semibold">{record.workedHours}h</TableCell>
-                    <TableCell className="text-right">
-                      <Badge
-                        variant={
-                          record.status === "Present"
-                            ? "success"
-                            : record.status === "Late"
-                            ? "warning"
-                            : "destructive"
-                        }
-                        className="text-[10px] font-mono"
-                      >
-                        {record.status}
-                      </Badge>
+              </TableHeader>
+              <TableBody>
+                {paginatedAttendance.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                      No records.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  paginatedAttendance.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell className="font-medium text-xs">{record.employee}</TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">{record.date}</TableCell>
+                      <TableCell className="font-mono text-[11px]">{record.checkIn}</TableCell>
+                      <TableCell className="font-mono text-[11px]">{record.checkOut}</TableCell>
+                      <TableCell className="font-mono text-right text-xs font-semibold">{record.workedHours}h</TableCell>
+                      <TableCell className="text-right">
+                        <Badge
+                          variant={
+                            record.status === "Present"
+                              ? "success"
+                              : record.status === "Late"
+                              ? "warning"
+                              : "destructive"
+                          }
+                          className="text-[10px] font-mono"
+                        >
+                          {record.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredAttendance.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
+          />
         </div>
       ) : (
         /* Kanban View */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Present */}
-          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border/60">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                  Present ({presentRecords.length})
-                </h3>
-              </div>
-            </div>
-            <div className="space-y-2.5">
-              {presentRecords.length === 0 ? (
-                <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
-                  No present logs.
-                </div>
-              ) : (
-                presentRecords.map((r) => (
-                  <div key={r.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-emerald-500/40 transition-all space-y-2">
-                    <div className="flex items-start justify-between gap-1">
-                      <h4 className="text-xs font-semibold text-foreground">{r.employee}</h4>
-                      <Badge variant="success" className="text-[10px] font-mono shrink-0">
-                        {r.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-1 border-t border-border/40">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-emerald-500" /> {r.checkIn} - {r.checkOut}
-                      </span>
-                      <span className="font-semibold text-foreground">{r.workedHours}h</span>
-                    </div>
-                    <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> {r.date}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          {kanbanColumns.map((col) => {
+            const colPage = kanbanPages[col.key] || 1;
+            const colTotalPages = Math.ceil(col.records.length / pageSize);
+            const paginatedColRecords = col.records.slice((colPage - 1) * pageSize, colPage * pageSize);
 
-          {/* Late */}
-          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border/60">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                  Late Arrival ({lateRecords.length})
-                </h3>
-              </div>
-            </div>
-            <div className="space-y-2.5">
-              {lateRecords.length === 0 ? (
-                <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
-                  No late logs.
-                </div>
-              ) : (
-                lateRecords.map((r) => (
-                  <div key={r.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-amber-500/40 transition-all space-y-2">
-                    <div className="flex items-start justify-between gap-1">
-                      <h4 className="text-xs font-semibold text-foreground">{r.employee}</h4>
-                      <Badge variant="warning" className="text-[10px] font-mono shrink-0">
-                        {r.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-1 border-t border-border/40">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-amber-500" /> {r.checkIn} - {r.checkOut}
-                      </span>
-                      <span className="font-semibold text-foreground">{r.workedHours}h</span>
-                    </div>
-                    <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> {r.date}
-                    </div>
+            return (
+              <div key={col.key} className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${col.color}`} />
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                      {col.title} ({col.records.length})
+                    </h3>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
+                </div>
+                <div className="space-y-2.5">
+                  {paginatedColRecords.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
+                      No logs.
+                    </div>
+                  ) : (
+                    paginatedColRecords.map((r) => (
+                      <div key={r.id} className={`p-3 rounded-lg border border-border/80 bg-card ${col.hoverColor} transition-all space-y-2`}>
+                        <div className="flex items-start justify-between gap-1">
+                          <h4 className="text-xs font-semibold text-foreground">{r.employee}</h4>
+                          <Badge variant={col.badgeVariant} className="text-[10px] font-mono shrink-0">
+                            {r.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-1 border-t border-border/40">
+                          <span className="flex items-center gap-1">
+                            <Clock className={`w-3 h-3 ${col.clockColor}`} /> {r.checkIn} - {r.checkOut}
+                          </span>
+                          <span className="font-semibold text-foreground">{r.workedHours}h</span>
+                        </div>
+                        <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> {r.date}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
 
-          {/* Half Day */}
-          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border/60">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-blue-500" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                  Half Day ({halfDayRecords.length})
-                </h3>
-              </div>
-            </div>
-            <div className="space-y-2.5">
-              {halfDayRecords.length === 0 ? (
-                <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
-                  No half day logs.
-                </div>
-              ) : (
-                halfDayRecords.map((r) => (
-                  <div key={r.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-blue-500/40 transition-all space-y-2">
-                    <div className="flex items-start justify-between gap-1">
-                      <h4 className="text-xs font-semibold text-foreground">{r.employee}</h4>
-                      <Badge variant="outline" className="text-[10px] font-mono shrink-0">
-                        {r.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-1 border-t border-border/40">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-blue-500" /> {r.checkIn} - {r.checkOut}
-                      </span>
-                      <span className="font-semibold text-foreground">{r.workedHours}h</span>
-                    </div>
-                    <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> {r.date}
+                {colTotalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-border/60 text-[11px] font-mono text-muted-foreground">
+                    <span>Page {colPage} of {colTotalPages}</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="iconSm"
+                        className="h-6 w-6"
+                        disabled={colPage <= 1}
+                        onClick={() => setKanbanPages((prev) => ({ ...prev, [col.key]: colPage - 1 }))}
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="iconSm"
+                        className="h-6 w-6"
+                        disabled={colPage >= colTotalPages}
+                        onClick={() => setKanbanPages((prev) => ({ ...prev, [col.key]: colPage + 1 }))}
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </Button>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Absent */}
-          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border/60">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-rose-500" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                  Absent ({absentRecords.length})
-                </h3>
+                )}
               </div>
-            </div>
-            <div className="space-y-2.5">
-              {absentRecords.length === 0 ? (
-                <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
-                  No absent logs.
-                </div>
-              ) : (
-                absentRecords.map((r) => (
-                  <div key={r.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-rose-500/40 transition-all space-y-2 opacity-85">
-                    <div className="flex items-start justify-between gap-1">
-                      <h4 className="text-xs font-semibold text-foreground">{r.employee}</h4>
-                      <Badge variant="destructive" className="text-[10px] font-mono shrink-0">
-                        {r.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-1 border-t border-border/40">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-rose-500" /> No Check-in
-                      </span>
-                      <span className="font-semibold text-foreground">0.00h</span>
-                    </div>
-                    <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> {r.date}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
+
