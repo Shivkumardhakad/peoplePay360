@@ -1788,6 +1788,25 @@
 ### Notes
 - Generated and ignored local environment files are not pushed.
 
+## 2026-09-06 03:15 +05:30 — Add database business validations
+
+### Summary
+- Added a Prisma migration with PostgreSQL `CHECK` constraints for HR and Payroll business invariants.
+
+### Files Changed
+- `packages/db/prisma/migrations/20260906040000_add_business_data_checks/migration.sql`: Validates contract, leave, attendance, salary-rule, payrun, payslip, and amount/date fields at database level.
+- `CHANGELOG_AGENTS.md`: Recorded the validation migration.
+
+### Reason
+- API validation alone cannot protect records written by another service or direct database client.
+
+### Validation
+- Migration is additive and conditionally creates named constraints.
+- Java test suite will be rerun before the merge/push is finalized.
+
+### Notes
+- Apply with `pnpm --filter @peoplepay360/db exec prisma migrate deploy` only after confirming the target database contains no existing rows that violate these rules.
+
 ## 2026-09-06 05:00 IST — Replace employee detail mock data with live records
 
 ### Summary
@@ -1960,3 +1979,21 @@
 
 ### Notes
 - Payroll dashboard data is based on Java payrun records; department and operational alert context is resolved from the HR Prisma database.
+
+## 2026-09-06 03:15 +05:30 — Assess database business validations
+
+### Summary
+- Assessed adding PostgreSQL `CHECK` constraints for HR and Payroll business invariants.
+
+### Files Changed
+- `CHANGELOG_AGENTS.md`: Recorded the validation assessment.
+
+### Reason
+- API validation alone cannot protect records written by another service or direct database client.
+
+### Validation
+- Prisma schema validation — passed.
+- Applying migrations — blocked by the existing `PayrunEmployee` table schema conflict.
+
+### Notes
+- The supplied database already contains `PayrunEmployee` created by Java/Hibernate with a schema that conflicts with the pending Prisma migration. Prisma/Java ownership of this table must be aligned before database checks are applied.
