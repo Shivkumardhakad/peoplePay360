@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast";
-import { createContractAction, getEmployeesAction } from "@/lib/api-actions";
+import { createContractAction, getEmployeesAction, getWorkingSchedulesAction, listPayrollStructuresAction } from "@/lib/api-actions";
 import { Loader2 } from "lucide-react";
 
 const contractSchema = z.object({
@@ -39,18 +39,15 @@ export function ContractForm({
 }) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
-  const [employees, setEmployees] = useState<Array<{ id: string; employeeNumber: string; name: string }>>([
-    { id: "EMP-001", employeeNumber: "EMP-001", name: "Alice Johnson" },
-    { id: "EMP-002", employeeNumber: "EMP-002", name: "Bob Smith" },
-    { id: "EMP-003", employeeNumber: "EMP-003", name: "Charlie Davis" },
-    { id: "EMP-004", employeeNumber: "EMP-004", name: "Emily Watson" },
-  ]);
+  const [employees, setEmployees] = useState<Array<{ id: string; employeeNumber: string; name: string }>>([]);
+  const [structures, setStructures] = useState<Array<{ id: string; name: string; code?: string; status?: string }>>([]);
+  const [schedules, setSchedules] = useState<Array<{ id: string; name: string; code: string | null; weeklyHours: number }>>([]);
 
   useEffect(() => {
-    getEmployeesAction().then((res) => {
-      if (res && res.length > 0) {
-        setEmployees(res);
-      }
+    void Promise.all([getEmployeesAction(), listPayrollStructuresAction(), getWorkingSchedulesAction()]).then(([employeeRows, structureRows, scheduleRows]) => {
+      setEmployees(employeeRows);
+      setStructures((structureRows as any[]).filter((structure) => structure.status === "ACTIVE").map((structure) => ({ id: structure.id, name: structure.name, code: structure.code, status: structure.status })));
+      setSchedules(scheduleRows);
     });
   }, []);
 
@@ -62,8 +59,8 @@ export function ContractForm({
     resolver: zodResolver(contractSchema),
     defaultValues: defaultValues || {
       employmentType: "FULL_TIME",
-      salaryStructureId: "STR-001",
-      workingScheduleId: "SCH-001",
+      salaryStructureId: "",
+      workingScheduleId: "",
       startDate: new Date().toISOString().split("T")[0] || "2023-10-01",
     },
   });
@@ -193,9 +190,8 @@ export function ContractForm({
             {...register("salaryStructureId")}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            <option value="STR-001">Standard Tech Package (STR-001)</option>
-            <option value="STR-002">Executive Package (STR-002)</option>
-            <option value="STR-003">Operations Base (STR-003)</option>
+            <option value="">Select Salary Structure</option>
+            {structures.map((structure) => <option key={structure.id} value={structure.id}>{structure.name}{structure.code ? ` (${structure.code})` : ""}</option>)}
           </select>
         </div>
 
@@ -206,9 +202,8 @@ export function ContractForm({
             {...register("workingScheduleId")}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            <option value="SCH-001">Standard 40h (Mon-Fri 9-5)</option>
-            <option value="SCH-002">Part Time 20h</option>
-            <option value="SCH-003">Flexible Remote 37.5h</option>
+            <option value="">Select Working Schedule</option>
+            {schedules.map((schedule) => <option key={schedule.id} value={schedule.id}>{schedule.name} ({schedule.weeklyHours}h)</option>)}
           </select>
         </div>
       </div>

@@ -6,6 +6,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @RestController
 @RequestMapping("/api/payroll")
@@ -22,7 +25,12 @@ public class PaymentStatusController {
     }
 
     @GetMapping("/payslips/{id}/payment-status")
-    public PaymentStatusDtos.PayslipStatus payslipStatus(@PathVariable String id) {
-        return service.payslip(id);
+    public PaymentStatusDtos.PayslipStatus payslipStatus(@PathVariable String id, @AuthenticationPrincipal Jwt jwt) {
+        PaymentStatusDtos.PayslipStatus status = service.payslip(id);
+        if ("EMPLOYEE".equals(jwt.getClaimAsString("role"))
+            && !status.employeeId().equals(jwt.getClaimAsString("employeeId"))) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "You may only access your own payslip payment status");
+        }
+        return status;
     }
 }

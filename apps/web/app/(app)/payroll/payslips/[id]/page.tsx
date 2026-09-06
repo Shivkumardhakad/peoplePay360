@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
-import { generatePayslipPDF } from "@/lib/payslip-pdf";
-import { getPayslipAction } from "@/lib/api-actions";
+import { getPayslipAction, getPayslipPaymentStatusAction, getPayslipPdfAction } from "@/lib/api-actions";
 import { ArrowLeft, Printer, Download, CheckCircle, FileText, Loader2 } from "lucide-react";
 
 export default function PayslipDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,8 +16,14 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
   const [downloading, setDownloading] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [livePayslip, setLivePayslip] = useState<any>(null);
+  const [paymentStatus, setPaymentStatus] = useState<any>(null);
 
-  useEffect(() => { getPayslipAction(payslipId).then(setLivePayslip).catch(() => setLivePayslip({ error: true })); }, [payslipId]);
+  useEffect(() => {
+    getPayslipAction(payslipId).then((payslip) => {
+      setLivePayslip(payslip);
+      return getPayslipPaymentStatusAction(payslipId).then(setPaymentStatus).catch(() => setPaymentStatus(null));
+    }).catch(() => setLivePayslip({ error: true }));
+  }, [payslipId]);
 
   if (livePayslip?.error) return <div className="p-6 text-sm text-destructive">Payslip could not be loaded from Payroll API.</div>;
   if (!livePayslip) return <div className="p-6 text-sm text-muted-foreground">Loading payslip...</div>;
@@ -27,7 +32,14 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
   const handleDownloadPDF = async () => {
     setDownloading(true);
     try {
-      generatePayslipPDF(payslip);
+      const base64 = await getPayslipPdfAction(payslipId);
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Payslip_${payslipId}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
       toast({
         title: "Payslip Downloaded",
         description: `Exported PDF for ${payslip.employeeName} (${payslipId}).`,
@@ -66,13 +78,14 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
               <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                 {payslip.period}
               </span>
-              <Badge variant="success" className="text-[10px] font-mono">
-                <CheckCircle className="w-3 h-3 mr-1" /> Paid
+              <Badge variant={paymentStatus?.status === "PAID" ? "success" : "secondary"} className="text-[10px] font-mono">
+                <CheckCircle className="w-3 h-3 mr-1" /> {paymentStatus?.status ?? "Loading"}
               </Badge>
             </div>
             <p className="text-[11px] text-muted-foreground font-mono">
               {payslip.employeeName} • {payslip.department} • {payslip.contractRef}
             </p>
+            {paymentStatus && <p className="text-[10px] text-muted-foreground font-mono">Payment: {paymentStatus.status}{paymentStatus.paidAt ? ` · ${String(paymentStatus.paidAt).slice(0, 10)}` : ""}</p>}
           </div>
         </div>
 

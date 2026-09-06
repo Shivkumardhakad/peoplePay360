@@ -3,10 +3,9 @@ import { Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { StatusBadge } from "@/components/status-badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { hrApiFetch } from "@/lib/hr-api";
-import { formatDate, formatDateTime, formatHours, humanizeStatus, statusTone, todayInputValue } from "../self-service-utils";
+import { todayInputValue } from "../self-service-utils";
+import { AttendanceTableClient } from "./attendance-table-client";
 
 type Attendance = {
   id: string;
@@ -86,34 +85,8 @@ export default async function MyAttendancePage() {
         </div>
       </form>
 
-      <div className="pp-solid-surface overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-b-[0.5px] border-border bg-muted/20 hover:bg-muted/20">
-              <TableHead>Date</TableHead>
-              <TableHead>Check In</TableHead>
-              <TableHead>Check Out</TableHead>
-              <TableHead className="text-right">Break</TableHead>
-              <TableHead className="text-right">Worked</TableHead>
-              <TableHead className="text-right">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {attendance.map((record) => (
-              <TableRow key={record.id} className="border-b-[0.5px] border-border hover:bg-muted/30">
-                <TableCell className="font-mono text-xs text-muted-foreground">{formatDate(record.date)}</TableCell>
-                <TableCell className="font-mono text-xs">{formatDateTime(record.checkIn)}</TableCell>
-                <TableCell className="font-mono text-xs">{formatDateTime(record.checkOut)}</TableCell>
-                <TableCell className="text-right font-mono text-xs">{record.breakMinutes}m</TableCell>
-                <TableCell className="text-right font-mono text-xs font-semibold">{formatHours(record.workedMinutes)}</TableCell>
-                <TableCell className="text-right">
-                  <StatusBadge tone={statusTone(record.status)} label={humanizeStatus(record.status)} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <AttendanceTableClient attendance={attendance} />
     </div>
   );
 }
+

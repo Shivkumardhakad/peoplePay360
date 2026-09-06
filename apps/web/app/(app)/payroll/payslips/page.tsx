@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
-import { generatePayslipPDF } from "@/lib/payslip-pdf";
-import { listPayrollPayslipsAction } from "@/lib/api-actions";
+import { getPayslipPdfAction, listPayrollPayslipsAction } from "@/lib/api-actions";
+
+import { TablePagination } from "@/components/ui/table-pagination";
 
 function money(value: number) {
   return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -22,6 +23,10 @@ export default function PayslipsPage() {
   const [search, setSearch] = useState("");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [livePayslips, setLivePayslips] = useState<any[]>([]);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => { listPayrollPayslipsAction().then(setLivePayslips).catch((error) => toast({ title: "Payroll API unavailable", description: error.message, type: "error" })); }, [toast]);
 
@@ -47,10 +52,25 @@ export default function PayslipsPage() {
       p.id.toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredPayslips.length / pageSize);
+  const paginatedPayslips = filteredPayslips.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+  };
+
   const handleDownload = async (slip: any) => {
     setDownloadingId(slip.id);
     try {
-      generatePayslipPDF(slip);
+      const base64 = await getPayslipPdfAction(slip.id);
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Payslip_${slip.id}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
       toast({
         title: "Payslip Downloaded",
         description: `Exported PDF for ${slip.employeeName} (${slip.id}).`,
@@ -59,7 +79,7 @@ export default function PayslipsPage() {
     } catch {
       toast({
         title: "Download Failed",
-        description: "Failed to generate PDF.",
+        description: "PDF is available only after the payslip is validated or paid.",
         type: "error",
       });
     } finally {
@@ -89,7 +109,7 @@ export default function PayslipsPage() {
           <Input
             placeholder="Filter payslips..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-8 h-7 text-xs"
           />
         </div>
@@ -99,81 +119,96 @@ export default function PayslipsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Employee</TableHead>
-              <TableHead>Batch</TableHead>
-              <TableHead>Period</TableHead>
-              <TableHead className="text-right">Gross</TableHead>
-              <TableHead className="text-right">Deductions</TableHead>
-              <TableHead className="text-right font-semibold">Net Salary</TableHead>
-              <TableHead className="text-right">Status</TableHead>
-              <TableHead className="w-[140px] text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredPayslips.length === 0 ? (
+      <div className="space-y-3">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={8} className="h-20 text-center text-xs text-muted-foreground">
-                  No payslips found.
-                </TableCell>
+                <TableHead>Employee</TableHead>
+                <TableHead>Batch</TableHead>
+                <TableHead>Period</TableHead>
+                <TableHead className="text-right">Gross</TableHead>
+                <TableHead className="text-right">Deductions</TableHead>
+                <TableHead className="text-right font-semibold">Net Salary</TableHead>
+                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="w-[140px] text-right">Actions</TableHead>
               </TableRow>
-            ) : (
-              filteredPayslips.map((payslip) => {
-                const isDownloading = downloadingId === payslip.id;
+            </TableHeader>
+            <TableBody>
+              {paginatedPayslips.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-20 text-center text-xs text-muted-foreground">
+                    No payslips found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedPayslips.map((payslip) => {
+                  const isDownloading = downloadingId === payslip.id;
 
-                return (
-                  <TableRow key={payslip.id}>
-                    <TableCell className="font-medium text-xs">
-                      <Link href={`/payroll/payslips/${payslip.id}`} className="hover:underline">
-                        {payslip.employeeName}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{payslip.payrun}</TableCell>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{payslip.period}</TableCell>
-                    <TableCell className="text-right font-mono text-xs text-muted-foreground">{money(payslip.gross)}</TableCell>
-                    <TableCell className="text-right font-mono text-xs text-rose-600">-{money(payslip.deductions)}</TableCell>
-                    <TableCell className="text-right font-mono text-xs font-semibold">{money(payslip.net)}</TableCell>
-                    <TableCell className="text-right">
-                      <Badge
-                        variant={payslip.status === "PAID" ? "success" : "secondary"}
-                        className="text-[10px] font-mono"
-                      >
-                        {payslip.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right p-1.5">
-                      <div className="flex justify-end items-center gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownload(payslip)}
-                          disabled={isDownloading}
-                          className="h-6 px-2 text-[11px] gap-1"
-                        >
-                          {isDownloading ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Download className="w-3 h-3" />
-                          )}
-                          <span>{isDownloading ? "PDF..." : "PDF"}</span>
-                        </Button>
-                        <Link href={`/payroll/payslips/${payslip.id}`}>
-                          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground">
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </Button>
+                  return (
+                    <TableRow key={payslip.id}>
+                      <TableCell className="font-medium text-xs">
+                        <Link href={`/payroll/payslips/${payslip.id}`} className="hover:underline">
+                          {payslip.employeeName}
                         </Link>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{payslip.payrun}</TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">{payslip.period}</TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground">{money(payslip.gross)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs text-rose-600">-{money(payslip.deductions)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-semibold">{money(payslip.net)}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge
+                          variant={payslip.status === "PAID" ? "success" : "secondary"}
+                          className="text-[10px] font-mono"
+                        >
+                          {payslip.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right p-1.5">
+                        <div className="flex justify-end items-center gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownload(payslip)}
+                            disabled={isDownloading}
+                            className="h-6 px-2 text-[11px] gap-1"
+                          >
+                            {isDownloading ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Download className="w-3 h-3" />
+                            )}
+                            <span>{isDownloading ? "PDF..." : "PDF"}</span>
+                          </Button>
+                          <Link href={`/payroll/payslips/${payslip.id}`}>
+                            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredPayslips.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+        />
       </div>
     </div>
   );
 }
+

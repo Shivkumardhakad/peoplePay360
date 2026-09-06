@@ -94,8 +94,9 @@ The HR API uses a dedicated PostgreSQL database through Prisma and requires `DAT
 | POST | `/api/payroll/payruns/{id}/validate` | Validate payrun and return warnings |
 | POST | `/api/payroll/payruns/{id}/pay` | Mark payrun paid |
 | POST | `/api/payroll/payruns/{id}/cancel` | Cancel payrun |
-| GET | `/api/payroll/payruns/{payrunId}/payslips` | List payrun payslips |
-| GET | `/api/payroll/payslips/{id}` | Get payslip with lines |
+  | GET | `/api/payroll/payruns/{payrunId}/payslips` | List payrun payslips |
+  | GET | `/api/payroll/payslips/{id}` | Get payslip with lines |
+  | GET | `/api/payroll/me/payslips` | List payslips for the authenticated employee |
 | GET | `/api/payroll/payslips/{id}/pdf` | Download or display payslip PDF |
 
 #### Reports

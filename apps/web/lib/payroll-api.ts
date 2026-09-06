@@ -9,6 +9,17 @@ type PayrollFetchOptions = Omit<RequestInit, "body" | "headers"> & {
 };
 
 export async function payrollApiFetch<T>(path: string, options: PayrollFetchOptions = {}): Promise<T> {
+  const response = await payrollApiRequest(path, options);
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
+}
+
+export async function payrollApiFetchBinary(path: string, options: PayrollFetchOptions = {}) {
+  const response = await payrollApiRequest(path, options);
+  return Buffer.from(await response.arrayBuffer()).toString("base64");
+}
+
+async function payrollApiRequest(path: string, options: PayrollFetchOptions = {}) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || !session.user.role) redirect("/login");
 
@@ -31,6 +42,5 @@ export async function payrollApiFetch<T>(path: string, options: PayrollFetchOpti
     cache: "no-store",
   });
   if (!response.ok) throw new Error(`Payroll API ${response.status}: ${await response.text()}`);
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+  return response;
 }

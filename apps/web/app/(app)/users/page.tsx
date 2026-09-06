@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, ShieldCheck, Loader2, KeyRound, LayoutList, Kanban, Mail, UserCheck } from "lucide-react";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { Plus, Search, ShieldCheck, Loader2, KeyRound, LayoutList, Kanban, Mail, UserCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   getUsersAction,
   createUserAction,
@@ -24,13 +25,6 @@ type SystemUser = {
   employeeId?: string | null;
   createdAt?: string | Date;
 };
-
-const INITIAL_USERS: SystemUser[] = [
-  { id: "USR-001", name: "Admin User", email: "admin@peoplepay360.local", role: "ADMIN" },
-  { id: "USR-002", name: "Bob Smith", email: "hr.manager@peoplepay360.local", role: "HR_MANAGER" },
-  { id: "USR-003", name: "Alice Johnson", email: "payroll.manager@peoplepay360.local", role: "PAYROLL_MANAGER" },
-  { id: "USR-004", name: "Emily Watson", email: "employee@peoplepay360.local", role: "EMPLOYEE" },
-];
 
 function formatRoleLabel(role: SystemUserRole) {
   switch (role) {
@@ -59,6 +53,11 @@ export default function UsersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [kanbanPages, setKanbanPages] = useState<{ [key: string]: number }>({});
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -102,6 +101,15 @@ export default function UsersPage() {
         u.id.toLowerCase().includes(term)
     );
   }, [search, users]);
+
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+    setKanbanPages({});
+  };
 
   const handleResetPassword = async (userId: string, userName: string) => {
     setActionLoadingId(userId);
@@ -169,35 +177,20 @@ export default function UsersPage() {
         return;
       }
 
-      const createdUser: SystemUser = {
-        id: res.user.id,
-        name: res.user.name,
-        email: res.user.email,
-        role: res.user.role as SystemUserRole,
-        employeeId: res.user.employeeId,
-        createdAt: res.user.createdAt,
-      };
-
-      setUsers((current) => [createdUser, ...current]);
       toast({
-        title: "User Created Successfully",
-        description: `${createdUser.name} (${createdUser.email}) can now log in immediately.`,
+        title: "User Created",
+        description: `Created system account for ${cleanName} (${role}).`,
         type: "success",
       });
 
+      setDialogOpen(false);
       setName("");
       setEmail("");
       setPassword("");
       setRole("HR_MANAGER");
-      setDialogOpen(false);
+      await loadUsers();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
-      setError(msg);
-      toast({
-        title: "System Error",
-        description: msg,
-        type: "error",
-      });
+      setError(err instanceof Error ? err.message : "Unknown error creating user");
     } finally {
       setSubmitting(false);
     }
@@ -209,16 +202,25 @@ export default function UsersPage() {
   const payrollUserUsers = filteredUsers.filter((u) => u.role === "HR_PAYROLL_USER");
   const employeeUsers = filteredUsers.filter((u) => u.role === "EMPLOYEE");
 
+  const kanbanRoleCols = [
+    { roleKey: "ADMIN", title: "Admin", users: adminUsers, dotColor: "bg-violet-500", hoverColor: "hover:border-violet-500/40", badgeRole: "ADMIN" },
+    { roleKey: "HR_MANAGER", title: "HR Mgr", users: hrManagerUsers, dotColor: "bg-sky-500", hoverColor: "hover:border-sky-500/40", badgeRole: "HR MGR" },
+    { roleKey: "PAYROLL_MANAGER", title: "Payroll Mgr", users: payrollMgrUsers, dotColor: "bg-emerald-500", hoverColor: "hover:border-emerald-500/40", badgeRole: "PAYROLL MGR" },
+    { roleKey: "HR_PAYROLL_USER", title: "Payroll Asst", users: payrollUserUsers, dotColor: "bg-amber-500", hoverColor: "hover:border-amber-500/40", badgeRole: "ASST" },
+    { roleKey: "EMPLOYEE", title: "Employees", users: employeeUsers, dotColor: "bg-slate-400", hoverColor: "hover:border-border", badgeRole: "EMP" },
+  ];
+
   return (
     <div className="space-y-3">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-primary" />
-            <h1 className="text-base font-semibold tracking-tight text-foreground">Team & Roles</h1>
+            <h1 className="text-base font-semibold tracking-tight text-foreground">User Management</h1>
           </div>
           <p className="text-xs text-muted-foreground">
-            Administer user accounts, security profiles, and role-based access permissions.
+            System accounts, security credentials, and role-based access control.
           </p>
         </div>
 
@@ -338,7 +340,7 @@ export default function UsersPage() {
           <Input
             placeholder="Search users..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-8 h-7 text-xs"
           />
         </div>
@@ -352,219 +354,160 @@ export default function UsersPage() {
 
       {/* Content View */}
       {viewMode === "list" ? (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User Name</TableHead>
-                <TableHead>Email Address</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-                <TableHead className="w-[110px] text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && users.length === 0 ? (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground">
-                    <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                      <span>Loading users...</span>
-                    </div>
-                  </TableCell>
+                  <TableHead>User Name</TableHead>
+                  <TableHead>Email Address</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                  <TableHead className="w-[110px] text-right">Action</TableHead>
                 </TableRow>
-              ) : filteredUsers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground">
-                    No users found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredUsers.map((u) => {
-                  const isResetting = actionLoadingId === u.id;
+              </TableHeader>
+              <TableBody>
+                {loading && users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                        <span>Loading users...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground">
+                      No users found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedUsers.map((u) => {
+                    const isResetting = actionLoadingId === u.id;
 
-                  return (
-                    <TableRow key={u.id}>
-                      <TableCell className="font-medium text-xs">{u.name}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{u.email}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[10px] font-mono">
-                          {formatRoleLabel(u.role)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant="success" className="text-[10px] font-mono">
-                          Active
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right p-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleResetPassword(u.id, u.name)}
-                          disabled={isResetting}
-                          className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1"
-                          title="Reset user password"
-                        >
-                          {isResetting ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <KeyRound className="w-3 h-3 text-muted-foreground" />
-                          )}
-                          <span>{isResetting ? "Resetting..." : "Reset PW"}</span>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                    return (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium text-xs">{u.name}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{u.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px] font-mono">
+                            {formatRoleLabel(u.role)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="success" className="text-[10px] font-mono">
+                            Active
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right p-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleResetPassword(u.id, u.name)}
+                            disabled={isResetting}
+                            className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1"
+                            title="Reset user password"
+                          >
+                            {isResetting ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <KeyRound className="w-3 h-3 text-muted-foreground" />
+                            )}
+                            <span>{isResetting ? "Resetting..." : "Reset PW"}</span>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredUsers.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
+          />
         </div>
       ) : (
         /* Kanban View */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
-          {/* Admin Column */}
-          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border/60">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-violet-500" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                  Admin ({adminUsers.length})
-                </h3>
-              </div>
-            </div>
-            <div className="space-y-2.5">
-              {adminUsers.map((u) => (
-                <div key={u.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-violet-500/40 transition-all space-y-2">
-                  <div className="flex items-start justify-between gap-1">
-                    <h4 className="text-xs font-semibold text-foreground flex items-center gap-1">
-                      <UserCheck className="w-3.5 h-3.5 text-violet-500" /> {u.name}
-                    </h4>
-                    <Badge variant="outline" className="text-[9px] font-mono shrink-0">
-                      ADMIN
-                    </Badge>
-                  </div>
-                  <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
-                    <Mail className="w-3 h-3 shrink-0" /> {u.email}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
+          {kanbanRoleCols.map((col) => {
+            const colPage = kanbanPages[col.roleKey] || 1;
+            const colTotalPages = Math.ceil(col.users.length / pageSize);
+            const paginatedColUsers = col.users.slice((colPage - 1) * pageSize, colPage * pageSize);
 
-          {/* HR Manager Column */}
-          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border/60">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-sky-500" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                  HR Mgr ({hrManagerUsers.length})
-                </h3>
-              </div>
-            </div>
-            <div className="space-y-2.5">
-              {hrManagerUsers.map((u) => (
-                <div key={u.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-sky-500/40 transition-all space-y-2">
-                  <div className="flex items-start justify-between gap-1">
-                    <h4 className="text-xs font-semibold text-foreground">{u.name}</h4>
-                    <Badge variant="outline" className="text-[9px] font-mono shrink-0">
-                      HR MGR
-                    </Badge>
+            return (
+              <div key={col.roleKey} className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`h-2 w-2 rounded-full ${col.dotColor}`} />
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                      {col.title} ({col.users.length})
+                    </h3>
                   </div>
-                  <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
-                    <Mail className="w-3 h-3 shrink-0" /> {u.email}
-                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="space-y-2.5">
+                  {paginatedColUsers.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
+                      No users
+                    </div>
+                  ) : (
+                    paginatedColUsers.map((u) => (
+                      <div key={u.id} className={`p-3 rounded-lg border border-border/80 bg-card ${col.hoverColor} transition-all space-y-2`}>
+                        <div className="flex items-start justify-between gap-1">
+                          <h4 className="text-xs font-semibold text-foreground flex items-center gap-1 truncate">
+                            {col.roleKey === "ADMIN" && <UserCheck className="w-3.5 h-3.5 text-violet-500 shrink-0" />}
+                            <span className="truncate">{u.name}</span>
+                          </h4>
+                          <Badge variant="outline" className="text-[9px] font-mono shrink-0">
+                            {col.badgeRole}
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
+                          <Mail className="w-3 h-3 shrink-0" /> {u.email}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
 
-          {/* Payroll Manager Column */}
-          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border/60">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                  Payroll Mgr ({payrollMgrUsers.length})
-                </h3>
-              </div>
-            </div>
-            <div className="space-y-2.5">
-              {payrollMgrUsers.map((u) => (
-                <div key={u.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-emerald-500/40 transition-all space-y-2">
-                  <div className="flex items-start justify-between gap-1">
-                    <h4 className="text-xs font-semibold text-foreground">{u.name}</h4>
-                    <Badge variant="outline" className="text-[9px] font-mono shrink-0">
-                      PAYROLL MGR
-                    </Badge>
+                {colTotalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-border/60 text-[11px] font-mono text-muted-foreground">
+                    <span>Page {colPage} of {colTotalPages}</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="iconSm"
+                        className="h-6 w-6"
+                        disabled={colPage <= 1}
+                        onClick={() => setKanbanPages((prev) => ({ ...prev, [col.roleKey]: colPage - 1 }))}
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="iconSm"
+                        className="h-6 w-6"
+                        disabled={colPage >= colTotalPages}
+                        onClick={() => setKanbanPages((prev) => ({ ...prev, [col.roleKey]: colPage + 1 }))}
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
-                  <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
-                    <Mail className="w-3 h-3 shrink-0" /> {u.email}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Payroll User Column */}
-          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border/60">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                  Payroll Asst ({payrollUserUsers.length})
-                </h3>
+                )}
               </div>
-            </div>
-            <div className="space-y-2.5">
-              {payrollUserUsers.map((u) => (
-                <div key={u.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-amber-500/40 transition-all space-y-2">
-                  <div className="flex items-start justify-between gap-1">
-                    <h4 className="text-xs font-semibold text-foreground">{u.name}</h4>
-                    <Badge variant="outline" className="text-[9px] font-mono shrink-0">
-                      ASST
-                    </Badge>
-                  </div>
-                  <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
-                    <Mail className="w-3 h-3 shrink-0" /> {u.email}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Employee Column */}
-          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border/60">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-slate-400" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                  Employees ({employeeUsers.length})
-                </h3>
-              </div>
-            </div>
-            <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
-              {employeeUsers.slice(0, 15).map((u) => (
-                <div key={u.id} className="p-3 rounded-lg border border-border/80 bg-card hover:border-border transition-all space-y-2 opacity-90">
-                  <div className="flex items-start justify-between gap-1">
-                    <h4 className="text-xs font-semibold text-foreground truncate">{u.name}</h4>
-                    <Badge variant="secondary" className="text-[9px] font-mono shrink-0">
-                      EMP
-                    </Badge>
-                  </div>
-                  <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
-                    <Mail className="w-3 h-3 shrink-0" /> {u.email}
-                  </p>
-                </div>
-              ))}
-              {employeeUsers.length > 15 && (
-                <p className="text-[11px] font-mono text-center text-muted-foreground pt-1">
-                  + {employeeUsers.length - 15} more employees
-                </p>
-              )}
-            </div>
-          </div>
+            );
+          })}
         </div>
       )}
     </div>

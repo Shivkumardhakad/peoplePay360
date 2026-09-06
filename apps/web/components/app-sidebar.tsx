@@ -19,6 +19,7 @@ import {
   Receipt,
   ListChecks,
   SlidersHorizontal,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,15 +32,6 @@ export interface Session {
     employeeId: string | null;
   };
 }
-
-export const MOCK_SESSION: Session = {
-  user: {
-    id: "1",
-    name: "Admin User",
-    role: "ADMIN",
-    employeeId: null,
-  },
-};
 
 function NavLink({
   href,
@@ -75,7 +67,7 @@ function NavLink({
   );
 }
 
-export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
+export function AppSidebar({ session }: { session: Session }) {
   const role = session.user.role;
   const isEmployee = role === "EMPLOYEE";
   const isHRManagerOnly = role === "HR_MANAGER";
@@ -111,6 +103,7 @@ export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
           <>
             <NavLink href="/employees" icon={Users}>Employees</NavLink>
             <NavLink href="/contracts" icon={FileText}>Contracts</NavLink>
+            <NavLink href="/working-schedules" icon={CalendarDays}>Working Schedules</NavLink>
           </>
         )}
 
@@ -141,6 +134,8 @@ export function AppSidebar({ session = MOCK_SESSION }: { session?: Session }) {
                 <NavLink href="/payroll/payslips" icon={Receipt} nested>Payslips</NavLink>
                 <NavLink href="/payroll/structures" icon={ListChecks} nested>Structures</NavLink>
                 <NavLink href="/payroll/rules" icon={SlidersHorizontal} nested>Rules</NavLink>
+                <NavLink href="/reports" icon={BarChart3} nested>Reports</NavLink>
+                <NavLink href="/audit-logs" icon={Shield} nested>Audit &amp; Logs</NavLink>
               </>
             ) : (
               <NavLink href="/payroll/payslips" icon={Receipt} nested>My Payslips</NavLink>

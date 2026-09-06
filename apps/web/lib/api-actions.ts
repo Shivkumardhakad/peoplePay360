@@ -4,7 +4,9 @@ import { prisma } from "@peoplepay360/db";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
-import { payrollApiFetch } from "@/lib/payroll-api";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { payrollApiFetch, payrollApiFetchBinary } from "@/lib/payroll-api";
 
 const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:4000/api/hr";
 
@@ -21,8 +23,11 @@ export async function createEmployeeAction(data: {
   jobPosition?: string;
   dateOfJoining: string;
   status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED";
+  password?: string;
 }) {
   const prismaStatus = data.status === "INACTIVE" ? "TERMINATED" : data.status;
+  const department = await prisma.department.findFirst({ where: { name: { equals: data.department.trim(), mode: "insensitive" } }, select: { id: true } });
+  if (!department) return { success: false, error: `Department not found: ${data.department}` };
 
   try {
     const res = await fetch(`${HR_API_URL}/employees`, {
@@ -33,6 +38,7 @@ export async function createEmployeeAction(data: {
         lastName: data.lastName,
         email: data.email,
         phone: data.phone || null,
+        departmentId: department.id,
         hireDate: new Date(data.dateOfJoining),
         status: prismaStatus,
       }),
@@ -41,6 +47,10 @@ export async function createEmployeeAction(data: {
 
     if (res.ok) {
       const created = await res.json();
+      if (data.password?.trim()) {
+        const passwordHash = await bcrypt.hash(data.password.trim(), 10);
+        await prisma.user.upsert({ where: { email: data.email.trim().toLowerCase() }, update: { name: `${data.firstName} ${data.lastName}`, passwordHash, role: "EMPLOYEE", employeeId: created.id }, create: { email: data.email.trim().toLowerCase(), name: `${data.firstName} ${data.lastName}`, passwordHash, role: "EMPLOYEE", employeeId: created.id } });
+      }
       revalidatePath("/employees");
       return { success: true, employee: created };
     }
@@ -56,10 +66,15 @@ export async function createEmployeeAction(data: {
         lastName: data.lastName,
         email: data.email,
         phone: data.phone || null,
+        departmentId: department.id,
         hireDate: new Date(data.dateOfJoining),
         status: prismaStatus,
       },
     });
+    if (data.password?.trim()) {
+      const passwordHash = await bcrypt.hash(data.password.trim(), 10);
+      await prisma.user.upsert({ where: { email: data.email.trim().toLowerCase() }, update: { name: `${data.firstName} ${data.lastName}`, passwordHash, role: "EMPLOYEE", employeeId: fallback.id }, create: { email: data.email.trim().toLowerCase(), name: `${data.firstName} ${data.lastName}`, passwordHash, role: "EMPLOYEE", employeeId: fallback.id } });
+    }
     revalidatePath("/employees");
     return { success: true, employee: fallback };
   } catch (err: unknown) {
@@ -91,10 +106,18 @@ export async function getEmployeesAction() {
 }
 
 export async function updateEmployeeAction(employeeId: string, data: {
-  firstName: string; lastName: string; email: string; phone?: string; department?: string; jobPosition?: string; dateOfJoining?: string; status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED";
+  firstName: string; lastName: string; email: string; phone?: string; department?: string; jobPosition?: string; dateOfJoining?: string; status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "TERMINATED"; password?: string;
 }) {
   try {
-    const employee = await prisma.employee.update({ where: { id: employeeId }, data: { firstName: data.firstName, lastName: data.lastName, email: data.email.trim().toLowerCase(), phone: data.phone || null, ...(data.dateOfJoining ? { hireDate: new Date(data.dateOfJoining) } : {}), status: data.status === "INACTIVE" ? "TERMINATED" : data.status } });
+    const department = data.department ? await prisma.department.findFirst({ where: { name: { equals: data.department.trim(), mode: "insensitive" } }, select: { id: true } }) : null;
+    if (data.department && !department) return { success: false, error: `Department not found: ${data.department}` };
+    const employee = await prisma.employee.update({ where: { id: employeeId }, data: { firstName: data.firstName, lastName: data.lastName, email: data.email.trim().toLowerCase(), phone: data.phone || null, ...(department ? { departmentId: department.id } : {}), ...(data.dateOfJoining ? { hireDate: new Date(data.dateOfJoining) } : {}), status: data.status === "INACTIVE" ? "TERMINATED" : data.status } });
+    if (data.password?.trim()) {
+      const passwordHash = await bcrypt.hash(data.password.trim(), 10);
+      const linkedUser = await prisma.user.findFirst({ where: { employeeId }, select: { id: true } });
+      if (linkedUser) await prisma.user.update({ where: { id: linkedUser.id }, data: { passwordHash } });
+      else await prisma.user.create({ data: { email: employee.email, name: `${employee.firstName} ${employee.lastName}`, passwordHash, role: "EMPLOYEE", employeeId } });
+    }
     revalidatePath("/employees");
     revalidatePath(`/employees/${employeeId}`);
     return { success: true, employee };
@@ -130,9 +153,16 @@ export async function getEmployeeAction(employeeId: string) {
   };
 }
 
-export async function getPayrollEligibleEmployeesAction() {
-  const employees = await prisma.employee.findMany({ where: { status: "ACTIVE" }, orderBy: { lastName: "asc" }, include: { department: true, contracts: { where: { status: "ACTIVE" }, orderBy: { startDate: "desc" }, take: 1 } } });
-  return employees.map((employee) => ({ id: employee.id, employeeNumber: employee.employeeNumber, name: `${employee.firstName} ${employee.lastName}`, department: employee.department?.name ?? "-", wage: Number(employee.contracts[0]?.baseSalary ?? 0) }));
+export async function listPayrollDepartmentsAction() {
+  return prisma.department.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
+}
+
+export async function getPayrollEligibleEmployeesAction(departmentId?: string) {
+  const employees = await prisma.employee.findMany({ where: { status: "ACTIVE", ...(departmentId ? { OR: [{ departmentId }, { contracts: { some: { status: "ACTIVE", departmentId } } }] } : {}) }, orderBy: { lastName: "asc" }, include: { department: true, contracts: { where: { status: "ACTIVE" }, orderBy: { startDate: "desc" }, take: 1, include: { department: true } } } });
+  return employees.map((employee) => {
+    const contract = employee.contracts[0];
+    return { id: employee.id, employeeNumber: employee.employeeNumber, name: `${employee.firstName} ${employee.lastName}`, departmentId: employee.departmentId ?? contract?.departmentId ?? null, department: employee.department?.name ?? contract?.department?.name ?? "-", wage: Number(contract?.baseSalary ?? 0) };
+  });
 }
 
 // -------------------------------------------------------------
@@ -163,6 +193,57 @@ export async function getContractsAction() {
     }));
   } catch {
     return [];
+  }
+}
+
+export async function getWorkingSchedulesAction() {
+  const schedules = await prisma.workingSchedule.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, include: { scheduleDays: { orderBy: { dayOfWeek: "asc" } }, _count: { select: { contracts: true } } } });
+  return schedules.map((schedule) => ({ ...schedule, weeklyHours: Number(schedule.weeklyHours), contractCount: schedule._count.contracts }));
+}
+
+type WorkingScheduleDayInput = { dayOfWeek: "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN"; startTime?: string | null; endTime?: string | null; breakMinutes?: number; isWorkingDay?: boolean };
+
+function calculateWeeklyHours(days: WorkingScheduleDayInput[]) {
+  return days.reduce((total, day) => {
+    if (!day.isWorkingDay || !day.startTime || !day.endTime) return total;
+    const [startHour = 0, startMinute = 0] = day.startTime.split(":").map(Number);
+    const [endHour = 0, endMinute = 0] = day.endTime.split(":").map(Number);
+    const minutes = Math.max(0, (endHour * 60 + endMinute) - (startHour * 60 + startMinute) - Number(day.breakMinutes ?? 0));
+    return total + minutes / 60;
+  }, 0);
+}
+
+export async function saveWorkingScheduleAction(data: { id?: string; name: string; code?: string; description?: string; status?: "ACTIVE" | "INACTIVE"; days: WorkingScheduleDayInput[] }) {
+  try {
+    const days = data.days.map((day) => ({ ...day, breakMinutes: Number(day.breakMinutes ?? 0), isWorkingDay: Boolean(day.isWorkingDay) }));
+    const weeklyHours = calculateWeeklyHours(days);
+    if (!data.name.trim()) return { success: false, error: "Schedule name is required." };
+    if (weeklyHours <= 0) return { success: false, error: "Add at least one working day with valid start and end times." };
+    const result = await prisma.$transaction(async (tx) => {
+      const schedule = data.id
+        ? await tx.workingSchedule.update({ where: { id: data.id }, data: { name: data.name.trim(), code: data.code?.trim() || null, description: data.description?.trim() || null, status: data.status ?? "ACTIVE", weeklyHours, days } })
+        : await tx.workingSchedule.create({ data: { name: data.name.trim(), code: data.code?.trim() || null, description: data.description?.trim() || null, status: data.status ?? "ACTIVE", weeklyHours, days } });
+      if (data.id) await tx.workingScheduleDay.deleteMany({ where: { workingScheduleId: schedule.id } });
+      if (days.length) await tx.workingScheduleDay.createMany({ data: days.map((day) => ({ workingScheduleId: schedule.id, dayOfWeek: day.dayOfWeek, startTime: day.startTime || null, endTime: day.endTime || null, breakMinutes: day.breakMinutes, isWorkingDay: day.isWorkingDay })) });
+      return schedule;
+    });
+    revalidatePath("/working-schedules");
+    revalidatePath("/contracts");
+    return { success: true, schedule: result };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to save working schedule." };
+  }
+}
+
+export async function deactivateWorkingScheduleAction(id: string) {
+  try {
+    const assigned = await prisma.contract.count({ where: { workingScheduleId: id, status: "ACTIVE" } });
+    if (assigned > 0) return { success: false, error: "This schedule is assigned to active contracts and cannot be deactivated." };
+    await prisma.workingSchedule.update({ where: { id }, data: { status: "INACTIVE" } });
+    revalidatePath("/working-schedules");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to deactivate working schedule." };
   }
 }
 
@@ -709,7 +790,8 @@ export async function sendPayrunPayslipsAction(payrunId: string) {
       if (!employee?.email) throw new Error(`Employee email is missing for ${summary.employeeId}.`);
       const payslip = await getPayslipAction(summary.id);
       const lines = (payslip.lines ?? []).map((line: any) => `<tr><td>${escapeEmailHtml(line.rule)}</td><td>${escapeEmailHtml(line.category)}</td><td>${Number(line.amount).toFixed(2)}</td></tr>`).join("");
-      await transporter.sendMail({ from, to: employee.email, subject: `Payslip - ${payrun.name}`, html: `<p>Hello ${escapeEmailHtml(employee.firstName)},</p><p>Your payslip for ${escapeEmailHtml(String(payrun.periodStart).slice(0, 10))} to ${escapeEmailHtml(String(payrun.periodEnd).slice(0, 10))} is ready.</p><table><thead><tr><th>Component</th><th>Category</th><th>Amount</th></tr></thead><tbody>${lines}</tbody></table><p>Gross: ${Number(payslip.gross).toFixed(2)}<br>Deductions: ${Number(payslip.deductions).toFixed(2)}<br><strong>Net: ${Number(payslip.net).toFixed(2)}</strong></p>` });
+      const pdfBase64 = await getPayslipPdfAction(summary.id);
+      await transporter.sendMail({ from, to: employee.email, subject: `Payslip - ${payrun.name}`, html: `<p>Hello ${escapeEmailHtml(employee.firstName)},</p><p>Your payslip for ${escapeEmailHtml(String(payrun.periodStart).slice(0, 10))} to ${escapeEmailHtml(String(payrun.periodEnd).slice(0, 10))} is ready.</p><table><thead><tr><th>Component</th><th>Category</th><th>Amount</th></tr></thead><tbody>${lines}</tbody></table><p>Gross: ${Number(payslip.gross).toFixed(2)}<br>Deductions: ${Number(payslip.deductions).toFixed(2)}<br><strong>Net: ${Number(payslip.net).toFixed(2)}</strong></p>`, attachments: [{ filename: `Payslip_${summary.id}.pdf`, content: Buffer.from(pdfBase64, "base64"), contentType: "application/pdf" }] });
       results.push({ employeeId: employee.id, email: employee.email, status: "sent" });
     }
     return { success: true, message: `Sent ${results.length} payslip(s).`, sent: results.length, results };
@@ -728,6 +810,21 @@ export async function listPayrollRulesAction() {
 
 export async function listPayrollCategoriesAction() {
   return payrollApiFetch<unknown[]>("/api/payroll/salary-rule-categories");
+}
+
+export async function createPayrollCategoryAction(body: unknown) {
+  try { return { success: true, result: await payrollApiFetch("/api/payroll/salary-rule-categories", { method: "POST", body }) }; }
+  catch (error) { return { success: false, error: payrollUnavailableMessage(error) }; }
+}
+
+export async function updatePayrollCategoryAction(id: string, body: unknown) {
+  try { return { success: true, result: await payrollApiFetch(`/api/payroll/salary-rule-categories/${id}`, { method: "PUT", body }) }; }
+  catch (error) { return { success: false, error: payrollUnavailableMessage(error) }; }
+}
+
+export async function deletePayrollCategoryAction(id: string) {
+  try { await payrollApiFetch(`/api/payroll/salary-rule-categories/${id}`, { method: "DELETE" }); return { success: true }; }
+  catch (error) { return { success: false, error: payrollUnavailableMessage(error) }; }
 }
 
 export async function createPayrollRuleAction(body: unknown) {
@@ -779,8 +876,75 @@ export async function getPayrunAction(id: string) {
   return payrollApiFetch(`/api/payroll/payruns/${id}`);
 }
 
+export async function getPayrollReportAction(from: string, to: string, status?: string, departmentId?: string, employeeType?: string) {
+  const query = new URLSearchParams({ from: `${from}T00:00:00`, to: `${to}T23:59:59` });
+  if (status) query.set("status", status);
+  const [summary, report] = await Promise.all([
+    payrollApiFetch<any>(`/api/payroll/reports/summary?${query.toString()}`),
+    payrollApiFetch<any>(`/api/payroll/reports/payslips?${query.toString()}`),
+  ]);
+  const employeeIds: string[] = Array.from(new Set<string>((report.payslips ?? []).map((row: any) => String(row.employeeId ?? "")).filter(Boolean)));
+  const [employees, departments] = await Promise.all([
+    prisma.employee.findMany({
+      where: { id: { in: employeeIds } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        departmentId: true,
+        contracts: {
+          where: { startDate: { lte: new Date(`${to}T23:59:59`) }, OR: [{ endDate: null }, { endDate: { gte: new Date(`${from}T00:00:00`) } }] },
+          orderBy: { startDate: "desc" },
+          take: 1,
+          select: { employmentType: true },
+        },
+      },
+    }),
+    prisma.department.findMany({ select: { id: true, name: true } }),
+  ]);
+  const employeeMap = new Map(employees.map((employee) => [employee.id, employee]));
+  const departmentMap = new Map(departments.map((department) => [department.id, department.name]));
+  const payslips = (report.payslips ?? []).map((row: any) => ({ ...row, employeeName: employeeMap.get(row.employeeId) ? `${employeeMap.get(row.employeeId)?.firstName} ${employeeMap.get(row.employeeId)?.lastName}` : "Unknown employee", department: departmentMap.get(employeeMap.get(row.employeeId)?.departmentId ?? "") ?? "Unassigned", departmentId: employeeMap.get(row.employeeId)?.departmentId ?? "", employeeType: employeeMap.get(row.employeeId)?.contracts[0]?.employmentType ?? "UNKNOWN" })).filter((row: any) => (!departmentId || row.departmentId === departmentId) && (!employeeType || row.employeeType === employeeType));
+  const filteredSummary = { ...summary, payslipCount: payslips.length, payrunCount: new Set(payslips.map((row: any) => row.payrunId)).size, grossAmount: payslips.reduce((total: number, row: any) => total + Number(row.grossAmount ?? 0), 0), deductionAmount: payslips.reduce((total: number, row: any) => total + Number(row.deductionAmount ?? 0), 0), netAmount: payslips.reduce((total: number, row: any) => total + Number(row.netAmount ?? 0), 0) };
+  return { summary: filteredSummary, payslips, departments: departments.map((department) => ({ id: department.id, name: department.name })) };
+}
+
+export async function getPayrollAuditAction(payrunId: string) {
+  return payrollApiFetch(`/api/payroll/payruns/${payrunId}/audit`);
+}
+
+export async function getPayrollAuditLogAction() {
+  const payruns = await payrollApiFetch<any[]>("/api/payroll/payruns");
+  const auditedPayruns = payruns.filter((payrun) => payrun.status !== "DRAFT").slice(0, 25);
+  const entries = await Promise.all(auditedPayruns.map(async (payrun) => {
+    try {
+      const audit = await getPayrollAuditAction(payrun.id) as any;
+      return { payrunId: payrun.id, payrunName: payrun.name, periodStart: payrun.periodStart, periodEnd: payrun.periodEnd, status: payrun.status, audit };
+    } catch {
+      return null;
+    }
+  }));
+  return entries.filter(Boolean);
+}
+
+export async function getPayrunPaymentStatusAction(payrunId: string) {
+  return payrollApiFetch(`/api/payroll/payruns/${payrunId}/payment-status`);
+}
+
+export async function getPayslipPaymentStatusAction(payslipId: string) {
+  return payrollApiFetch(`/api/payroll/payslips/${payslipId}/payment-status`);
+}
+
 export async function createPayrunAction(body: unknown) {
-  const result = await payrollApiFetch("/api/payroll/payruns", { method: "POST", body });
+  const request = body as { departmentId?: string; selectedEmployeeIds?: string[] };
+  if (request.departmentId) {
+    const selectedEmployeeIds = request.selectedEmployeeIds ?? [];
+    const matchingEmployees = await prisma.employee.count({ where: { id: { in: selectedEmployeeIds }, status: "ACTIVE", OR: [{ departmentId: request.departmentId }, { contracts: { some: { status: "ACTIVE", departmentId: request.departmentId } } }] } });
+    if (matchingEmployees !== selectedEmployeeIds.length) throw new Error("All selected employees must belong to the chosen department.");
+  }
+  const { departmentId: _departmentId, selectedEmployeeIds, ...payrollBody } = request as any;
+  payrollBody.employeeIds = selectedEmployeeIds;
+  const result = await payrollApiFetch("/api/payroll/payruns", { method: "POST", body: payrollBody });
   revalidatePath("/payroll/payruns");
   return result;
 }
@@ -804,15 +968,34 @@ export async function updatePayrollStructureAction(id: string, body: unknown) {
 }
 
 export async function getPayslipAction(id: string) {
+  const session = await getServerSession(authOptions);
   const payslip = await payrollApiFetch<any>(`/api/payroll/payslips/${id}`);
+  if (session?.user?.role === "EMPLOYEE" && payslip.employeeId !== session.user.employeeId) {
+    throw new Error("You are not authorized to view this payslip.");
+  }
+  return enrichPayslipForUi(payslip);
+}
+
+async function enrichPayslipForUi(payslip: any) {
   const employee = await prisma.employee.findUnique({ where: { id: payslip.employeeId }, include: { department: true, jobPosition: true } });
   const contract = await prisma.contract.findUnique({ where: { id: payslip.contractId } });
   return { ...payslip, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : payslip.employeeId, department: employee?.department?.name ?? "-", position: employee?.jobPosition?.title ?? "-", contractRef: contract?.title ?? payslip.contractId, period: `${String(payslip.periodStart).slice(0, 10)} → ${String(payslip.periodEnd).slice(0, 10)}`, gross: Number(payslip.grossAmount), deductions: Number(payslip.deductionAmount), net: Number(payslip.netAmount), lines: (payslip.lines ?? []).map((line: any) => ({ rule: line.name, category: line.code, amount: Number(line.amount), type: line.amount < 0 ? "DEDUCTION" : "EARNING" })) };
 }
 
+export async function getPayslipPdfAction(id: string) {
+  const payslip = await getPayslipAction(id);
+  if (!["VALIDATED", "PAID"].includes(payslip.status)) throw new Error("Payslip PDF is available only after validation or payment.");
+  return payrollApiFetchBinary(`/api/payroll/payslips/${id}/pdf`);
+}
+
 export async function listPayrollPayslipsAction() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role === "EMPLOYEE") {
+    const payslips = await payrollApiFetch<any[]>("/api/payroll/me/payslips");
+    return Promise.all(payslips.map(async (payslip) => ({ ...(await enrichPayslipForUi(payslip)), payrun: payslip.payrunName })));
+  }
   const payruns = await payrollApiFetch<any[]>("/api/payroll/payruns");
-  const slips = (await Promise.all(payruns.flatMap((payrun) => (payrun.payslips ?? []).map((summary: any) => getPayslipAction(summary.id).then((payslip) => ({ ...payslip, payrun: payrun.name })))))).flat();
+  const slips = (await Promise.all(payruns.flatMap((payrun) => (payrun.payslips ?? []).filter((summary: any) => session?.user?.role !== "EMPLOYEE" || summary.employeeId === session.user.employeeId).map((summary: any) => getPayslipAction(summary.id).then((payslip) => ({ ...payslip, payrun: payrun.name })))))).flat();
   return slips;
 }
 

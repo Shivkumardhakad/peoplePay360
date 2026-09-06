@@ -1,3 +1,5 @@
+server:
+  port: 8080
 spring:
   application:
     name: payroll
@@ -18,6 +20,10 @@ spring:
       connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT_MS:30000}
       validation-timeout: ${DB_POOL_VALIDATION_TIMEOUT_MS:5000}
       max-lifetime: ${DB_POOL_MAX_LIFETIME_MS:1800000}
+      # Supabase/PgBouncer transaction poolers do not preserve named prepared statements.
+      # Disabling them avoids metadata discovery conflicts such as "S_1 already exists".
+      data-source-properties:
+        prepareThreshold: 0
 
   jpa:
     hibernate:
