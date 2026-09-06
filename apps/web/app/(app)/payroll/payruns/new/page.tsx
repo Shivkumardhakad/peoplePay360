@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,20 +9,39 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { ArrowRight, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
-
-const MOCK_ELIGIBLE_EMPLOYEES = [
-  { id: "EMP-001", name: "Alice Johnson", department: "Engineering", wage: 120000 },
-  { id: "EMP-002", name: "Bob Smith", department: "Human Resources", wage: 95000 },
-  { id: "EMP-003", name: "Charlie Davis", department: "Finance & Accounting", wage: 75000 },
-  { id: "EMP-004", name: "Emily Watson", department: "Product & Design", wage: 110000 },
-];
+import { createPayrunAction, listPayrollDepartmentsAction, listPayrollStructuresAction } from "@/lib/api-actions";
+import { getPayrollEligibleEmployeesAction } from "@/lib/api-actions";
 
 export default function NewPayrunWizard() {
   const router = useRouter();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
-  const [selectedEmployees, setSelectedEmployees] = useState<string[]>(["EMP-001", "EMP-002", "EMP-004"]);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [structures, setStructures] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [departmentId, setDepartmentId] = useState("");
+  const [structureId, setStructureId] = useState("");
+  const [periodStart, setPeriodStart] = useState("2026-09-01");
+  const [periodEnd, setPeriodEnd] = useState("2026-09-30");
+
+  useEffect(() => {
+    Promise.all([listPayrollDepartmentsAction(), listPayrollStructuresAction()]).then(([loadedDepartments, loadedStructures]) => {
+      setDepartments(loadedDepartments);
+      setDepartmentId(loadedDepartments[0]?.id ?? "");
+      setStructures(loadedStructures as any[]);
+      setStructureId((loadedStructures as any[])[0]?.id ?? "");
+    }).catch((error) => toast({ title: "Unable to load payrun setup", description: error.message, type: "error" }));
+  }, [toast]);
+
+  useEffect(() => {
+    if (!departmentId) return;
+    getPayrollEligibleEmployeesAction(departmentId).then((loadedEmployees) => {
+      setEmployees(loadedEmployees);
+      setSelectedEmployees(loadedEmployees.map((employee) => employee.id));
+    }).catch((error) => toast({ title: "Unable to load department employees", description: error.message, type: "error" }));
+  }, [departmentId, toast]);
 
   const toggleEmployee = (id: string) => {
     if (selectedEmployees.includes(id)) {
@@ -34,15 +53,14 @@ export default function NewPayrunWizard() {
 
   const handleCreatePayrun = async () => {
     setIsCreating(true);
-    await new Promise((r) => setTimeout(r, 600)); // Visible loading state
-
-    toast({
-      title: "Payrun Batch Initialized",
-      description: `Created PR-2023-11 with ${selectedEmployees.length} employees.`,
-      type: "success",
-    });
-
-    router.push("/payroll/payruns/PR-2023-11");
+    try {
+      if (!departmentId || !structureId || !selectedEmployees.length) throw new Error("Select a department, salary structure, and at least one employee.");
+      const created = await createPayrunAction({ name: `Payroll ${periodStart} to ${periodEnd}`, periodStart: `${periodStart}T00:00:00`, periodEnd: `${periodEnd}T23:59:59`, salaryStructureId: structureId, selectedEmployeeIds: selectedEmployees, departmentId });
+      toast({ title: "Payrun Batch Initialized", description: "Payrun created in the Java Payroll API.", type: "success" });
+      router.push(`/payroll/payruns/${(created as any).id}`);
+    } catch (error) {
+      toast({ title: "Payrun creation failed", description: error instanceof Error ? error.message : "Payroll API request failed.", type: "error" });
+    } finally { setIsCreating(false); }
   };
 
   return (
@@ -81,24 +99,33 @@ export default function NewPayrunWizard() {
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
             <div className="space-y-1.5 max-w-sm">
+              <Label htmlFor="department" className="text-xs font-medium">Department / Branch</Label>
+              <select id="department" value={departmentId} onChange={(event) => setDepartmentId(event.target.value)} className="flex h-8 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                <option value="">Select department / branch</option>
+                {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-1.5 max-w-sm">
               <Label htmlFor="structure" className="text-xs font-medium">Salary Structure</Label>
               <select
                 id="structure"
+                value={structureId}
+                onChange={(event) => setStructureId(event.target.value)}
                 className="flex h-8 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <option value="STR-001">Standard Tech Package (STR-001)</option>
-                <option value="STR-002">Executive Leadership Package (STR-002)</option>
+                {structures.map((structure) => <option key={structure.id} value={structure.id}>{structure.name} ({structure.code})</option>)}
               </select>
             </div>
 
             <div className="grid grid-cols-2 gap-3 max-w-sm">
               <div className="space-y-1.5">
                 <Label htmlFor="periodStart" className="text-xs font-medium">Start Date</Label>
-                <Input id="periodStart" type="date" defaultValue="2023-11-01" className="font-mono text-xs h-8" />
+                <Input id="periodStart" type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} className="font-mono text-xs h-8" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="periodEnd" className="text-xs font-medium">End Date</Label>
-                <Input id="periodEnd" type="date" defaultValue="2023-11-30" className="font-mono text-xs h-8" />
+                <Input id="periodEnd" type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} className="font-mono text-xs h-8" />
               </div>
             </div>
           </CardContent>
@@ -114,21 +141,20 @@ export default function NewPayrunWizard() {
         <Card>
           <CardHeader className="border-b border-border pb-3">
             <CardTitle>Step 2: Eligible Employees</CardTitle>
-            <CardDescription>Select active employees with active contracts in the target period.</CardDescription>
+            <CardDescription>Select active employees from {departments.find((department) => department.id === departmentId)?.name ?? "the selected department"} with active contracts in the target period.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10 text-center"></TableHead>
-                  <TableHead className="w-[85px]">ID</TableHead>
                   <TableHead>Employee</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead className="text-right">Base Wage</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {MOCK_ELIGIBLE_EMPLOYEES.map((emp) => {
+                {employees.map((emp) => {
                   const isChecked = selectedEmployees.includes(emp.id);
                   return (
                     <TableRow key={emp.id} className="hover:bg-muted/40">
@@ -140,7 +166,6 @@ export default function NewPayrunWizard() {
                           className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary cursor-pointer"
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-[11px] text-muted-foreground">{emp.id}</TableCell>
                       <TableCell className="font-medium text-xs">{emp.name}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{emp.department}</TableCell>
                       <TableCell className="text-right font-mono text-xs font-semibold">

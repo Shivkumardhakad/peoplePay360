@@ -6,7 +6,7 @@
     "dev": "turbo run dev --filter=web --filter=@peoplepay360/hr-api",
     "dev:web": "pnpm --filter web dev",
     "dev:hr": "pnpm --filter @peoplepay360/hr-api dev",
-    "dev:payroll": "mvn -f apps/payroll/pom.xml spring-boot:run",
+    "dev:payroll": "node scripts/dev-payroll.mjs",
     "build": "turbo run build",
     "build:payroll": "mvn -f apps/payroll/pom.xml test",
     "lint": "turbo run lint",

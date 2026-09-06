@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { EmployeeForm, type EmployeeFormValues } from "@/components/employee-form";
-import { Plus, Search, Users, ArrowUpRight, List, LayoutGrid, Building2, Briefcase, UserCheck, Clock, UserX, Pencil } from "lucide-react";
+import { Plus, Search, Users, ArrowUpRight, List, LayoutGrid, Building2, Briefcase, UserCheck, Clock, UserX } from "lucide-react";
 import { getEmployeesAction } from "@/lib/api-actions";
 
 interface EmployeeItem {
@@ -20,13 +20,6 @@ interface EmployeeItem {
   status: "Active" | "Inactive" | "On Leave";
 }
 
-const INITIAL_EMPLOYEES: EmployeeItem[] = [
-  { id: "EMP-001", name: "Alice Johnson", department: "Engineering", position: "Senior Frontend Engineer", status: "Active" },
-  { id: "EMP-002", name: "Bob Smith", department: "Human Resources", position: "HR Manager", status: "Active" },
-  { id: "EMP-003", name: "Charlie Davis", department: "Finance & Accounting", position: "Payroll Specialist", status: "On Leave" },
-  { id: "EMP-004", name: "Emily Watson", department: "Product & Design", position: "Lead UX Designer", status: "Active" },
-];
-
 const KANBAN_COLUMNS: { status: EmployeeItem["status"]; title: string; icon: any; color: string; badgeVariant: "success" | "warning" | "secondary" }[] = [
   { status: "Active", title: "Active Employees", icon: UserCheck, color: "border-emerald-500/20 bg-emerald-500/5 text-emerald-500", badgeVariant: "success" },
   { status: "On Leave", title: "On Leave", icon: Clock, color: "border-amber-500/20 bg-amber-500/5 text-amber-500", badgeVariant: "warning" },
@@ -35,30 +28,20 @@ const KANBAN_COLUMNS: { status: EmployeeItem["status"]; title: string; icon: any
 
 export default function EmployeesPage() {
   const { data: session } = useSession();
-  const [employees, setEmployees] = useState<EmployeeItem[]>(INITIAL_EMPLOYEES);
+  const [employees, setEmployees] = useState<EmployeeItem[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingEmp, setEditingEmp] = useState<EmployeeItem | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
-  useEffect(() => {
-    getEmployeesAction().then((liveData) => {
-      if (liveData && liveData.length > 0) {
-        setEmployees(
-          liveData.map((e) => ({
-            id: e.employeeNumber || e.id,
-            name: e.name,
-            department: e.department,
-            position: e.position,
-            status: e.status === "ACTIVE" ? "Active" : e.status === "ON_LEAVE" ? "On Leave" : "Inactive",
-          }))
-        );
-      }
-    });
-  }, []);
+  useEffect(() => { getEmployeesAction().then((rows) => setEmployees(rows.map((row) => ({ ...row, status: row.status === "ACTIVE" ? "Active" : row.status === "ON_LEAVE" ? "On Leave" : "Inactive" })))); }, []);
 
-  const role = session?.user?.role || "ADMIN";
-  const canAddEmployee = role === "ADMIN" || role === "HR_MANAGER";
+  const role = session?.user?.role;
+  const canAddEmployee =
+    role === "ADMIN" ||
+    role === "HR_MANAGER" ||
+    role === "HR_PAYROLL_MANAGER" ||
+    role === "PAYROLL_MANAGER" ||
+    role === "HR_PAYROLL_USER";
 
   const filteredEmployees = employees.filter(
     (e) =>
@@ -68,32 +51,10 @@ export default function EmployeesPage() {
       e.id.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleCreated = (data: EmployeeFormValues) => {
-    const newEmp: EmployeeItem = {
-      id: `EMP-${String(employees.length + 1).padStart(3, "0")}`,
-      name: `${data.firstName} ${data.lastName}`,
-      department: data.department,
-      position: "New Hire",
-      status: data.status === "ACTIVE" ? "Active" : data.status === "ON_LEAVE" ? "On Leave" : "Inactive",
-    };
-    setEmployees([newEmp, ...employees]);
+  const handleCreated = async (_data: EmployeeFormValues) => {
+    const rows = await getEmployeesAction();
+    setEmployees(rows.map((row) => ({ ...row, status: row.status === "ACTIVE" ? "Active" : row.status === "ON_LEAVE" ? "On Leave" : "Inactive" })));
     setDialogOpen(false);
-  };
-
-  const handleUpdated = (id: string, data: EmployeeFormValues) => {
-    setEmployees((prev) =>
-      prev.map((e) =>
-        e.id === id
-          ? {
-              ...e,
-              name: `${data.firstName} ${data.lastName}`,
-              department: data.department,
-              status: data.status === "ACTIVE" ? "Active" : data.status === "ON_LEAVE" ? "On Leave" : "Inactive",
-            }
-          : e
-      )
-    );
-    setEditingEmp(null);
   };
 
   return (
@@ -122,30 +83,6 @@ export default function EmployeesPage() {
           </Dialog>
         )}
       </div>
-
-      {/* Edit Employee Dialog */}
-      <Dialog open={Boolean(editingEmp)} onOpenChange={(open) => !open && setEditingEmp(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Employee ({editingEmp?.id})</DialogTitle>
-          </DialogHeader>
-          {editingEmp && (
-            <EmployeeForm
-              employeeId={editingEmp.id}
-              defaultValues={{
-                firstName: editingEmp.name.split(" ")[0] || "",
-                lastName: editingEmp.name.split(" ").slice(1).join(" ") || "",
-                email: `${editingEmp.name.toLowerCase().replace(/\s+/g, ".")}@company.com`,
-                department: editingEmp.department,
-                status: editingEmp.status === "Active" ? "ACTIVE" : editingEmp.status === "On Leave" ? "ON_LEAVE" : "INACTIVE",
-                dateOfJoining: "2023-01-15",
-              }}
-              onSuccess={(data) => handleUpdated(editingEmp.id, data)}
-              onCancel={() => setEditingEmp(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Toolbar */}
       <div className="p-2 rounded-lg border border-border bg-card flex items-center justify-between gap-3">
@@ -195,25 +132,23 @@ export default function EmployeesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[90px]">ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead className="text-right">Status</TableHead>
-                <TableHead className="w-[70px] text-right">Actions</TableHead>
+                <TableHead className="w-[40px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredEmployees.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
+                  <TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground">
                     No records found.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredEmployees.map((employee) => (
                   <TableRow key={employee.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{employee.id}</TableCell>
                     <TableCell className="font-medium">
                       <Link href={`/employees/${employee.id}`} className="hover:underline">
                         {employee.name}
@@ -236,26 +171,12 @@ export default function EmployeesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right p-1">
-                      <div className="flex items-center justify-end gap-1">
-                        {canAddEmployee && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                            onClick={() => setEditingEmp(employee)}
-                            title="Edit Employee"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                        <Link
-                          href={`/employees/${employee.id}`}
-                          className="inline-flex p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                          title="View Profile"
-                        >
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
+                      <Link
+                        href={`/employees/${employee.id}`}
+                        className="inline-flex p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                      >
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))
@@ -306,26 +227,12 @@ export default function EmployeesPage() {
                             </Link>
                             <span className="text-[10px] font-mono text-muted-foreground">{emp.id}</span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            {canAddEmployee && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground opacity-70 group-hover:opacity-100"
-                                onClick={() => setEditingEmp(emp)}
-                                title="Edit Employee"
-                              >
-                                <Pencil className="w-3 h-3" />
-                              </Button>
-                            )}
-                            <Link
-                              href={`/employees/${emp.id}`}
-                              className="p-1 rounded text-muted-foreground hover:text-foreground opacity-70 group-hover:opacity-100 transition-opacity"
-                              title="View Profile"
-                            >
-                              <ArrowUpRight className="w-3.5 h-3.5" />
-                            </Link>
-                          </div>
+                          <Link
+                            href={`/employees/${emp.id}`}
+                            className="p-1 rounded text-muted-foreground hover:text-foreground opacity-70 group-hover:opacity-100 transition-opacity"
+                          >
+                            <ArrowUpRight className="w-3.5 h-3.5" />
+                          </Link>
                         </div>
 
                         <div className="space-y-1 text-[11px] text-muted-foreground pt-1 border-t border-border/50">

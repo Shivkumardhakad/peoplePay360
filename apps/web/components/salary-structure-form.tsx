@@ -20,9 +20,11 @@ export type SalaryStructureFormValues = z.infer<typeof structureSchema>;
 export function SalaryStructureForm({
   defaultValues,
   onSuccess,
+  onSave,
 }: {
   defaultValues?: Partial<SalaryStructureFormValues>;
   onSuccess?: (data: SalaryStructureFormValues) => void;
+  onSave?: (data: SalaryStructureFormValues) => Promise<void>;
 }) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
@@ -41,16 +43,16 @@ export function SalaryStructureForm({
 
   const onSubmit = async (data: SalaryStructureFormValues) => {
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 400));
-    setSubmitting(false);
-
-    toast({
-      title: "Structure Created",
-      description: `Salary Structure "${data.name}" is now available for contracts.`,
-      type: "success",
-    });
-    onSuccess?.(data);
-    reset();
+    try {
+      await onSave?.(data);
+      toast({ title: "Structure Created", description: `Salary Structure "${data.name}" is now available for contracts.`, type: "success" });
+      onSuccess?.(data);
+      reset();
+    } catch (error) {
+      toast({ title: "Unable to save structure", description: error instanceof Error ? error.message : "Payroll API request failed.", type: "error" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

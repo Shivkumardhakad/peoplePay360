@@ -26,7 +26,8 @@ All `/api/payroll/**` endpoints require a Bearer JWT. The token must contain a `
 
 - `ADMIN`
 - `PAYROLL_MANAGER`
-- `HR_MANAGER`
+- `HR_PAYROLL_MANAGER`
+- `HR_PAYROLL_USER`
 
 Example header:
 
@@ -36,6 +37,8 @@ Content-Type: application/json
 ```
 
 Unauthenticated requests return `401`; a token without an allowed role returns `403`.
+
+Permissions are endpoint-specific: `HR_PAYROLL_USER` has read access to reports, payslips, audits, payment status, and salary configuration; `HR_PAYROLL_MANAGER` and `PAYROLL_MANAGER` can also create/update payroll data and execute payrun actions; `ADMIN` has full access. `HR_MANAGER` does not access Payroll routes. Unknown future Payroll routes are restricted to `ADMIN` by default.
 
 ## Salary rule categories
 
@@ -123,6 +126,41 @@ Update additionally requires a non-blank `status`; `rules` must contain at least
 | POST | `/api/payroll/payruns/{id}/cancel` | — | `200` |
 | GET | `/api/payroll/payruns/{payrunId}/payslips` | — | `200` |
 | GET | `/api/payroll/payslips/{id}` | — | `200` |
+| GET | `/api/payroll/payslips/{id}/pdf` | — | `200` PDF |
+
+The PDF endpoint returns an inline `application/pdf` response. It requires the same Bearer JWT as the other Payroll endpoints and includes the payslip header, period, totals, and salary-rule lines.
+
+## Reports
+
+Reports use persisted payruns and payslips and require `from` and `to` ISO date-time query parameters. `to` must be after `from`.
+
+| Method | Path | Query | Success |
+|---|---|---|---|
+| GET | `/api/payroll/reports/summary` | `from`, `to` | `200` |
+| GET | `/api/payroll/reports/payslips` | `from`, `to`, optional `status` | `200` |
+
+Example: `/api/payroll/reports/summary?from=2026-09-01T00:00:00&to=2026-10-01T00:00:00`
+
+## Payroll auditor
+
+`GET /api/payroll/payruns/{id}/audit` checks the real payrun and payslip records for missing payslips, duplicate employees, missing totals, negative amounts, deductions above gross, net-total mismatches, and missing salary-rule lines. It returns a risk score, pass/fail result, auditor version, and structured findings.
+
+## Payment status
+
+| Method | Path | Success |
+|---|---|---|
+| GET | `/api/payroll/payruns/{id}/payment-status` | `200` |
+| GET | `/api/payroll/payslips/{id}/payment-status` | `200` |
+
+The payrun response exposes the persisted payrun status, `paidAt`, total payslips, paid payslips, and total net amount. The payslip response exposes its status, paid timestamp, employee, payrun, and net amount. Status changes remain controlled by the existing payrun lifecycle endpoint.
+
+## Formula salary rules
+
+`FORMULA` salary rules now execute during payrun computation. The restricted engine supports `+`, `-`, `*`, `/`, parentheses, unary signs, numeric values, `base_salary`, `gross`, `deductions`, `net`, `worked_minutes`, `unpaid_leave_days`, `attendance_exceptions`, and earlier rule codes. Unsafe expressions, unknown variables, malformed formulas, and division by zero return a validation error.
+
+During compute, Payroll reads period-applicable contracts from `HR_API_URL`, filters for active selected employees and the selected salary structure, and rejects overlapping contracts, invalid base salaries, or contracts outside the payrun period. It also loads bank-account, attendance, and approved unpaid-leave context for selected employees. Formula rules can use the context variables documented above.
+
+Before `VALIDATED` status, the API re-checks persisted payslips against the payrun period and HR contract employee scope, then validates contract IDs, non-negative totals, `net = gross - deductions`, salary-rule line presence, line-total consistency, missing bank accounts, attendance exceptions, and approved unpaid leave. Blocking warnings keep the payrun in `COMPUTED` status and are returned in the validation response.
 
 Create payrun request:
 
@@ -131,7 +169,8 @@ Create payrun request:
   "name": "September 2026 Payroll",
   "periodStart": "2026-09-01T00:00:00",
   "periodEnd": "2026-09-30T23:59:59",
-  "salaryStructureId": "<structure-id>"
+  "salaryStructureId": "<structure-id>",
+  "employeeIds": ["<employee-id-1>", "<employee-id-2>"]
 }
 ```
 
@@ -153,8 +192,7 @@ Validation, missing resources, invalid lifecycle transitions, and external HR fa
 
 ## Current test status and known limitations
 
-- Java 21 Payroll test run: 4 tests passed (1 application context test and 3 payrun service tests).
-- `FORMULA` salary rules currently return an error because no formula engine is configured.
+- Java 21 Payroll test run: 12 tests passed (including application context, formula, payrun, audit, PDF, payment-status, and report tests).
 - Payrun compute depends on the HR API being available and returning period-valid contracts.
 - There is no generated OpenAPI/Swagger endpoint configured yet; this document is the current endpoint reference.
 

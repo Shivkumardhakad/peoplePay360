@@ -11,6 +11,7 @@ import { DepartmentsController } from "./departments/departments.controller";
 import { HrDashboardController } from "./dashboard/dashboard.controller";
 import { EmployeesController } from "./employees/employees.controller";
 import { JobPositionsController } from "./job-positions/job-positions.controller";
+import { MeController } from "./me/me.controller";
 import { PayrollController } from "./payroll/payroll.controller";
 import { RbacController } from "./rbac/rbac.controller";
 import { HrService } from "./shared/hr.service";
@@ -28,6 +29,7 @@ import { WorkingSchedulesController } from "./working-schedules/working-schedule
     HrDashboardController,
     EmployeesController,
     JobPositionsController,
+    MeController,
     PayrollController,
     RbacController,
     TimeOffController,

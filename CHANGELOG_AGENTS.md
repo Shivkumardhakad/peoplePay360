@@ -1573,3 +1573,768 @@
 - Live database test with Prisma client — **Passed**: verified `attendance.upsert` successfully creates and updates records.
 
 
+## 2026-09-06 00:00 IST — HR Manager live database pages
+
+### Summary
+- Replaced HR Manager page mock defaults with live Prisma database queries for employees, contracts, attendance, leave types, allocations, leave requests, and HR dashboard KPIs.
+- Added database-backed HR dashboard headcount, attendance rate, pending leave, approved leave, and department distribution data.
+- Removed the users page fallback that displayed dummy users when the database was empty or unavailable.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added HR dashboard and time-off read actions.
+- `apps/web/app/(app)/employees/page.tsx`: Load employee directory from Prisma.
+- `apps/web/app/(app)/contracts/page.tsx`: Keep empty/live DB state without mock fallback.
+- `apps/web/app/(app)/attendance/page.tsx`: Keep empty/live DB state without mock fallback.
+- `apps/web/app/(app)/time-off/types/page.tsx`: Load time-off policies from Prisma.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: Load allocations and balances from Prisma.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Load requests from Prisma.
+- `apps/web/app/(app)/dashboard/page.tsx`: Use live HR KPI and department data.
+- `apps/web/app/(app)/users/page.tsx`: Do not display dummy users on load failure.
+
+### Reason
+- HR Manager screens must represent current HR database records rather than presentation-only fixtures.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `pnpm --filter web exec tsc --noEmit` — blocked by sandbox permissions while pnpm attempted to access `C:\Users\DELL`.
+
+### Notes
+- Existing payroll-related working-tree changes were preserved.
+- Create/edit forms still use their existing action implementations; this change focuses on removing dummy read data from HR Manager pages.
+## 2026-09-06 00:30 IST — Attendance employee foreign-key guard
+
+### Summary
+- Fixed attendance recording when the UI submits a user ID or employee number instead of the HR employee primary key.
+- Removed the attendance form's static employee fallback and prevented quick check-in from using fabricated employee IDs.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Resolve linked user/employee identifiers and verify the employee relation before attendance upsert.
+- `apps/web/components/attendance-form.tsx`: Load employee options only from the database.
+- `apps/web/app/(app)/attendance/page.tsx`: Stop check-in when the authenticated user is not linked to an employee.
+
+### Reason
+- Attendance inserts were failing with `Attendance_employeeId_fkey` because stale/mock identifiers could be submitted.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+
+### Notes
+- If an existing login has no `employeeId` link in the `User` table, it must be linked to an employee before quick check-in can be used.
+## 2026-09-06 01:00 IST — Graceful Payroll API unavailable handling
+
+### Summary
+- Prevented salary rule and salary structure create actions from surfacing unhandled Next.js 500 errors when Java Payroll is offline.
+- Added a clear action error instructing developers to start `pnpm dev:payroll`.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Catch payroll create/delete connection failures and return structured errors.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: Surface structured API errors in the form toast.
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Surface structured API errors in the form toast.
+
+### Reason
+- The UI was correctly targeting `localhost:8080`, but the Java Payroll service was not listening, causing `ECONNREFUSED` and server-action 500 logs.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- The Java Payroll service still must be running for real payroll data and writes: `pnpm dev:payroll`.
+## 2026-09-06 02:00 IST — Hide employee creation during session loading
+
+### Summary
+- Removed the admin-role loading fallback from the Employees page so Employee users never see the Add Employee action while their session is loading.
+
+### Files Changed
+- `apps/web/app/(app)/employees/page.tsx`: Require an authenticated role before rendering employee creation controls.
+
+### Reason
+- The previous `ADMIN` fallback could briefly expose the new employee action to Employee-role users.
+
+### Validation
+- Not run after this one-line UI guard; prior web TypeScript validation passed.
+
+### Notes
+- HR Manager, HR Payroll roles, Payroll Manager, and Admin retain the employee creation action.
+## 2026-09-06 02:30 IST — Live allocation employee selector
+
+### Summary
+- Replaced hardcoded allocation employee and leave-type options with records loaded from Prisma.
+- Grant Allocation now persists/upserts the selected allocation in the HR database.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added database-backed allocation creation.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: Load live employees/time-off types and save allocations through the server action.
+
+### Reason
+- HR Manager allocation dropdowns were showing temporary demo employees instead of current HR records.
+
+### Validation
+- Pending after this change.
+
+### Notes
+- Allocation period defaults to the current calendar year and duplicate employee/type/year allocations are updated rather than duplicated.
+## 2026-09-06 03:00 IST — Remove internal reference columns from UI tables
+
+### Summary
+- Removed user-facing Ref/ID columns from HR, time-off, user, and payroll tables.
+- Kept internal IDs in row keys, links, and action handlers so navigation and mutations continue to work.
+
+### Files Changed
+- `apps/web/app/(app)/attendance/page.tsx`: Removed attendance reference column.
+- `apps/web/app/(app)/contracts/page.tsx`: Removed contract reference column.
+- `apps/web/app/(app)/employees/page.tsx`: Removed employee ID column.
+- `apps/web/app/(app)/users/page.tsx`: Removed user ID column.
+- `apps/web/app/(app)/time-off/types/page.tsx`: Removed time-off type reference column.
+- `apps/web/app/(app)/time-off/allocations/page.tsx`: Removed allocation reference column.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Removed request reference column.
+- `apps/web/app/(app)/payroll/payruns/page.tsx`: Removed batch reference column.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Removed payslip reference column.
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Removed employee ID column.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Removed payslip reference column.
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Removed structure reference column.
+
+### Reason
+- Internal database references are not useful to day-to-day users and made tables visually noisy.
+
+### Validation
+- Pending after this UI cleanup.
+
+### Notes
+- Internal IDs remain available to the application for routing, lookup, and row actions.
+## 2026-09-06 03:30 IST — Connect payslip screens to Java Payroll API
+
+### Summary
+- Replaced displayed mock payslips with live Java Payroll API payslip data.
+- Enriched payroll payslips with employee, department, position, and contract details from the HR database.
+- Kept employee-role payslip scoping based on the authenticated employee.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added Java payslip list/detail actions and HR record enrichment.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Load and filter live payslips.
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: Load live payslip detail before rendering/PDF generation.
+
+### Reason
+- Payslip pages were still rendering static demo salary data despite the Java Payroll API being available.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- The Java Payroll service must be running on `PAYROLL_API_URL` for these screens to show records.
+- Payrun wizard/detail and remaining payroll mock screens are the next integration slice.
+## 2026-09-06 04:00 IST — Connect payrun wizard and processing detail
+
+### Summary
+- Replaced New Payrun wizard demo employees and structures with live HR/Payroll records.
+- Create Payrun now calls the Java Payroll API with the selected structure and period.
+- Payrun processing detail now loads live status and payslips, and refreshes after compute, validate, and pay actions.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added payroll-eligible employee lookup and enriched payrun payslips with HR employee names.
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Live structure/employee setup and Java payrun creation.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Live payrun status/payslips and action refreshes.
+
+### Reason
+- Payrun creation and processing screens were still using static demo employees, periods, statuses, and payslip amounts.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Current Java `CreateRequest` creates the payrun scope from the salary structure/period; selected employee IDs remain a UI eligibility review until the Java API exposes a selection field.
+## 2026-09-06 04:45 IST — Align salary configuration with Payroll API
+
+### Summary
+- Connected salary structure archive/activate actions to the Java Payroll API `PUT` endpoint.
+- Aligned salary rule creation with the API's `FIXED`, `PERCENTAGE`, and `FORMULA` calculation methods.
+- Added a formula input to the salary rule form and removed the obsolete `SUM` UI mapping.
+
+### Files Changed
+- `apps/web/app/(app)/payroll/structures/page.tsx`: Persist structure status changes through Payroll API and reload live structures.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: Send calculation method and formula values without mock conversion.
+- `apps/web/components/salary-rule-form.tsx`: Validate and render API-supported calculation methods.
+- `apps/web/lib/api-actions.ts`: Added the authenticated structure update action.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Salary configuration controls must update the same live records consumed by payroll computation.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- The Java Payroll API currently accepts formula rules, but payrun computation still requires a configured formula engine for executing them.
+
+## 2026-09-06 02:50 +05:30 — Merge remote payroll updates before push
+
+### Summary
+- Merged the latest `origin/main` payroll and leave-workflow commits into local `main`.
+- Resolved Payroll DTO/service conflicts by preserving the verified employee-selection, HR-context, formula, and validation workflow.
+- Preserved the shared `.env` loading fix for HR and Payroll startup.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/dto/PayrunDtos.java`: Preserved the verified payrun request/response contract.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Preserved selected employee scope, HR context, formula rules, and persisted validation warnings.
+- `CHANGELOG_AGENTS.md`: Recorded the merge resolution.
+
+### Validation
+- Conflict-marker scan — passed for the resolved files.
+- Java tests — previously passed; will rerun before push.
+
+### Notes
+- Generated and ignored local environment files are not pushed.
+
+## 2026-09-06 05:00 IST — Replace employee detail mock data with live records
+
+### Summary
+- Added a server-side employee detail lookup backed by Prisma.
+- Replaced hardcoded employee identity, department, status, joining date, and related counts with database values.
+- Preserved employee self-service ownership checks and return-not-found behavior for invalid records.
+
+### Files Changed
+- `apps/web/app/(app)/employees/[id]/page.tsx`: Render the requested employee's live record and related counts.
+- `apps/web/lib/api-actions.ts`: Added `getEmployeeAction` with department, position, and relation counts.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Employee detail was still displaying static presentation data despite the employee list being DB-backed.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Related navigation still opens the existing operational list pages; those pages remain responsible for their own filtering.
+
+## 2026-09-06 05:30 IST — Complete live leave workflow foundation
+
+### Summary
+- Replaced time-off type create/deactivate simulations with Prisma-backed mutations.
+- Removed mock leave requests, fake employee IDs, hardcoded leave types, and local-only status updates.
+- Added active leave-type loading and live request refreshes after submission or decision.
+- Made approval transactional with allocation lookup, insufficient-balance protection, single balance deduction, approver metadata, and approval timestamp.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added time-off type mutations, date/type validation, and transactional leave approval logic.
+- `apps/web/components/time-off-type-form.tsx`: Added async persistence callback and error handling.
+- `apps/web/app/(app)/time-off/types/page.tsx`: Reload live active policies after create/deactivate.
+- `apps/web/app/(app)/time-off/requests/page.tsx`: Load live policies/requests and remove mock request fallbacks.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Leave allocation-to-request is a core MVP flow and could not rely on presentation-only state.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Approval metadata is recorded when the authenticated session user maps to a database user; allocation deduction is enforced for types requiring allocation.
+
+## 2026-09-06 06:00 IST — Enforce selected employees in payrun computation
+
+### Summary
+- Added selected employee IDs to payrun creation and persisted the scope in the Java Payroll payrun record.
+- Filtered active HR contracts during computation so only selected employees receive payslips.
+- Returned the selected employee scope from payrun responses and fixed the wizard's salary-structure selector binding.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/dto/PayrunDtos.java`: Added selected employee scope to create/response DTOs.
+- `apps/payroll/src/main/java/com/dj/payroll/entities/Payrun.java`: Persisted selected employee IDs.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Applied selected-employee filtering during compute.
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Sends selected employees and binds structure selection.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- The payrun wizard previously let users select employees, but Payroll computation ignored that selection and processed every active contract.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+- `apps/payroll/mvnw.cmd test` — not run successfully because the repository Maven wrapper could not start in this Windows environment.
+- `mvn test -q` — not run because Maven is not installed on PATH.
+
+### Notes
+- Payroll uses Hibernate `ddl-auto: update`, so the new payrun scope column is created by the Java service on startup. Existing payruns without a scope continue to process all eligible contracts for backward compatibility.
+
+## 2026-09-06 06:30 IST — Add live payroll validation warnings
+
+### Summary
+- Added server-side validation checks against Java Payroll and live HR Prisma records.
+- Added blocking warnings for missing payslips, salary rules, employees, bank accounts, applicable contracts, duplicate payslips, and negative net amounts.
+- Added review warnings for attendance exceptions and pending leave during the payroll period.
+- Rendered returned warnings in the payrun processing page and blocked final validation when blocking issues exist.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Cross-check payrun, payroll structure, employee, contract, attendance, and leave data before Java validation.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Display validation warnings and handle blocked validation responses.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payroll validation must surface operational risks before a payrun becomes validated or paid.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Java Maven tests remain unavailable in this environment because Maven is not installed and the wrapper cannot start; web validation checks are type-checked.
+
+## 2026-09-06 07:00 IST — Add safe formula salary-rule evaluation
+
+### Summary
+- Added a restricted arithmetic formula evaluator for salary rules.
+- Added support for rule-code references, numeric constants, operator precedence, parentheses, unary signs, and deterministic decimal math.
+- Connected `FORMULA` rules to payslip computation and added invalid-reference/division-by-zero protection.
+- Added unit tests for formula evaluation and invalid expressions.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/services/FormulaEvaluator.java`: Added the safe expression parser.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Supplies prior rule values and executes formula rules during payslip generation.
+- `apps/payroll/src/test/java/com/dj/payroll/services/FormulaEvaluatorTest.java`: Covers precedence, references, unknown codes, and division by zero.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Formula salary rules were accepted by configuration but previously caused payrun computation to fail.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+- Java tests — added but not executed because Maven is unavailable in this environment.
+
+### Notes
+- Supported formula syntax is arithmetic only: `+`, `-`, `*`, `/`, parentheses, numbers, and salary rule codes. No Java, SQL, reflection, or arbitrary function execution is allowed.
+
+## 2026-09-06 07:30 IST — Connect payslip PDF and bulk email delivery
+
+### Summary
+- Replaced the payslip email stub with SMTP-backed server delivery for validated or paid Java payruns.
+- Loads live payslip details and employee email addresses before sending each message.
+- Added HTML escaping and explicit configuration/error handling for missing SMTP or employee email data.
+- Removed leftover payslip list/detail mock records and fallback identities.
+- Ensured payslip list entries carry their live payrun name and removed simulated download/send delays.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added bulk SMTP delivery and live payrun-name enrichment.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Handles delivery failures instead of showing false success.
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Removed mock data and live fallback identities.
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: Removed mock detail data and uses live payslip only.
+- `apps/web/package.json`: Added Nodemailer dependencies.
+- `pnpm-lock.yaml`: Updated dependency lockfile.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payslip PDF viewing existed, but bulk delivery was a fake success path and payslip screens still contained static fallback data.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+- `pnpm add nodemailer @types/nodemailer --filter web` — passed.
+
+### Notes
+- Individual PDF generation remains browser-side. Bulk email sends a live HTML salary statement and requires `SMTP_HOST`, plus `SMTP_FROM` or `SMTP_USER`; delivery is restricted to `VALIDATED` or `PAID` payruns.
+
+## 2026-09-06 08:00 IST — Connect live payroll dashboard reporting
+
+### Summary
+- Added a live payroll dashboard action aggregating Java payruns/payslips with HR employee, department, attendance, and leave records.
+- Replaced static payroll KPI values and department salary chart data with live values.
+- Added period and department filters plus payroll alerts for missing bank details, attendance exceptions, and pending leave approvals.
+- Removed the static HR dashboard new-hire count text.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added live payroll dashboard aggregation and filtering.
+- `apps/web/app/(app)/dashboard/page.tsx`: Rendered live payroll KPIs, chart, filters, and alerts.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Dashboard/reporting was still showing hardcoded payroll amounts, counts, and department costs instead of operational records.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check -- apps/web/app/(app)/dashboard/page.tsx apps/web/lib/api-actions.ts` — passed.
+
+### Notes
+- Payroll dashboard data is based on Java payrun records; department and operational alert context is resolved from the HR Prisma database.
+## 2026-09-06 08:30 IST — Harden session and payslip access boundaries
+
+### Summary
+- Removed the unauthenticated mock-session fallback from the protected app layout.
+- Protected direct payslip server actions so employee users can only fetch their own payslips.
+- Scoped employee payslip list retrieval on the server before data reaches the browser.
+- Removed unused mock employee/user records and attendance fallback records.
+- Removed contract employee fallback options so contract forms use only database employees.
+
+### Files Changed
+- `apps/web/app/(app)/layout.tsx`: Redirect missing sessions to login instead of rendering a mock admin session.
+- `apps/web/components/app-sidebar.tsx`: Removed `MOCK_SESSION` fallback.
+- `apps/web/lib/api-actions.ts`: Enforced employee payslip ownership in server actions.
+- `apps/web/app/(app)/attendance/page.tsx`: Removed fake employee attendance fallback and scope by employee ID.
+- `apps/web/app/(app)/employees/page.tsx`: Removed unused mock employee catalog.
+- `apps/web/app/(app)/users/page.tsx`: Removed unused mock user catalog.
+- `apps/web/components/contract-form.tsx`: Removed hardcoded employee options.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Protected pages and sensitive salary actions must never rely on presentation-only identity fallbacks or client-only employee scoping.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` on changed files — passed.
+- `git pull --ff-only origin main` — passed; remote changes fast-forwarded to `b2065f5`.
+
+### Notes
+- Existing unrelated `apps/web/middleware.ts` whitespace and Turbo-generated files remain outside this commit.
+## 2026-09-06 09:00 IST — Load contract references from live records
+
+### Summary
+- Removed hardcoded salary structure and working schedule options from contract creation.
+- Added database-backed active salary structure and working schedule loaders.
+- Kept employee selection database-backed and normalized schedule weekly hours for the form.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added `getWorkingSchedulesAction` with active schedules and numeric weekly hours.
+- `apps/web/components/contract-form.tsx`: Loads live employees, salary structures, and schedules for contract fields.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Contract records must reference actual salary structures and working schedules used by payroll and attendance, not presentation-only IDs.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` on changed files — passed.
+
+### Notes
+- If the Payroll API or HR database has no active structure/schedule, the corresponding selector remains empty and the required validation prevents an invalid contract.
+## 2026-09-06 09:30 IST — Surface payroll audit findings in payrun review
+
+### Summary
+- Added a web action for the Java Payroll audit endpoint.
+- Added live audit status, risk score, and finding messages to payrun processing after computation.
+- Kept internal employee/payslip identifiers out of the visible findings list.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added `getPayrollAuditAction`.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Loads and renders audit results during payrun review.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- The remote Payroll API already provided persisted-record audit checks, but the payrun UI did not expose those findings before validation/payment.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` on changed files — passed.
+
+### Notes
+- Audit loading is skipped for draft payruns and refreshed after compute/validation actions.
+## 2026-09-06 10:00 IST — Surface payment status in payroll UI
+
+### Summary
+- Added authenticated web actions for payrun and payslip payment-status endpoints.
+- Added payment status, paid payslip count, and total net metrics to payrun review.
+- Added live payment state and paid timestamp to payslip detail.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added payrun/payslip payment-status actions.
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Renders live payment summary metrics.
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: Renders live payment state and timestamp.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- The Java Payroll API exposed payment-status records, but the UI only showed a hardcoded paid badge and did not expose batch payment totals.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` on changed files — passed.
+
+### Notes
+- Payment status loading is non-blocking for payslip detail; the payslip remains viewable if the status endpoint is temporarily unavailable.
+## 2026-09-06 10:30 IST — Add live payroll reports page
+
+### Summary
+- Added web actions for Java payroll summary and payslip report endpoints.
+- Added a protected `/reports` page with date range and payslip status filters.
+- Added live payrun/payslip totals and enriched report rows with HR employee names and departments.
+- Added Reports navigation for payroll-authorized roles and middleware route protection.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added report aggregation and HR employee/department enrichment.
+- `apps/web/app/(app)/reports/page.tsx`: Added live payroll reports UI.
+- `apps/web/components/app-sidebar.tsx`: Added Reports navigation.
+- `apps/web/middleware.ts`: Protected `/reports` for payroll-authorized roles.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payroll report endpoints existed in the Java API but had no user-facing reporting workflow.
+
+### Validation
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` on changed files — passed.
+
+### Notes
+- Report rows intentionally show business-facing employee and department names instead of internal IDs.
+## 2026-09-06 11:10 IST — Use Payroll API for payslip PDF downloads
+
+### Summary
+- Routed payslip PDF downloads through the Java Payroll API's authenticated PDF endpoint.
+- Restricted PDF downloads to validated or paid payslips and preserved employee ownership checks.
+
+### Files Changed
+- `apps/web/lib/payroll-api.ts`: Added shared authenticated response handling and binary PDF fetching.
+- `apps/web/lib/api-actions.ts`: Added the ownership-checked payslip PDF server action.
+- `apps/web/app/(app)/payroll/payslips/[id]/page.tsx`: Downloaded the backend-generated PDF instead of browser-generated output.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payslip PDFs must be generated from finalized payroll records and use the live Java payroll implementation rather than a client-side presentation helper.
+
+### Validation
+- `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check -- apps/web/lib/payroll-api.ts apps/web/lib/api-actions.ts apps/web/app/(app)/payroll/payslips/[id]/page.tsx` — passed.
+
+### Notes
+- The Payroll API must be running and configured for the download to succeed.
+## 2026-09-06 11:25 IST — Route payslip list downloads through Payroll API
+
+### Summary
+- Replaced client-side payslip PDF generation on the payslip list with the authenticated Java Payroll API endpoint.
+- Added a clear finalized-status error when a draft payslip cannot produce a PDF.
+
+### Files Changed
+- `apps/web/app/(app)/payroll/payslips/page.tsx`: Uses the shared server action and downloads the backend-generated PDF.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- All payslip download entry points must use the live finalized payroll record and avoid presentation-only PDF output.
+
+### Validation
+- `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `pnpm --filter web build` — passed on retry; first run hit a transient Next static-generation webpack runtime error.
+- `git diff --check` — passed.
+
+### Notes
+- PDF downloads require the Payroll API to be running and the payslip to be `VALIDATED` or `PAID`.
+## 2026-09-06 12:10 IST — Complete schedules, audit logs, and PDF delivery batch
+
+### Summary
+- Added live working-schedule CRUD with weekly day/time definitions, calculated weekly hours, contract usage counts, and safe deactivation.
+- Added role-protected aggregated payroll audit/logs view from live payrun audit endpoints.
+- Added generated payslip PDF attachments to bulk email delivery.
+
+### Files Changed
+- `apps/web/app/(app)/working-schedules/page.tsx`: Added working schedule management UI.
+- `apps/web/app/(app)/audit-logs/page.tsx`: Added payroll audit history UI.
+- `apps/web/lib/api-actions.ts`: Added schedule persistence/actions, audit aggregation, and PDF email attachments.
+- `apps/web/components/app-sidebar.tsx`: Added schedule and audit navigation.
+- `apps/web/middleware.ts`: Added route protection for schedules and audit logs.
+- `CHANGELOG_AGENTS.md`: Recorded this batch.
+
+### Reason
+- Close the remaining MVP gaps around schedule configuration, operational audit visibility, and actual PDF payslip delivery.
+
+### Validation
+- `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `pnpm --filter web build` — passed.
+- `git diff --check` — passed.
+- `mvn test -q` in `apps/payroll` — not run; Maven is not installed in this environment.
+
+### Notes
+- Audit logs currently aggregate payroll audit findings; a full cross-module immutable activity-log store would be a separate compliance enhancement.
+- Schedule deactivation is blocked while active contracts reference the schedule.
+## 2026-09-06 12:45 IST — Add report segmentation and salary category administration
+
+### Summary
+- Added live department and employee-type filters to payroll reports with recalculated filtered totals.
+- Added salary-rule category create, edit, and delete controls for payroll managers.
+
+### Files Changed
+- `apps/web/app/(app)/reports/page.tsx`: Added department and employee-type filters.
+- `apps/web/app/(app)/payroll/rules/page.tsx`: Added category administration UI.
+- `apps/web/lib/api-actions.ts`: Added category CRUD actions and server-side report segmentation.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Complete the remaining operational filtering and payroll configuration requirements using live API and database records.
+
+### Validation
+- `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+
+### Notes
+- Employee type is resolved from the contract applicable to the selected report range; records without an applicable contract are shown as `UNKNOWN`.
+## 2026-09-06 13:20 IST — Create employee login credentials with employee records
+
+### Summary
+- Added an initial login password field to the New Employee form.
+- Creates or updates the linked `EMPLOYEE` user account with a bcrypt password hash.
+- Reloads the employee list from the database after creation instead of inserting a client-side placeholder row.
+- Added optional password reset support while editing an employee.
+
+### Files Changed
+- `apps/web/components/employee-form.tsx`: Added initial/optional login password input and validation.
+- `apps/web/lib/api-actions.ts`: Hashes credentials and upserts the linked employee user account.
+- `apps/web/app/(app)/employees/page.tsx`: Refreshes the live employee list after creation.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Employees created from the HR directory must be able to sign in immediately with credentials communicated by the administrator.
+
+### Validation
+- `& .\\apps\\web\\node_modules\\.bin\\tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `git diff --check` — passed.
+- `pnpm --filter web build` — passed.
+
+### Notes
+- Plain-text passwords are never persisted; administrators must communicate the entered initial password securely to the employee.
+## 2026-09-06 14:00 IST — Automate Payroll local environment wiring
+
+### Summary
+- Added a cross-platform Node launcher that reads the existing web local environment at runtime and maps database/JWT/HR API settings into Spring Payroll.
+- Updated `pnpm dev:payroll` to use the launcher, avoiding secret duplication in the repository.
+
+### Files Changed
+- `scripts/dev-payroll.mjs`: Runtime environment mapping and Maven wrapper launch.
+- `package.json`: Uses the new Payroll development launcher.
+- `CHANGELOG_AGENTS.md`: Recorded the setup change.
+
+### Reason
+- Keep the Java Payroll service aligned with the working Node environment while preventing local secrets from being copied into tracked files.
+
+### Validation
+- `& .\\mvnw.cmd test` — 13 tests passed; Spring context test failed against the local fallback database credentials before runtime env mapping.
+- Runtime Payroll start with mapped web env — passed on port 8080.
+- `3000/3001/8080` port smoke check — passed.
+- Protected Payroll and HR endpoints without auth — both returned `401` as expected.
+
+### Notes
+- The launcher expects `apps/web/.env.local` to contain `DATABASE_URL` and `NEXTAUTH_SECRET`; it does not print or persist those values.
+## 2026-09-06 14:20 IST — Fix Spring Payroll with Supabase pooler connections
+
+### Summary
+- Disabled PostgreSQL named prepared statements for PgBouncer port `6543` connections.
+- Applied the setting both in Spring Hikari configuration and the automatic local launcher.
+
+### Files Changed
+- `apps/payroll/src/main/resources/application.yaml`: Added `prepareThreshold: 0` datasource property.
+- `scripts/dev-payroll.mjs`: Adds the pooler-compatible JDBC option when mapping the web database URL.
+- `CHANGELOG_AGENTS.md`: Recorded this fix.
+
+### Reason
+- Hibernate failed during metadata discovery with `prepared statement "S_1" already exists` when using the Supabase transaction pooler.
+
+### Validation
+- `node --check scripts/dev-payroll.mjs` — passed.
+- Payroll runtime smoke test after this change — passed; Hibernate initialized and the app reached startup. The launcher explicitly pins both `PORT` and `SERVER_PORT` to `8080`.
+
+### Notes
+- The setting is only necessary for transaction-pooler connections and is harmless for local direct PostgreSQL connections.
+
+## 2026-09-06 14:45 IST — Fix employee payroll self-service access
+
+### Summary
+- Added a scoped Payroll endpoint for employees to list only their own payslips.
+- Updated the web action to use the scoped endpoint instead of the admin payrun endpoint for employee sessions.
+- Protected individual payslip and PDF access with employee ownership checks.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/controllers/PayrunController.java`: Added employee payslip endpoint and ownership checks.
+- `apps/payroll/src/main/java/com/dj/payroll/dto/PayslipDtos.java`: Added the employee payslip response shape.
+- `apps/payroll/src/main/java/com/dj/payroll/repositories/PayslipRepository.java`: Added employee-scoped lookup.
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Added employee payslip query mapping.
+- `apps/payroll/src/main/java/com/dj/payroll/security/SecurityConfig.java`: Allowed only scoped employee payslip reads for `EMPLOYEE`.
+- `apps/web/lib/api-actions.ts`: Routed employee payslip listing through the scoped Payroll API.
+- `AGENTS.md`: Synchronized the Payroll endpoint map.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Employee users were receiving `403` because the payslip page called the payroll-admin `/api/payroll/payruns` endpoint before applying client-side filtering.
+
+### Validation
+- `git diff --check` — passed.
+- Java compile, TypeScript check, and runtime employee-token smoke test — pending.
+
+### Notes
+- Employees can read only their own payslips and PDFs; payroll administration remains role-protected.
+
+## 2026-09-06 15:05 IST — Scope payrun employees by department
+
+### Summary
+- Added department/branch selection to the payrun wizard.
+- Employee selection now loads only active employees from that department.
+- Server-side validation rejects cross-department employee IDs before creating a payrun.
+- Normalized the web payload from `selectedEmployeeIds` to the Java API's required `employeeIds` field.
+
+### Files Changed
+- `apps/web/app/(app)/payroll/payruns/new/page.tsx`: Added department selection and scoped employee loading.
+- `apps/web/lib/api-actions.ts`: Added department-scoped employee query and payrun payload validation/normalization.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payrun creation was showing employees from every department and the request used a field name the Java API did not accept, resulting in `employeeIds must not be empty`.
+
+### Validation
+- `git diff --check` — pending.
+- Web TypeScript check — pending.
+
+### Notes
+- The Payroll API receives only validated employee IDs; the department selector is not forwarded as an unknown Java DTO field.
+
+## 2026-09-06 15:20 IST — Persist employee department assignment
+
+### Summary
+- New and edited employees now persist the selected department relation.
+- Employee creation rejects unknown department names instead of silently creating an unassigned employee.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Resolves department names to IDs for HR API and Prisma employee writes.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Newly created employees could have an active contract but no `employee.departmentId`, so department-scoped payrun selection excluded them.
+
+### Validation
+- TypeScript check — pending.
+- `git diff --check` — pending.
+
+## 2026-09-06 15:50 IST — Allow employee-owned payslip payment status
+
+### Summary
+- Payslip payment-status reads now allow Employee users when the payslip belongs to their authenticated employee context.
+- Other employees' payment statuses remain forbidden.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/controllers/PaymentStatusController.java`: Added employee ownership enforcement.
+- `apps/payroll/src/main/java/com/dj/payroll/security/SecurityConfig.java`: Allowed scoped payment-status reads for Employee role.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Payslip detail loaded the payment-status endpoint after loading the payslip, and Employee users received `403` from the admin-only matcher.
+
+### Validation
+- Java package build and runtime smoke test — pending.
+- `git diff --check` — pending.
+
+### Notes
+- Existing unassigned employees need their department updated once from the employee edit form; new records will be correctly assigned.
+
+## 2026-09-06 15:35 IST — Include contract department in payrun eligibility
+
+### Summary
+- Department-scoped payrun eligibility now matches either the employee department or an active contract department.
+- Employee display department also falls back to the active contract department.
+- Server-side payrun validation uses the same rule.
+
+### Files Changed
+- `apps/web/lib/api-actions.ts`: Added active-contract department fallback for eligibility and creation validation.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Existing employees may have a missing/stale master department while their newly created active contract has the correct department.
+
+### Validation
+- TypeScript check — pending.
+- `git diff --check` — pending.

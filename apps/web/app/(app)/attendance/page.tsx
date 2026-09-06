@@ -14,6 +14,7 @@ import { Plus, Search, LogIn, LogOut, Loader2, LayoutList, Kanban, Clock, Calend
 
 interface AttendanceRecord {
   id: string;
+  employeeId: string;
   employee: string;
   date: string;
   checkIn: string;
@@ -22,17 +23,10 @@ interface AttendanceRecord {
   status: "Present" | "Late" | "Absent" | "Half Day";
 }
 
-const INITIAL_ATTENDANCE: AttendanceRecord[] = [
-  { id: "ATT-001", employee: "Alice Johnson", date: "2023-10-01", checkIn: "08:55", checkOut: "17:05", workedHours: "8.16", status: "Present" },
-  { id: "ATT-002", employee: "Bob Smith", date: "2023-10-01", checkIn: "09:15", checkOut: "17:00", workedHours: "7.75", status: "Late" },
-  { id: "ATT-003", employee: "Charlie Davis", date: "2023-10-01", checkIn: "-", checkOut: "-", workedHours: "0.00", status: "Absent" },
-  { id: "ATT-004", employee: "Emily Watson", date: "2023-10-01", checkIn: "09:00", checkOut: "17:30", workedHours: "8.50", status: "Present" },
-];
-
 export default function AttendancePage() {
   const { data: session } = useSession();
   const { toast } = useToast();
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(INITIAL_ATTENDANCE);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -41,13 +35,11 @@ export default function AttendancePage() {
 
   useEffect(() => {
     getAttendanceAction().then((live) => {
-      if (live && live.length > 0) {
-        setAttendance(live);
-      }
+      setAttendance(live);
     });
   }, []);
 
-  const role = session?.user?.role || "ADMIN";
+  const role = String(session?.user?.role || "ADMIN");
   const isEmployee = role === "EMPLOYEE";
   const canAddManual =
     role === "ADMIN" ||
@@ -55,22 +47,10 @@ export default function AttendancePage() {
     role === "HR_PAYROLL_MANAGER" ||
     role === "PAYROLL_MANAGER" ||
     role === "HR_PAYROLL_USER";
-  const currentUserName = session?.user?.name || "Emily Watson";
+  const currentUserName = session?.user?.name || "";
 
   const scopedAttendance = isEmployee
-    ? (attendance.some((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
-        ? attendance.filter((r) => r.employee.toLowerCase() === currentUserName.toLowerCase())
-        : [
-            {
-              id: "ATT-MINE",
-              employee: currentUserName,
-              date: new Date().toISOString().split("T")[0] || "2023-10-01",
-              checkIn: "09:00",
-              checkOut: "-",
-              workedHours: "In Progress",
-              status: "Present" as const,
-            },
-          ])
+    ? attendance.filter((r) => r.employeeId === session?.user?.employeeId)
     : attendance;
 
   const filteredAttendance = scopedAttendance.filter(
@@ -85,7 +65,13 @@ export default function AttendancePage() {
     if (type === "IN") setCheckingIn(true);
     else setCheckingOut(true);
 
-    const empId = session?.user?.employeeId || session?.user?.id || "EMP-001";
+    const empId = session?.user?.employeeId || session?.user?.id;
+    if (!empId) {
+      toast({ title: "Attendance error", description: "Your login is not linked to an employee record.", type: "error" });
+      if (type === "IN") setCheckingIn(false);
+      else setCheckingOut(false);
+      return;
+    }
     const timeParts = new Date().toTimeString().split(" ");
     const timeNow = (timeParts[0] || "09:00").slice(0, 5);
 
@@ -98,9 +84,7 @@ export default function AttendancePage() {
           type: "success",
         });
         const live = await getAttendanceAction();
-        if (live && live.length > 0) {
-          setAttendance(live);
-        }
+        setAttendance(live);
       } else {
         toast({
           title: "Attendance error",
@@ -112,7 +96,7 @@ export default function AttendancePage() {
       toast({
         title: "Check-in Error",
         description: "Failed to record attendance state.",
-        type: "destructive",
+        type: "error",
       });
     } finally {
       if (type === "IN") setCheckingIn(false);
@@ -255,7 +239,6 @@ export default function AttendancePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[85px]">Ref</TableHead>
                 <TableHead>Employee</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>In</TableHead>
@@ -267,14 +250,13 @@ export default function AttendancePage() {
             <TableBody>
               {filteredAttendance.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-20 text-center text-xs text-muted-foreground">
+                  <TableCell colSpan={6} className="h-20 text-center text-xs text-muted-foreground">
                     No records.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredAttendance.map((record) => (
                   <TableRow key={record.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{record.id}</TableCell>
                     <TableCell className="font-medium text-xs">{record.employee}</TableCell>
                     <TableCell className="font-mono text-[11px] text-muted-foreground">{record.date}</TableCell>
                     <TableCell className="font-mono text-[11px]">{record.checkIn}</TableCell>

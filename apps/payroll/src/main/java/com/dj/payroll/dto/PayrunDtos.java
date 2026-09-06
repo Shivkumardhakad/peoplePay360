@@ -1,6 +1,7 @@
 package com.dj.payroll.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
@@ -15,14 +16,15 @@ public final class PayrunDtos {
         @NotBlank String name,
         @NotNull LocalDateTime periodStart,
         @NotNull LocalDateTime periodEnd,
-        @NotBlank String salaryStructureId
+        @NotBlank String salaryStructureId,
+        @NotEmpty List<@NotBlank String> employeeIds
     ) {}
 
     public record Response(
         String id, String name, LocalDateTime periodStart, LocalDateTime periodEnd,
         String salaryStructureId, String status, Instant computedAt,
         Instant validatedAt, Instant paidAt, List<PayslipSummary> payslips,
-        Instant createdAt, Instant updatedAt
+        List<String> selectedEmployeeIds, Instant createdAt, Instant updatedAt
     ) {}
 
     public record PayslipSummary(

@@ -1,77 +1,45 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
-import { generatePayslipPDF } from "@/lib/payslip-pdf";
+import { getPayslipAction, getPayslipPaymentStatusAction, getPayslipPdfAction } from "@/lib/api-actions";
 import { ArrowLeft, Printer, Download, CheckCircle, FileText, Loader2 } from "lucide-react";
-
-interface SlipLine {
-  rule: string;
-  category: string;
-  amount: number;
-  type: "EARNING" | "DEDUCTION";
-}
-
-const MOCK_PAYSLIP_DATA = {
-  id: "PS-1001",
-  employeeName: "Alice Johnson",
-  employeeId: "EMP-001",
-  department: "Engineering",
-  position: "Senior Frontend Engineer",
-  period: "October 2023",
-  contractRef: "CON-1001 (Standard Tech)",
-  gross: 10000.0,
-  deductions: 2500.0,
-  net: 7500.0,
-  lines: [
-    { rule: "Basic Salary", category: "BASIC", amount: 8000.0, type: "EARNING" },
-    { rule: "Housing Allowance (HRA)", category: "ALLOWANCE", amount: 1500.0, type: "EARNING" },
-    { rule: "Transport & Remote Allowance", category: "ALLOWANCE", amount: 500.0, type: "EARNING" },
-    { rule: "Health & Medical Insurance", category: "DEDUCTION", amount: -300.0, type: "DEDUCTION" },
-    { rule: "Income Tax Withholding", category: "DEDUCTION", amount: -1800.0, type: "DEDUCTION" },
-    { rule: "Retirement / Provident Fund", category: "DEDUCTION", amount: -400.0, type: "DEDUCTION" },
-  ] as SlipLine[],
-};
 
 export default function PayslipDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: payslipId } = use(params);
-  const { data: session } = useSession();
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [livePayslip, setLivePayslip] = useState<any>(null);
+  const [paymentStatus, setPaymentStatus] = useState<any>(null);
 
-  const isEmployee = session?.user?.role === "EMPLOYEE";
-  const currentUserName = session?.user?.name || "Employee";
-  const currentEmpId = session?.user?.employeeId || "EMP-004";
+  useEffect(() => {
+    getPayslipAction(payslipId).then((payslip) => {
+      setLivePayslip(payslip);
+      return getPayslipPaymentStatusAction(payslipId).then(setPaymentStatus).catch(() => setPaymentStatus(null));
+    }).catch(() => setLivePayslip({ error: true }));
+  }, [payslipId]);
 
-  const payslip = {
-    ...MOCK_PAYSLIP_DATA,
-    id: payslipId,
-    ...(isEmployee
-      ? {
-          employeeName: currentUserName,
-          employeeId: currentEmpId,
-          department: "Product & Design",
-          position: "Staff Member",
-          gross: 8500.0,
-          deductions: 1700.0,
-          net: 6800.0,
-        }
-      : {}),
-  };
+  if (livePayslip?.error) return <div className="p-6 text-sm text-destructive">Payslip could not be loaded from Payroll API.</div>;
+  if (!livePayslip) return <div className="p-6 text-sm text-muted-foreground">Loading payslip...</div>;
+  const payslip = livePayslip;
 
   const handleDownloadPDF = async () => {
     setDownloading(true);
-    await new Promise((r) => setTimeout(r, 600)); // Perceptible loading feedback
-
     try {
-      generatePayslipPDF(payslip);
+      const base64 = await getPayslipPdfAction(payslipId);
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Payslip_${payslipId}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
       toast({
         title: "Payslip Downloaded",
         description: `Exported PDF for ${payslip.employeeName} (${payslipId}).`,
@@ -90,7 +58,6 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
 
   const handlePrint = async () => {
     setPrinting(true);
-    await new Promise((r) => setTimeout(r, 300));
     window.print();
     setPrinting(false);
   };
@@ -111,13 +78,14 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
               <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                 {payslip.period}
               </span>
-              <Badge variant="success" className="text-[10px] font-mono">
-                <CheckCircle className="w-3 h-3 mr-1" /> Paid
+              <Badge variant={paymentStatus?.status === "PAID" ? "success" : "secondary"} className="text-[10px] font-mono">
+                <CheckCircle className="w-3 h-3 mr-1" /> {paymentStatus?.status ?? "Loading"}
               </Badge>
             </div>
             <p className="text-[11px] text-muted-foreground font-mono">
               {payslip.employeeName} • {payslip.department} • {payslip.contractRef}
             </p>
+            {paymentStatus && <p className="text-[10px] text-muted-foreground font-mono">Payment: {paymentStatus.status}{paymentStatus.paidAt ? ` · ${String(paymentStatus.paidAt).slice(0, 10)}` : ""}</p>}
           </div>
         </div>
 
@@ -188,7 +156,7 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payslip.lines.map((line, idx) => (
+              {payslip.lines.map((line: any, idx: number) => (
                 <TableRow key={idx} className="hover:bg-transparent">
                   <TableCell className="py-2 px-4 text-xs font-medium">{line.rule}</TableCell>
                   <TableCell className="py-2 px-4 text-center font-mono text-[11px] text-muted-foreground">

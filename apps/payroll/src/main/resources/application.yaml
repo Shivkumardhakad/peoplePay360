@@ -1,12 +1,24 @@
+server:
+  port: 8080
 spring:
   application:
     name: payroll
+
+  # Load the workspace-level .env when running `pnpm dev:payroll` locally.
+  # In production, process environment variables take precedence.
+  config:
+    import: optional:file:.env[.properties],optional:file:../../.env[.properties]
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/oddo}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:root}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # Supabase/PgBouncer transaction poolers do not preserve named prepared statements.
+      # Disabling them avoids metadata discovery conflicts such as "S_1 already exists".
+      data-source-properties:
+        prepareThreshold: 0
 
   jpa:
     hibernate:
@@ -26,3 +38,4 @@ spring:
 
 peoplepay:
   hr-api-url: ${HR_API_URL:http://localhost:3001/api/hr}
+  hr-api-jwt-secret: ${HR_API_JWT_SECRET:${JWT_SECRET:PeoplePay360-dev-jwt-secret-change-in-production-2026}}

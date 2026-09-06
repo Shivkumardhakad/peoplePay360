@@ -7,5 +7,6 @@ import java.util.List;
 
 public interface PayslipRepository extends JpaRepository<Payslip, String> {
     List<Payslip> findAllByPayrunIdOrderByEmployeeIdAsc(String payrunId);
+    List<Payslip> findAllByEmployeeIdOrderByPeriodStartDesc(String employeeId);
     boolean existsByPayrunIdAndEmployeeId(String payrunId, String employeeId);
 }

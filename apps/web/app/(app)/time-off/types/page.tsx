@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { TimeOffTypeForm, type TimeOffTypeFormValues } from "@/components/time-off-type-form";
 import { Sparkles, Trash2, Loader2 } from "lucide-react";
+import { createTimeOffTypeAction, deactivateTimeOffTypeAction, getTimeOffTypesAction } from "@/lib/api-actions";
 
 interface LeaveTypeItem {
   id: string;
@@ -17,39 +18,30 @@ interface LeaveTypeItem {
   isPaid: boolean;
 }
 
-const INITIAL_TYPES: LeaveTypeItem[] = [
-  { id: "TYP-001", name: "Annual Leave", unit: "Days", requiresApproval: true, isPaid: true },
-  { id: "TYP-002", name: "Sick Leave", unit: "Days", requiresApproval: false, isPaid: true },
-  { id: "TYP-003", name: "Casual Absence", unit: "Days", requiresApproval: true, isPaid: true },
-  { id: "TYP-004", name: "Unpaid Leave", unit: "Days", requiresApproval: true, isPaid: false },
-];
-
 export default function TimeOffTypesPage() {
   const { toast } = useToast();
-  const [types, setTypes] = useState<LeaveTypeItem[]>(INITIAL_TYPES);
+  const [types, setTypes] = useState<LeaveTypeItem[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const handleCreated = (data: TimeOffTypeFormValues) => {
-    const newType: LeaveTypeItem = {
-      id: `TYP-${String(types.length + 1).padStart(3, "0")}`,
-      name: data.name,
-      unit: data.unit === "DAYS" ? "Days" : "Hours",
-      requiresApproval: data.requiresApproval,
-      isPaid: data.isPaid,
-    };
-    setTypes([...types, newType]);
+  const reloadTypes = async () => {
+    const rows = await getTimeOffTypesAction();
+    setTypes(rows.filter((row) => row.status === "ACTIVE").map((row) => ({ id: row.id, name: row.name, unit: row.unit === "DAYS" ? "Days" : "Hours", requiresApproval: row.approvalRequired, isPaid: row.paid })));
   };
+
+  useEffect(() => { void reloadTypes(); }, []);
+
+  const handleCreated = (_data: TimeOffTypeFormValues) => { void reloadTypes(); };
 
   const handleDelete = async (id: string, name: string) => {
     setDeletingId(id);
-    await new Promise((r) => setTimeout(r, 450));
-    setTypes((prev) => prev.filter((t) => t.id !== id));
-    setDeletingId(null);
-    toast({
-      title: "Leave Policy Removed",
-      description: `Policy ${name} (${id}) has been removed.`,
-      type: "info",
-    });
+    try {
+      const result = await deactivateTimeOffTypeAction(id);
+      if (!result.success) throw new Error(result.error);
+      await reloadTypes();
+      toast({ title: "Leave Policy Deactivated", description: `Policy ${name} is no longer available for new requests.`, type: "info" });
+    } catch (error) {
+      toast({ title: "Unable to remove policy", description: error instanceof Error ? error.message : "Database request failed.", type: "error" });
+    } finally { setDeletingId(null); }
   };
 
   return (
@@ -72,7 +64,6 @@ export default function TimeOffTypesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[95px]">Type Ref</TableHead>
                 <TableHead>Policy Name</TableHead>
                 <TableHead>Unit</TableHead>
                 <TableHead>Approval Workflow</TableHead>
@@ -86,7 +77,6 @@ export default function TimeOffTypesPage() {
 
                 return (
                   <TableRow key={type.id}>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{type.id}</TableCell>
                     <TableCell className="font-medium text-xs">{type.name}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{type.unit}</TableCell>
                     <TableCell>
@@ -130,7 +120,10 @@ export default function TimeOffTypesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
-              <TimeOffTypeForm onSuccess={handleCreated} />
+              <TimeOffTypeForm onSuccess={handleCreated} onSave={async (data) => {
+                const result = await createTimeOffTypeAction(data);
+                if (!result.success) throw new Error(result.error);
+              }} />
             </CardContent>
           </Card>
         </div>

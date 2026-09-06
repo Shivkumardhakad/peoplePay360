@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { AttendanceStatus, ComputationType, ContractStatus, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
@@ -214,18 +214,43 @@ export class HrService {
   updateBankAccount(id: string, data: Prisma.BankAccountUpdateInput) { return this.prisma.client.bankAccount.update({ where: { id }, data }); }
   deleteBankAccount(id: string) { return this.prisma.client.bankAccount.delete({ where: { id } }); }
 
-  listDepartments() {
-    return this.prisma.client.department.findMany({
-      include: {
-        positions: true,
-        _count: { select: { employees: true } }
-      },
-      orderBy: { name: "asc" }
-    });
+  async listDepartments(page = 1, limit = 50) {
+    const [data, total] = await Promise.all([
+      this.prisma.client.department.findMany({
+        include: { _count: { select: { employees: true, positions: true } } },
+        orderBy: { name: "asc" },
+        skip: (page - 1) * limit,
+        take: limit
+      }),
+      this.prisma.client.department.count()
+    ]);
+    return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
-  createDepartment(data: Prisma.DepartmentCreateInput) { return this.prisma.client.department.create({ data }); }
-  updateDepartment(id: string, data: Prisma.DepartmentUpdateInput) { return this.prisma.client.department.update({ where: { id }, data }); }
-  deleteDepartment(id: string) { return this.prisma.client.department.delete({ where: { id } }); }
+  async getDepartment(id: string) {
+    const department = await this.prisma.client.department.findUnique({ where: { id }, include: { positions: true, _count: { select: { employees: true } } } });
+    if (!department) throw new NotFoundException("Department not found");
+    return department;
+  }
+  async createDepartment(data: Prisma.DepartmentCreateInput) {
+    try { return await this.prisma.client.department.create({ data }); }
+    catch (error) { this.handleDepartmentError(error); }
+  }
+  async updateDepartment(id: string, data: Prisma.DepartmentUpdateInput) {
+    try { return await this.prisma.client.department.update({ where: { id }, data }); }
+    catch (error) { this.handleDepartmentError(error); }
+  }
+  async deleteDepartment(id: string) {
+    try { return await this.prisma.client.department.delete({ where: { id } }); }
+    catch (error) { this.handleDepartmentError(error); }
+  }
+
+  private handleDepartmentError(error: unknown): never {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") throw new NotFoundException("Department not found");
+    if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2002" || error.code === "P2003")) {
+      throw new ConflictException(error.code === "P2002" ? "Department code or name already exists" : "Department is still referenced");
+    }
+    throw error;
+  }
 
   listJobPositions() {
     return this.prisma.client.jobPosition.findMany({
@@ -237,29 +262,56 @@ export class HrService {
   updateJobPosition(id: string, data: Prisma.JobPositionUncheckedUpdateInput) { return this.prisma.client.jobPosition.update({ where: { id }, data }); }
   deleteJobPosition(id: string) { return this.prisma.client.jobPosition.delete({ where: { id } }); }
 
-  listContracts() {
-    return this.prisma.client.contract.findMany({
+  async listContracts(page?: number, limit?: number) {
+    const query = {
       include: { employee: true },
-      orderBy: [{ employeeId: "asc" }, { startDate: "desc" }]
-    });
+      orderBy: [{ employeeId: "asc" }, { startDate: "desc" }] as [{ employeeId: "asc" }, { startDate: "desc" }],
+      ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {})
+    };
+    const data = await this.prisma.client.contract.findMany(query);
+    if (!page || !limit) return data;
+    const total = await this.prisma.client.contract.count();
+    return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
-  getContract(id: string) { return this.prisma.client.contract.findUniqueOrThrow({ where: { id }, include: { employee: true, department: true, position: true, workingSchedule: true, salaryStructure: true } }); }
+  async getContract(id: string) {
+    const contract = await this.prisma.client.contract.findUnique({ where: { id }, include: { employee: true, department: true, position: true, workingSchedule: true, salaryStructure: true } });
+    if (!contract) throw new NotFoundException("Contract not found");
+    return contract;
+  }
   async createContract(data: Prisma.ContractUncheckedCreateInput) {
-    await this.ensureContractDoesNotOverlap(data.employeeId, new Date(data.startDate), data.endDate ? new Date(data.endDate) : null, data.status as ContractStatus, undefined);
-    return this.prisma.client.contract.create({ data });
+    await this.ensureNoActiveOverlap(data.employeeId, new Date(data.startDate), data.endDate === null || data.endDate === undefined ? data.endDate : new Date(data.endDate), data.status ?? "ACTIVE");
+    try { return await this.prisma.client.contract.create({ data }); }
+    catch (error) { this.handleContractError(error); }
   }
   async updateContract(id: string, data: Prisma.ContractUncheckedUpdateInput) {
-    const current = await this.prisma.client.contract.findUniqueOrThrow({ where: { id } });
-    await this.ensureContractDoesNotOverlap(
-      (data.employeeId as string | undefined) ?? current.employeeId,
-      (data.startDate as Date | undefined) ?? current.startDate,
-      data.endDate === undefined ? current.endDate : (data.endDate as Date | null),
-      (data.status as ContractStatus | undefined) ?? current.status,
-      id
-    );
-    return this.prisma.client.contract.update({ where: { id }, data });
+    const current = await this.prisma.client.contract.findUnique({ where: { id }, include: { _count: { select: { payslips: true } } } });
+    if (!current) throw new NotFoundException("Contract not found");
+    const protectedFields = ["employeeId", "salaryStructureId", "startDate", "endDate", "baseSalary"];
+    if (current._count.payslips > 0 && protectedFields.some((field) => field in data)) {
+      throw new ConflictException("Contract terms cannot change after payroll has been generated");
+    }
+    const employeeId = (data.employeeId as string | undefined) ?? current.employeeId;
+    const startDate = data.startDate === undefined ? current.startDate : new Date(data.startDate as string | Date);
+    const endDate = data.endDate === undefined || data.endDate === null ? current.endDate : new Date(data.endDate as string | Date);
+    const status = (data.status as string | undefined) ?? current.status;
+    await this.ensureNoActiveOverlap(employeeId, startDate, endDate, status, id);
+    try { return await this.prisma.client.contract.update({ where: { id }, data }); }
+    catch (error) { this.handleContractError(error); }
   }
 
+  private async ensureNoActiveOverlap(employeeId: string, startDate: Date, endDate: Date | null | undefined, status: string, excludeId?: string) {
+    if (status !== "ACTIVE") return;
+    const overlap = await this.prisma.client.contract.findFirst({
+      where: { employeeId, status: "ACTIVE", ...(excludeId ? { id: { not: excludeId } } : {}), startDate: { lte: endDate ?? new Date("9999-12-31") }, OR: [{ endDate: null }, { endDate: { gte: startDate } }] }
+    });
+    if (overlap) throw new ConflictException("Employee already has an overlapping active contract");
+  }
+
+  private handleContractError(error: unknown): never {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") throw new NotFoundException("Contract not found");
+    if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2002" || error.code === "P2003")) throw new ConflictException("Contract references conflict with existing data");
+    throw error;
+  }
   listWorkingSchedules() {
     return this.prisma.client.workingSchedule.findMany({
       include: { scheduleDays: true },

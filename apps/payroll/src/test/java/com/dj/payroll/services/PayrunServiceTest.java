@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -48,7 +49,8 @@ class PayrunServiceTest {
     @BeforeEach
     void setUp() {
         service = new PayrunService(payrunRepository, payslipRepository, payslipLineRepository,
-            structureRepository, structureRuleRepository, ruleRepository, categoryRepository, hrContractClient);
+            structureRepository, structureRuleRepository, ruleRepository, categoryRepository, hrContractClient,
+            new FormulaSalaryRuleEngine());
     }
 
     @Test
@@ -74,7 +76,7 @@ class PayrunServiceTest {
         when(structureRuleRepository.findAllBySalaryStructureIdOrderBySequenceAsc("structure-1"))
             .thenReturn(List.of(assignment));
         when(ruleRepository.findById("rule-1")).thenReturn(Optional.of(rule));
-        when(hrContractClient.findActiveContracts(payrun.getPeriodStart(), payrun.getPeriodEnd()))
+        when(hrContractClient.findActiveContracts(payrun.getPeriodStart(), payrun.getPeriodEnd(), payrun.getSalaryStructureId()))
             .thenReturn(List.of(new HrContractClient.ContractSnapshot("contract-1", "employee-1", new BigDecimal("1234.567"))));
         when(payslipRepository.existsByPayrunIdAndEmployeeId("payrun-1", "employee-1")).thenReturn(false);
         when(categoryRepository.findById("earning")).thenReturn(Optional.of(category));
@@ -88,7 +90,7 @@ class PayrunServiceTest {
         verify(payslipRepository).save(payslipCaptor.capture());
         assertEquals(new BigDecimal("1234.57"), payslipCaptor.getValue().getGrossAmount());
         assertEquals(new BigDecimal("1234.57"), payslipCaptor.getValue().getNetAmount());
-        verify(hrContractClient).findActiveContracts(payrun.getPeriodStart(), payrun.getPeriodEnd());
+        verify(hrContractClient).findActiveContracts(payrun.getPeriodStart(), payrun.getPeriodEnd(), payrun.getSalaryStructureId());
     }
 
     @Test
@@ -101,13 +103,63 @@ class PayrunServiceTest {
     }
 
     @Test
-    void validateRejectsPayrunWithoutPayslips() {
+    void computeRejectsOverlappingActiveContractsForOneEmployee() {
+        Payrun payrun = draftPayrun();
+        SalaryStructureRule assignment = new SalaryStructureRule();
+        assignment.setSalaryStructureId("structure-1");
+        assignment.setSalaryRuleId("rule-1");
+        assignment.setSequence(1);
+        SalaryRule rule = new SalaryRule();
+        rule.setId("rule-1");
+        rule.setCode("BASIC");
+        rule.setCalculationType("FIXED");
+        rule.setValue(new BigDecimal("1000"));
+        when(payrunRepository.findByIdForUpdate("payrun-1")).thenReturn(Optional.of(payrun));
+        when(structureRuleRepository.findAllBySalaryStructureIdOrderBySequenceAsc("structure-1")).thenReturn(List.of(assignment));
+        when(ruleRepository.findById("rule-1")).thenReturn(Optional.of(rule));
+        when(hrContractClient.findActiveContracts(payrun.getPeriodStart(), payrun.getPeriodEnd(), "structure-1"))
+            .thenReturn(List.of(
+                new HrContractClient.ContractSnapshot("contract-1", "employee-1", new BigDecimal("1000")),
+                new HrContractClient.ContractSnapshot("contract-2", "employee-1", new BigDecimal("1200"))));
+        assertThrows(IllegalArgumentException.class, () -> service.compute("payrun-1"));
+    }
+
+    @Test
+    void validateReturnsWarningsForPayrunWithoutPayslips() {
         Payrun payrun = draftPayrun();
         payrun.setStatus("COMPUTED");
         when(payrunRepository.findByIdForUpdate("payrun-1")).thenReturn(Optional.of(payrun));
         when(payslipRepository.findAllByPayrunIdOrderByEmployeeIdAsc("payrun-1")).thenReturn(List.of());
 
-        assertThrows(IllegalArgumentException.class, () -> service.validate("payrun-1"));
+        var result = service.validate("payrun-1");
+
+        assertEquals("COMPUTED", result.status());
+        assertEquals(true, result.warnings().contains("Payrun has no payslips"));
+    }
+
+    @Test
+    void validateChecksTotalsAndHrContractScope() {
+        Payrun payrun = draftPayrun();
+        payrun.setStatus("COMPUTED");
+        Payslip payslip = new Payslip();
+        payslip.setId("payslip-1");
+        payslip.setEmployeeId("employee-1");
+        payslip.setContractId("contract-1");
+        payslip.setPeriodStart(payrun.getPeriodStart());
+        payslip.setPeriodEnd(payrun.getPeriodEnd());
+        payslip.setGrossAmount(new BigDecimal("100.00"));
+        payslip.setDeductionAmount(new BigDecimal("10.00"));
+        payslip.setNetAmount(new BigDecimal("80.00"));
+        when(payrunRepository.findByIdForUpdate("payrun-1")).thenReturn(Optional.of(payrun));
+        when(payslipRepository.findAllByPayrunIdOrderByEmployeeIdAsc("payrun-1")).thenReturn(List.of(payslip));
+        when(payslipLineRepository.findAllByPayslipIdOrderBySequenceAsc("payslip-1")).thenReturn(List.of());
+        when(hrContractClient.findActiveContracts(payrun.getPeriodStart(), payrun.getPeriodEnd(), "structure-1"))
+            .thenReturn(List.of(new HrContractClient.ContractSnapshot("contract-1", "employee-1", new BigDecimal("100"))));
+
+        var result = service.validate("payrun-1");
+
+        assertEquals("COMPUTED", result.status());
+        assertEquals(true, result.warnings().stream().anyMatch(item -> item.contains("Net amount does not equal gross minus deductions")));
     }
 
     private Payrun draftPayrun() {
@@ -117,6 +169,7 @@ class PayrunServiceTest {
         payrun.setPeriodStart(LocalDateTime.of(2026, 9, 1, 0, 0));
         payrun.setPeriodEnd(LocalDateTime.of(2026, 9, 30, 23, 59));
         payrun.setStatus("DRAFT");
+        payrun.setSelectedEmployeeIds(new java.util.LinkedHashSet<>(Set.of("employee-1")));
         return payrun;
     }
 }

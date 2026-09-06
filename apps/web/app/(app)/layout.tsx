@@ -1,8 +1,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { AppSidebar, MOCK_SESSION, type Session } from "@/components/app-sidebar";
+import { AppSidebar, type Session } from "@/components/app-sidebar";
 import { AppTopbar } from "@/components/app-topbar";
 import { SessionProvider } from "@/components/session-provider";
+import { redirect } from "next/navigation";
 
 export default async function AppLayout({
   children,
@@ -10,17 +11,16 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const session = await getServerSession(authOptions);
+  if (!session?.user) redirect("/login");
 
-  const activeSession: Session = session?.user
-    ? {
-        user: {
-          id: session.user.id || "1",
-          name: session.user.name || "User",
-          role: (session.user.role as Session["user"]["role"]) || "ADMIN",
-          employeeId: session.user.employeeId || null,
-        },
-      }
-    : MOCK_SESSION;
+  const activeSession: Session = {
+    user: {
+      id: session.user.id,
+      name: session.user.name || "User",
+      role: session.user.role as Session["user"]["role"],
+      employeeId: session.user.employeeId || null,
+    },
+  };
 
   return (
     <SessionProvider session={session}>
