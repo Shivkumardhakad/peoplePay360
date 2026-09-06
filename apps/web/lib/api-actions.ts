@@ -8,7 +8,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { payrollApiFetch, payrollApiFetchBinary } from "@/lib/payroll-api";
 
-const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:4000/api/hr";
+const HR_API_URL = process.env.NEXT_PUBLIC_HR_API_URL ?? "http://localhost:3001/api/hr";
 
 // -------------------------------------------------------------
 // EMPLOYEES

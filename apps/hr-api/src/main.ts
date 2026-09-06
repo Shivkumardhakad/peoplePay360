@@ -7,6 +7,7 @@ import { AppModule } from "./app.module";
 // Load the workspace-level .env for local development. Production deployments
 // should provide these values through the process environment or secret store.
 loadDotenv({ path: resolve(__dirname, "../../../.env") });
+loadDotenv({ path: resolve(__dirname, "../../web/.env.local") });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

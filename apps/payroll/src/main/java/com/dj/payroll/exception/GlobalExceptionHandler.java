@@ -41,8 +41,13 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
 			DataIntegrityViolationException exception, HttpServletRequest request) {
 		HttpStatus status = HttpStatus.CONFLICT;
+		String detail = "The requested change conflicts with existing data.";
+		Throwable root = exception.getMostSpecificCause();
+		if (root != null && root.getMessage() != null) {
+			detail = root.getMessage();
+		}
 		return ResponseEntity.status(status).body(ApiErrorResponse.of(
-				status.value(), status.getReasonPhrase(), "The requested change conflicts with existing data.",
+				status.value(), status.getReasonPhrase(), detail,
 				request.getRequestURI()));
 	}
 

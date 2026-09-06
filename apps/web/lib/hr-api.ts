@@ -50,7 +50,7 @@ async function createHrApiToken() {
 }
 
 function getHrApiBaseUrl() {
-  return process.env.HR_API_URL ?? "http://localhost:4000/api/hr";
+  return process.env.HR_API_URL ?? "http://localhost:3001/api/hr";
 }
 
 function getSecret() {

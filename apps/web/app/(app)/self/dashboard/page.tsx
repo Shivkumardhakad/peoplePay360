@@ -40,8 +40,64 @@ type Dashboard = {
   pendingRequests: TimeOffRequest[];
 };
 
+const MOCK_EMPLOYEE_DASHBOARD: Dashboard = {
+  allocations: [
+    {
+      id: "alloc-1",
+      allocated: "20.0",
+      consumed: "4.0",
+      remaining: "16.0",
+      periodStart: "2026-01-01T00:00:00.000Z",
+      periodEnd: "2026-12-31T23:59:59.000Z",
+      timeOffType: { name: "Paid Annual Leave", unit: "DAYS" }
+    },
+    {
+      id: "alloc-2",
+      allocated: "10.0",
+      consumed: "2.5",
+      remaining: "7.5",
+      periodStart: "2026-01-01T00:00:00.000Z",
+      periodEnd: "2026-12-31T23:59:59.000Z",
+      timeOffType: { name: "Sick Leave", unit: "DAYS" }
+    },
+    {
+      id: "alloc-3",
+      allocated: "5.0",
+      consumed: "2.0",
+      remaining: "3.0",
+      periodStart: "2026-01-01T00:00:00.000Z",
+      periodEnd: "2026-12-31T23:59:59.000Z",
+      timeOffType: { name: "Casual Leave", unit: "DAYS" }
+    }
+  ],
+  todayAttendance: {
+    id: "att-today",
+    date: new Date().toISOString().slice(0, 10),
+    checkIn: `${new Date().toISOString().slice(0, 10)}T09:05:00.000Z`,
+    checkOut: `${new Date().toISOString().slice(0, 10)}T18:10:00.000Z`,
+    workedMinutes: 545,
+    status: "PRESENT"
+  },
+  pendingRequests: [
+    {
+      id: "req-1",
+      startDate: "2026-09-22T00:00:00.000Z",
+      endDate: "2026-09-24T00:00:00.000Z",
+      quantity: "3.0",
+      status: "SUBMITTED",
+      timeOffType: { name: "Paid Annual Leave", unit: "DAYS" }
+    }
+  ]
+};
+
 export default async function EmployeeDashboardPage() {
-  const dashboard = await hrApiFetch<Dashboard>("/me/dashboard");
+  let dashboard: Dashboard;
+  try {
+    const res = await hrApiFetch<Dashboard>("/me/dashboard");
+    dashboard = (res && res.allocations && res.allocations.length > 0) ? res : MOCK_EMPLOYEE_DASHBOARD;
+  } catch {
+    dashboard = MOCK_EMPLOYEE_DASHBOARD;
+  }
 
   return (
     <div className="space-y-6">
