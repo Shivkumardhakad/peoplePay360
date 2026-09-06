@@ -1997,3 +1997,30 @@
 
 ### Notes
 - The supplied database already contains `PayrunEmployee` created by Java/Hibernate with a schema that conflicts with the pending Prisma migration. Prisma/Java ownership of this table must be aligned before database checks are applied.
+
+## 2026-09-06 07:46 IST — Harden payroll and leave concurrency
+
+### Summary
+- Made repeated Payrun compute, validate, pay, and cancel requests safe and idempotent while retaining the existing pessimistic row lock.
+- Made HR time-off decisions atomically claim the request state and consume leave balance only when sufficient balance remains.
+- Added environment-configurable Hikari connection-pool limits for Payroll.
+- Confirmed duplicate payslips are already protected by the service check and `(payrunId, employeeId)` database unique constraint.
+
+### Files Changed
+- `apps/payroll/src/main/java/com/dj/payroll/services/PayrunService.java`: Added idempotent guarded state transitions.
+- `apps/payroll/src/main/java/com/dj/payroll/entities/Payrun.java`: Preserved the existing payrun entity shape while reviewing lock-safe transitions.
+- `apps/payroll/src/test/java/com/dj/payroll/services/PayrunServiceTest.java`: Updated compute coverage for idempotent retries.
+- `apps/hr-api/src/modules/shared/hr.service.ts`: Added atomic time-off decision and balance updates.
+- `apps/payroll/src/main/resources/application.yaml`: Added configurable Hikari pool settings.
+- `CHANGELOG_AGENTS.md`: Recorded this change.
+
+### Reason
+- Concurrent retries could otherwise repeat state transitions or over-consume a leave allocation. Configurable pooling provides predictable database resource usage under parallel API traffic.
+
+### Validation
+- `mvn "-Dmaven.repo.local=D:/oddo1/peoplePay360/.m2-local" test` — passed, 14 tests with 0 failures/errors.
+- `apps/hr-api/node_modules/.bin/tsc.CMD -p apps/hr-api/tsconfig.json --noEmit` — passed.
+- `git diff --check` — passed with only existing line-ending warnings.
+
+### Notes
+- No Redis/queue background-job system exists in this repository, so synchronous PDF/email processing was not changed in this focused concurrency pass.

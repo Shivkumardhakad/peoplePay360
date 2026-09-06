@@ -382,12 +382,34 @@ export class HrService {
       if (!["SUBMITTED", "DRAFT"].includes(existing.status) && status !== "CANCELLED") {
         throw new ConflictException(`Cannot change a ${existing.status.toLowerCase()} time-off request`);
       }
-      const request = await tx.timeOffRequest.update({ where: { id }, data: { status, approvedById: status === "APPROVED" ? approvedById : undefined, approvedAt: status === "APPROVED" ? new Date() : undefined } });
+
+      // Atomically claim the current request state so only one concurrent
+      // approval/rejection/cancellation can win the decision.
+      const claimed = await tx.timeOffRequest.updateMany({
+        where: { id, status: existing.status },
+        data: {
+          status,
+          approvedById: status === "APPROVED" ? approvedById : undefined,
+          approvedAt: status === "APPROVED" ? new Date() : undefined
+        }
+      });
+      if (claimed.count === 0) {
+        const current = await tx.timeOffRequest.findUniqueOrThrow({ where: { id }, include: { timeOffType: true } });
+        if (current.status === status) return current;
+        throw new ConflictException("This time-off request was already decided by another user");
+      }
+
+      const request = await tx.timeOffRequest.findUniqueOrThrow({ where: { id }, include: { timeOffType: true } });
       if (status === "APPROVED") {
         const allocation = await tx.allocation.findFirst({ where: { employeeId: request.employeeId, timeOffTypeId: request.timeOffTypeId, periodStart: { lte: request.startDate }, periodEnd: { gte: request.endDate } } });
         if (existing.timeOffType.requiresAllocation && !allocation) throw new BadRequestException("No valid leave allocation exists for this request");
-        if (allocation && Number(allocation.remaining ?? 0) < Number(request.quantity)) throw new BadRequestException("Insufficient leave balance");
-        if (allocation) await tx.allocation.update({ where: { id: allocation.id }, data: { consumed: { increment: request.quantity }, remaining: { decrement: request.quantity } } });
+        if (allocation) {
+          const balanceUpdate = await tx.allocation.updateMany({
+            where: { id: allocation.id, remaining: { gte: request.quantity } },
+            data: { consumed: { increment: request.quantity }, remaining: { decrement: request.quantity } }
+          });
+          if (balanceUpdate.count === 0) throw new BadRequestException("Insufficient leave balance");
+        }
       }
       return request;
     });

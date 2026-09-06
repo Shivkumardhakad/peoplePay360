@@ -104,6 +104,7 @@ public class PayrunService {
 
     public PayrunDtos.Response compute(String id) {
         Payrun payrun = findForUpdate(id);
+        if ("COMPUTED".equals(payrun.getStatus())) return toResponse(payrun);
         requireStatus(payrun, "DRAFT");
         List<SalaryStructureRule> assignments = structureRuleRepository
             .findAllBySalaryStructureIdOrderBySequenceAsc(payrun.getSalaryStructureId());
@@ -169,6 +170,9 @@ public class PayrunService {
 
     public PayrunDtos.ValidationResponse validate(String id) {
         Payrun payrun = findForUpdate(id);
+        if ("VALIDATED".equals(payrun.getStatus())) {
+            return new PayrunDtos.ValidationResponse(id, payrun.getStatus(), List.of());
+        }
         requireStatus(payrun, "COMPUTED");
         List<Payslip> payslips = payslipRepository.findAllByPayrunIdOrderByEmployeeIdAsc(id);
         List<String> warnings = new ArrayList<>();
@@ -262,6 +266,7 @@ public class PayrunService {
 
     public PayrunDtos.Response markPaid(String id) {
         Payrun payrun = findForUpdate(id);
+        if ("PAID".equals(payrun.getStatus())) return toResponse(payrun);
         requireStatus(payrun, "VALIDATED");
         payslipRepository.findAllByPayrunIdOrderByEmployeeIdAsc(id).forEach(payslip -> {
             payslip.setStatus("PAID");
@@ -276,6 +281,7 @@ public class PayrunService {
 
     public PayrunDtos.Response cancel(String id) {
         Payrun payrun = findForUpdate(id);
+        if ("CANCELLED".equals(payrun.getStatus())) return toResponse(payrun);
         if ("PAID".equals(payrun.getStatus()) || "CANCELLED".equals(payrun.getStatus())) {
             throw new IllegalArgumentException("Payrun cannot be cancelled in status " + payrun.getStatus());
         }

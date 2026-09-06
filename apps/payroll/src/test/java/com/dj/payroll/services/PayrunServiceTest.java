@@ -94,12 +94,13 @@ class PayrunServiceTest {
     }
 
     @Test
-    void computeRejectsPayrunThatIsAlreadyComputed() {
+    void computeIsIdempotentForAlreadyComputedPayrun() {
         Payrun payrun = draftPayrun();
         payrun.setStatus("COMPUTED");
         when(payrunRepository.findByIdForUpdate("payrun-1")).thenReturn(Optional.of(payrun));
+        when(payslipRepository.findAllByPayrunIdOrderByEmployeeIdAsc("payrun-1")).thenReturn(List.of());
 
-        assertThrows(IllegalArgumentException.class, () -> service.compute("payrun-1"));
+        assertEquals("COMPUTED", service.compute("payrun-1").status());
     }
 
     @Test
