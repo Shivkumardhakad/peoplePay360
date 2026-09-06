@@ -3,6 +3,7 @@
 import { useState, use, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,6 +42,7 @@ interface Slip {
 
 export default function PayrunProcessingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: payrunId } = use(params);
+  const router = useRouter();
   const { data: session } = useSession();
   const { toast } = useToast();
 

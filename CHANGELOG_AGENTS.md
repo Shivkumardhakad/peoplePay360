@@ -2422,6 +2422,28 @@
 ### Notes
 - Existing unassigned employees need their department updated once from the employee edit form; new records will be correctly assigned.
 
+## 2026-09-06 07:56 IST — Fix post-pull web type errors
+
+### Summary
+- Added the missing Next.js router hook to the payrun processing page.
+- Installed the already-declared web dependencies so the `nodemailer` server action import resolves locally.
+
+### Files Changed
+- `apps/web/app/(app)/payroll/payruns/[id]/page.tsx`: Added `useRouter` and initialized `router`.
+- `CHANGELOG_AGENTS.md`: Recorded this fix.
+
+### Reason
+- The post-pull web TypeScript check failed on an undefined `router` reference and a missing local `nodemailer` installation.
+
+### Validation
+- `pnpm install --filter web... --force --reporter=append-only` — passed.
+- `apps/web/node_modules/.bin/tsc.CMD --noEmit -p apps/web/tsconfig.json` — passed.
+- `apps/hr-api/node_modules/.bin/tsc.CMD -p apps/hr-api/tsconfig.json --noEmit` — passed.
+- `mvn "-Dmaven.repo.local=D:/oddo1/peoplePay360/.m2-local" test` — passed, 14 tests with 0 failures/errors.
+
+### Notes
+- No package manifest or lockfile changes were needed; `nodemailer` was already declared and locked.
+
 ## 2026-09-06 15:35 IST — Include contract department in payrun eligibility
 
 ### Summary
