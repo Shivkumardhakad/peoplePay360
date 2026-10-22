@@ -92,7 +92,7 @@ DB_PASSWORD=${GENERATED_DB_PASS}
 # Database URLs
 DATABASE_URL=postgresql://postgres:${GENERATED_DB_PASS}@postgres:5432/oddo_hr
 DIRECT_URL=postgresql://postgres:${GENERATED_DB_PASS}@postgres:5432/oddo_hr
-DB_URL=jdbc:postgresql://postgres:5432/oddo
+DB_URL=jdbc:postgresql://postgres:5432/oddo_hr
 
 # Authentication Secrets (Must match across all microservices)
 JWT_SECRET=${GENERATED_JWT_SECRET}

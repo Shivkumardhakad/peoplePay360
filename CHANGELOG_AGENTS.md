@@ -11,7 +11,7 @@
 - `apps/payroll/Dockerfile`: Created multi-stage Maven & Java 21 Dockerfile for Payroll API.
 - `apps/web/Dockerfile`: Created Dockerfile for Next.js Web frontend.
 - `apps/web/package.json`: Added "start": "next start" script.
-- `docker-compose.yml`: Created root Docker Compose configuration for full-stack orchestration (configured DIRECT_URL for Prisma, set web command to next start).
+- `docker-compose.yml`: Created root Docker Compose configuration for full-stack orchestration (configured DIRECT_URL for Prisma, set web command to next start, aligned Payroll DB_URL to oddo_hr database).
 - `scripts/init-postgres.sh`: Created database initialization shell script for Postgres container.
 - `scripts/deploy-aws-ec2.sh`: Created automated AWS EC2 Ubuntu deployment script (added DIRECT_URL generation).
 - `CHANGELOG_AGENTS.md`: Recorded deployment setup changes.

@@ -49,7 +49,7 @@ services:
       hr-api:
         condition: service_started
     environment:
-      DB_URL: "jdbc:postgresql://postgres:5432/oddo"
+      DB_URL: "jdbc:postgresql://postgres:5432/oddo_hr"
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres_secure_pass_2026}
       JWT_SECRET: ${JWT_SECRET}
