@@ -64,6 +64,7 @@ services:
       dockerfile: apps/web/Dockerfile
     container_name: peoplepay-web
     restart: always
+    command: ["pnpm", "--filter", "web", "exec", "next", "start", "-p", "3000"]
     depends_on:
       hr-api:
         condition: service_started
