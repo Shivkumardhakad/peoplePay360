@@ -29,6 +29,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres_secure_pass_2026}@postgres:5432/oddo_hr"
+      DIRECT_URL: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres_secure_pass_2026}@postgres:5432/oddo_hr"
       JWT_SECRET: ${JWT_SECRET}
       HR_API_JWT_SECRET: ${JWT_SECRET}
       PORT: 3001
@@ -70,6 +71,7 @@ services:
         condition: service_started
     environment:
       DATABASE_URL: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres_secure_pass_2026}@postgres:5432/oddo_hr"
+      DIRECT_URL: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres_secure_pass_2026}@postgres:5432/oddo_hr"
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NEXTAUTH_SECRET: ${JWT_SECRET}
       JWT_SECRET: ${JWT_SECRET}

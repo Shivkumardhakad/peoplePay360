@@ -91,6 +91,7 @@ DB_PASSWORD=${GENERATED_DB_PASS}
 
 # Database URLs
 DATABASE_URL=postgresql://postgres:${GENERATED_DB_PASS}@postgres:5432/oddo_hr
+DIRECT_URL=postgresql://postgres:${GENERATED_DB_PASS}@postgres:5432/oddo_hr
 DB_URL=jdbc:postgresql://postgres:5432/oddo
 
 # Authentication Secrets (Must match across all microservices)
@@ -106,7 +107,12 @@ PAYROLL_API_URL=http://payroll:8080
 EOF
   echo -e "${GREEN}[✓] Generated new .env.production with secure random secrets.${NC}"
 else
-  echo -e "${GREEN}[✓] Existing .env.production detected, using current values.${NC}"
+  # Ensure DIRECT_URL is present in existing .env.production
+  if ! grep -q "DIRECT_URL=" .env.production; then
+    DB_URL_VAL=$(grep "DATABASE_URL=" .env.production | cut -d'=' -f2-)
+    echo "DIRECT_URL=$DB_URL_VAL" >> .env.production
+  fi
+  echo -e "${GREEN}[✓] Existing .env.production detected, ensured DIRECT_URL is set.${NC}"
 fi
 
 # Ensure docker-compose uses .env.production

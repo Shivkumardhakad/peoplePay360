@@ -10,9 +10,9 @@
 - `apps/hr-api/Dockerfile`: Created Dockerfile for NestJS HR API.
 - `apps/payroll/Dockerfile`: Created multi-stage Maven & Java 21 Dockerfile for Payroll API.
 - `apps/web/Dockerfile`: Created Dockerfile for Next.js Web frontend.
-- `docker-compose.yml`: Created root Docker Compose configuration for full-stack orchestration.
+- `docker-compose.yml`: Created root Docker Compose configuration for full-stack orchestration (configured DIRECT_URL for Prisma).
 - `scripts/init-postgres.sh`: Created database initialization shell script for Postgres container.
-- `scripts/deploy-aws-ec2.sh`: Created automated AWS EC2 Ubuntu deployment script.
+- `scripts/deploy-aws-ec2.sh`: Created automated AWS EC2 Ubuntu deployment script (added DIRECT_URL generation).
 - `CHANGELOG_AGENTS.md`: Recorded deployment setup changes.
 
 ### Reason
