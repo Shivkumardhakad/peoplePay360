@@ -1,3 +1,26 @@
+## 2026-10-22 16:25 IST — Add Docker configuration and automated AWS EC2 deployment script
+
+### Summary
+- Created production Dockerfiles for HR API (`apps/hr-api/Dockerfile`), Payroll API (`apps/payroll/Dockerfile`), and Next.js Web (`apps/web/Dockerfile`).
+- Created root `docker-compose.yml` to orchestrate PostgreSQL (dual database setup `oddo_hr` & `oddo`), NestJS HR API, Spring Boot Java 21 Payroll API, and Next.js Web Frontend.
+- Created `scripts/init-postgres.sh` to initialize both database schemas automatically upon first Postgres container launch.
+- Created `scripts/deploy-aws-ec2.sh` automated bash script for AWS EC2 instances (configures 4GB Swap, installs Docker/Compose/Nginx, configures environment secrets, builds containers, runs Prisma migrations and seed, and sets up Nginx reverse proxy).
+
+### Files Changed
+- `apps/hr-api/Dockerfile`: Created Dockerfile for NestJS HR API.
+- `apps/payroll/Dockerfile`: Created multi-stage Maven & Java 21 Dockerfile for Payroll API.
+- `apps/web/Dockerfile`: Created Dockerfile for Next.js Web frontend.
+- `docker-compose.yml`: Created root Docker Compose configuration for full-stack orchestration.
+- `scripts/init-postgres.sh`: Created database initialization shell script for Postgres container.
+- `scripts/deploy-aws-ec2.sh`: Created automated AWS EC2 Ubuntu deployment script.
+- `CHANGELOG_AGENTS.md`: Recorded deployment setup changes.
+
+### Reason
+- User requested a complete, automated deployment setup and bash script to deploy PeoplePay360 on AWS EC2.
+
+### Validation
+- Validated Dockerfiles, environment variables, multi-module Maven parent pom references, and Postgres healthcheck definitions.
+
 ## 2026-09-06 07:30 IST — Add client-side pagination across all list and Kanban views
 
 ### Summary

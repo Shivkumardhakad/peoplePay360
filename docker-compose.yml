@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: peoplepay-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres_secure_pass_2026}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-postgres.sh:/docker-entrypoint-initdb.d/init-postgres.sh:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  hr-api:
+    build:
+      context: .
+      dockerfile: apps/hr-api/Dockerfile
+    container_name: peoplepay-hr-api
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres_secure_pass_2026}@postgres:5432/oddo_hr"
+      JWT_SECRET: ${JWT_SECRET}
+      HR_API_JWT_SECRET: ${JWT_SECRET}
+      PORT: 3001
+      WEB_ORIGIN: ${NEXTAUTH_URL:-http://localhost:3000}
+    ports:
+      - "3001:3001"
+
+  payroll:
+    build:
+      context: .
+      dockerfile: apps/payroll/Dockerfile
+    container_name: peoplepay-payroll
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      hr-api:
+        condition: service_started
+    environment:
+      DB_URL: "jdbc:postgresql://postgres:5432/oddo"
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres_secure_pass_2026}
+      JWT_SECRET: ${JWT_SECRET}
+      HR_API_URL: "http://hr-api:3001/api/hr"
+      HR_API_JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8080:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: peoplepay-web
+    restart: always
+    depends_on:
+      hr-api:
+        condition: service_started
+      payroll:
+        condition: service_started
+    environment:
+      DATABASE_URL: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres_secure_pass_2026}@postgres:5432/oddo_hr"
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
+      HR_API_URL: "http://hr-api:3001/api/hr"
+      NEXT_PUBLIC_HR_API_URL: ${NEXT_PUBLIC_HR_API_URL:-http://localhost:3001/api/hr}
+      PAYROLL_API_URL: "http://payroll:8080"
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
